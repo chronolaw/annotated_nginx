@@ -225,11 +225,14 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 解析命令行参数
     if (ngx_get_options(argc, argv) != NGX_OK) {
         return 1;
     }
 
+    // 1.9.x改到ngx_show_version_info()
     if (ngx_show_version) {
+        // NGINX_VER_BUILD in nginx.h
         ngx_write_stderr("nginx version: " NGINX_VER_BUILD NGX_LINEFEED);
 
         if (ngx_show_help) {
@@ -286,6 +289,8 @@ main(int argc, char *const *argv)
 
             ngx_write_stderr("configure arguments:" NGX_CONFIGURE NGX_LINEFEED);
         }
+
+        // 1.9.x ngx_show_version_info()结束
 
         if (!ngx_test_config) {
             return 0;
@@ -724,7 +729,7 @@ ngx_get_options(int argc, char *const *argv)
                 break;
 
             case 't':
-                ngx_test_config = 1;
+                ngx_test_config = 1;        //测试配置文件
                 break;
 
             case 'q':
@@ -732,12 +737,12 @@ ngx_get_options(int argc, char *const *argv)
                 break;
 
             case 'p':
-                if (*p) {
-                    ngx_prefix = p;
+                if (*p) {                   //-p后紧接着路径
+                    ngx_prefix = p;         //设置ngx_prefix变量
                     goto next;
                 }
 
-                if (argv[++i]) {
+                if (argv[++i]) {            //-p后有空格，使用argv数组
                     ngx_prefix = (u_char *) argv[i];
                     goto next;
                 }
@@ -747,7 +752,7 @@ ngx_get_options(int argc, char *const *argv)
 
             case 'c':
                 if (*p) {
-                    ngx_conf_file = p;
+                    ngx_conf_file = p;      //设置ngx_conf_file,配置文件
                     goto next;
                 }
 
@@ -775,7 +780,7 @@ ngx_get_options(int argc, char *const *argv)
 
             case 's':
                 if (*p) {
-                    ngx_signal = (char *) p;
+                    ngx_signal = (char *) p;        //要发送的信号，设置ngx_signal
 
                 } else if (argv[++i]) {
                     ngx_signal = argv[i];
@@ -790,7 +795,7 @@ ngx_get_options(int argc, char *const *argv)
                     || ngx_strcmp(ngx_signal, "reopen") == 0
                     || ngx_strcmp(ngx_signal, "reload") == 0)
                 {
-                    ngx_process = NGX_PROCESS_SIGNALLER;
+                    ngx_process = NGX_PROCESS_SIGNALLER;    //发送信号标志
                     goto next;
                 }
 
