@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,6 +14,7 @@
 #include <ngx_core.h>
 
 
+// nginx的动态数组，表示一块连续的内存，其中顺序存放着数组元素，概念上和原始数组很接近
 typedef struct {
     void        *elts;
     ngx_uint_t   nelts;

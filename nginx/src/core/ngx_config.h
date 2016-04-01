@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -56,6 +57,7 @@
 
 #define ngx_random               random
 
+// 重定义unix信号，名字更易读
 /* TODO: #ifndef */
 #define NGX_SHUTDOWN_SIGNAL      QUIT
 #define NGX_TERMINATE_SIGNAL     TERM
@@ -75,9 +77,14 @@
 
 #endif
 
-typedef intptr_t        ngx_int_t;
-typedef uintptr_t       ngx_uint_t;
-typedef intptr_t        ngx_flag_t;
+// nginx内部标准整数定义
+// ngx_rbtree_key_t = ngx_uint_t (ngx_rbtree.h)
+// ngx_rbtree_key_int_t = ngx_int_t(ngx_rbtree.h)
+// ngx_msec_t = ngx_rbtree_key_t = ngx_uint_t (ngx_time.h)
+// ngx_msec_int_t = ngx_rbtree_key_int_t ngx_int_t(ngx_time.h)
+typedef intptr_t        ngx_int_t;      //有符号整数
+typedef uintptr_t       ngx_uint_t;     //无符号整数
+typedef intptr_t        ngx_flag_t;     //相当于bool，标志量用
 
 
 #define NGX_INT32_LEN   (sizeof("-2147483648") - 1)

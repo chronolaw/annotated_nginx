@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,11 +14,16 @@
 #include <ngx_core.h>
 
 
+// 毫秒的整数类型，用于红黑树实现定时器
+// ngx_msec_t = ngx_uint_t (ngx_config.h)
+// ngx_msec_int_t = ngx_int_t (ngx_config.h)
 typedef ngx_rbtree_key_t      ngx_msec_t;
 typedef ngx_rbtree_key_int_t  ngx_msec_int_t;
 
+// 重定义标准C里的tm结构
 typedef struct tm             ngx_tm_t;
 
+// 重定义tm里的各个成员，加了ngx前缀
 #define ngx_tm_sec            tm_sec
 #define ngx_tm_min            tm_min
 #define ngx_tm_hour           tm_hour
@@ -27,6 +33,7 @@ typedef struct tm             ngx_tm_t;
 #define ngx_tm_wday           tm_wday
 #define ngx_tm_isdst          tm_isdst
 
+// 重定义时间相关的类型
 #define ngx_tm_sec_t          int
 #define ngx_tm_min_t          int
 #define ngx_tm_hour_t         int
