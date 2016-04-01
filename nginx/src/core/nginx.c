@@ -33,8 +33,10 @@ static ngx_conf_enum_t  ngx_debug_points[] = {
 };
 
 
+// ngx_core_module定义的核心指令，都在main域配置
 static ngx_command_t  ngx_core_commands[] = {
 
+    // 守护进程, on/off
     { ngx_string("daemon"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -42,6 +44,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, daemon),
       NULL },
 
+    // 起动master/worker进程机制, on/off
     { ngx_string("master_process"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -162,6 +165,7 @@ static ngx_command_t  ngx_core_commands[] = {
 };
 
 
+// ngx_core_module的函数指针表，创建配置结构体
 static ngx_core_module_t  ngx_core_module_ctx = {
     ngx_string("core"),
     ngx_core_module_create_conf,
@@ -169,6 +173,7 @@ static ngx_core_module_t  ngx_core_module_ctx = {
 };
 
 
+// ngx_core_module模块定义，指定指令集和函数指针表
 ngx_module_t  ngx_core_module = {
     NGX_MODULE_V1,
     &ngx_core_module_ctx,                  /* module context */
@@ -185,20 +190,27 @@ ngx_module_t  ngx_core_module = {
 };
 
 
+// 模块计数器，声明在ngx_conf_file.h
 ngx_uint_t          ngx_max_module;
 
-static ngx_uint_t   ngx_show_help;
-static ngx_uint_t   ngx_show_version;
-static ngx_uint_t   ngx_show_configure;
-static u_char      *ngx_prefix;
-static u_char      *ngx_conf_file;
-static u_char      *ngx_conf_params;
-static char        *ngx_signal;
+// 解析命令行的标志变量
+
+static ngx_uint_t   ngx_show_help;          // 显示帮助信息
+static ngx_uint_t   ngx_show_version;       // 显示版本信息
+static ngx_uint_t   ngx_show_configure;     // 显示编译配置信息
+
+// 启动时的参数
+
+static u_char      *ngx_prefix;             // -p参数，工作路径
+static u_char      *ngx_conf_file;          // -c参数，配置文件
+static u_char      *ngx_conf_params;        // -g参数
+static char        *ngx_signal;             // -s参数，unix信号, stop/quit/reload/reopen/
 
 
 static char **ngx_os_environ;
 
 
+// nginx启动的入口函数
 int ngx_cdecl
 main(int argc, char *const *argv)
 {
