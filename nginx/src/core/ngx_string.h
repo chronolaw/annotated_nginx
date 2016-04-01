@@ -162,6 +162,8 @@ u_char *ngx_cpystrn(u_char *dst, u_char *src, size_t n);
 u_char *ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src);
 
 // 字符串格式化,ngx_snprintf/ngx_slprintf较安全，不会缓冲区溢出
+// 参数max和last指明了缓冲区的的结束位置，所以格式化的结果只会填满缓冲区为止。
+// 函数执行后会返回u_char*指针，指示格式化输出后在buf里的结束位置，可以用这个返回值来判断结果的长度。
 u_char * ngx_cdecl ngx_sprintf(u_char *buf, const char *fmt, ...);
 u_char * ngx_cdecl ngx_snprintf(u_char *buf, size_t max, const char *fmt, ...);
 u_char * ngx_cdecl ngx_slprintf(u_char *buf, u_char *last, const char *fmt,
