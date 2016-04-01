@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -19,6 +20,7 @@
  *    TT        command type, i.e. HTTP "location" or "server" command
  */
 
+// nginx指令可以接受的参数数量
 #define NGX_CONF_NOARGS      0x00000001
 #define NGX_CONF_TAKE1       0x00000002
 #define NGX_CONF_TAKE2       0x00000004
@@ -28,8 +30,10 @@
 #define NGX_CONF_TAKE6       0x00000040
 #define NGX_CONF_TAKE7       0x00000080
 
+// 最多只能接受8个参数
 #define NGX_CONF_MAX_ARGS    8
 
+// 组合之前的参数，可以简化代码
 #define NGX_CONF_TAKE12      (NGX_CONF_TAKE1|NGX_CONF_TAKE2)
 #define NGX_CONF_TAKE13      (NGX_CONF_TAKE1|NGX_CONF_TAKE3)
 
@@ -39,9 +43,10 @@
 #define NGX_CONF_TAKE1234    (NGX_CONF_TAKE1|NGX_CONF_TAKE2|NGX_CONF_TAKE3   \
                               |NGX_CONF_TAKE4)
 
+// 特殊的指令属性
 #define NGX_CONF_ARGS_NUMBER 0x000000ff
-#define NGX_CONF_BLOCK       0x00000100
-#define NGX_CONF_FLAG        0x00000200
+#define NGX_CONF_BLOCK       0x00000100     //指令是配置块，即{...}
+#define NGX_CONF_FLAG        0x00000200     //指令接受on/off，转化为ngx_flag_t
 #define NGX_CONF_ANY         0x00000400
 #define NGX_CONF_1MORE       0x00000800
 #define NGX_CONF_2MORE       0x00001000
@@ -49,11 +54,12 @@
 
 #define NGX_DIRECT_CONF      0x00010000
 
-#define NGX_MAIN_CONF        0x01000000
-#define NGX_ANY_CONF         0x0F000000
+#define NGX_MAIN_CONF        0x01000000     //指令出现在配置文件的最外层
+#define NGX_ANY_CONF         0x0F000000     //指令可以在任意位置出现
 
 
 
+// nginx自己的nil/none，表示无效值，在C语言里需要做强制类型转换，C++可以用模板
 #define NGX_CONF_UNSET       -1
 #define NGX_CONF_UNSET_UINT  (ngx_uint_t) -1
 #define NGX_CONF_UNSET_PTR   (void *) -1
@@ -61,13 +67,16 @@
 #define NGX_CONF_UNSET_MSEC  (ngx_msec_t) -1
 
 
+// 配置解析的成功和失败，实际的类型是char*，在C++里要用reinterpret_cast
 #define NGX_CONF_OK          NULL
 #define NGX_CONF_ERROR       (void *) -1
 
+// 配置解析时的标志量，表示解析的状态
 #define NGX_CONF_BLOCK_START 1
 #define NGX_CONF_BLOCK_DONE  2
 #define NGX_CONF_FILE_DONE   3
 
+// 最基本的两个模块的标志，core模块和conf模块
 #define NGX_CORE_MODULE      0x45524F43  /* "CORE" */
 #define NGX_CONF_MODULE      0x464E4F43  /* "CONF" */
 
@@ -75,15 +84,30 @@
 #define NGX_MAX_CONF_ERRSTR  1024
 
 
+// 指令结构体，用于定义nginx指令
+// ngx_command_t (ngx_core.h)
 struct ngx_command_s {
+    //指令的名字
     ngx_str_t             name;
+
+    //指令的类型，是NGX_CONF_XXX的组合，决定指令出现的位置、参数数量、类型等
     ngx_uint_t            type;
+
+    // 指令解析函数，是函数指针
+    // 预设有ngx_conf_set_flag_slot等，见本文件
+    // cf：解析的环境结构体,重要的是cf->args，是指令字符串数组
+    // cmd：该指令的结构体
+    // conf当前的配置结构体
     char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+    //专门给http模块使用，决定存储在main/srv/loc的哪个层次
+    // NGX_HTTP_MAIN_CONF/NGX_HTTP_SRV_CONF/NGX_HTTP_LOC_CONF
     ngx_uint_t            conf;
-    ngx_uint_t            offset;
-    void                 *post;
+    ngx_uint_t            offset;   //变量在conf结构体里的偏移量，可用offsetof得到
+    void                 *post;     //任意数据，可以在set函数里使用
 };
 
+// 空指令，用于在指令数组的最后当做哨兵，结束数组，避免指定长度，类似NULL的作用
 #define ngx_null_command  { ngx_null_string, 0, NULL, 0, 0, NULL }
 
 
@@ -96,9 +120,14 @@ struct ngx_open_file_s {
 };
 
 
+// 填充宏，填充ngx_module_t的前7个字段，即ctx_index...version
 #define NGX_MODULE_V1          0, 0, 0, 0, 0, 0, 1
+
+// 填充宏，填充ngx_module_t的最后8个字段，设置为空指针
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
+// 重要的数据结构，定义nginx模块
+// 1.9.11后有变化，改到了ngx_module.h，可以定义动态模块，使用了spare0等字段
 struct ngx_module_s {
     ngx_uint_t            ctx_index;
     ngx_uint_t            index;
@@ -136,6 +165,7 @@ struct ngx_module_s {
 };
 
 
+// 核心模块的ctx结构，比较简单，只有创建和初始化配置结构函数
 typedef struct {
     ngx_str_t             name;
     void               *(*create_conf)(ngx_cycle_t *cycle);
@@ -154,9 +184,10 @@ typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
     ngx_command_t *dummy, void *conf);
 
 
+// 配置解析的环境结构体
 struct ngx_conf_s {
     char                 *name;
-    ngx_array_t          *args;
+    ngx_array_t          *args;         //保存解析到的指令字符串,0是指令名，其他的是参数
 
     ngx_cycle_t          *cycle;
     ngx_pool_t           *pool;
@@ -218,6 +249,7 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
 
 
 
+// 简单的初始化函数宏，针对各种类型操作
 #define ngx_conf_init_value(conf, default)                                   \
     if (conf == NGX_CONF_UNSET) {                                            \
         conf = default;                                                      \
@@ -243,6 +275,7 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
         conf = default;                                                      \
     }
 
+// 合并函数宏，同样根据类型选择
 #define ngx_conf_merge_value(conf, prev, default)                            \
     if (conf == NGX_CONF_UNSET) {                                            \
         conf = (prev == NGX_CONF_UNSET) ? default : prev;                    \
@@ -278,6 +311,7 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
         conf = (prev == NGX_CONF_UNSET) ? default : prev;                    \
     }
 
+// 字符串的合并比较特殊，要检查空指针
 #define ngx_conf_merge_str_value(conf, prev, default)                        \
     if (conf.data == NULL) {                                                 \
         if (prev.data) {                                                     \
@@ -318,6 +352,7 @@ void ngx_cdecl ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf,
     ngx_err_t err, const char *fmt, ...);
 
 
+// 预设的解析指令函数，可以解析bool/字符串/数字/秒等
 char *ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -333,7 +368,10 @@ char *ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
+// 声明nginx模块计数器变量，静态模块
 extern ngx_uint_t     ngx_max_module;
+
+// nginx模块数组，存储所有的模块指针
 extern ngx_module_t  *ngx_modules[];
 
 

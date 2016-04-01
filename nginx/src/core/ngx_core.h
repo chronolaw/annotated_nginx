@@ -1,6 +1,5 @@
 // annotated by chrono since 2016
 
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -15,14 +14,14 @@
 
 
 // 对核心的数据结构定义为_t类型，方便使用
-typedef struct ngx_module_s      ngx_module_t;
-typedef struct ngx_conf_s        ngx_conf_t;
+typedef struct ngx_module_s      ngx_module_t;          // ngx_conf_file.h
+typedef struct ngx_conf_s        ngx_conf_t;            // ngx_conf_file.h
 typedef struct ngx_cycle_s       ngx_cycle_t;
 typedef struct ngx_pool_s        ngx_pool_t;
 typedef struct ngx_chain_s       ngx_chain_t;
 typedef struct ngx_log_s         ngx_log_t;
 typedef struct ngx_open_file_s   ngx_open_file_t;
-typedef struct ngx_command_s     ngx_command_t;
+typedef struct ngx_command_s     ngx_command_t;         // ngx_conf_file.h
 typedef struct ngx_file_s        ngx_file_t;
 typedef struct ngx_event_s       ngx_event_t;
 typedef struct ngx_event_aio_s   ngx_event_aio_t;
@@ -43,7 +42,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define  NGX_AGAIN      -2      //未准备好，需要重试
 #define  NGX_BUSY       -3      //设备忙
 #define  NGX_DONE       -4      //已经完成部分工作，但还未完成，需后续操作
-#define  NGX_DECLINED   -5      //请求已经处理，拒绝执行
+#define  NGX_DECLINED   -5      //请求已经处理，拒绝执行,在nginx模块里返回表示模块不处理，引擎查找下一个模块来处理
 #define  NGX_ABORT      -6      //严重错误
 
 
