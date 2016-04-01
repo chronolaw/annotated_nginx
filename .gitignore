@@ -27,6 +27,9 @@
 *.out
 *.app
 
+# swp
+*.swp
+
 # objs
 Makefile
 objs/

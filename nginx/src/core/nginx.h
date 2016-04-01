@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -12,6 +13,10 @@
 #define nginx_version      1008000
 #define NGINX_VERSION      "1.8.0"
 #define NGINX_VER          "nginx/" NGINX_VERSION
+
+// nginx 1.7之后添加--build=Name选项
+// 可以定制一些编译信息
+// 例如--build="version: `git describe` , chrono build at `date +%Y%m%d`"
 
 #ifdef NGX_BUILD
 #define NGINX_VER_BUILD    NGINX_VER " (" NGX_BUILD ")"
