@@ -368,10 +368,10 @@ char *ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
-// 声明nginx模块计数器变量，静态模块
+// 声明nginx模块计数器变量，静态模块，nginx.c
 extern ngx_uint_t     ngx_max_module;
 
-// nginx模块数组，存储所有的模块指针
+// nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
 extern ngx_module_t  *ngx_modules[];
 
 
