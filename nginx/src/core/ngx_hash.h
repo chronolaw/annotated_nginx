@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -89,11 +90,12 @@ typedef struct {
 } ngx_hash_keys_arrays_t;
 
 
+// 键值对结构, 主要用来表示HTTP头部信息
 typedef struct {
-    ngx_uint_t        hash;
-    ngx_str_t         key;
-    ngx_str_t         value;
-    u_char           *lowcase_key;
+    ngx_uint_t        hash;         //散列（哈希）标记
+    ngx_str_t         key;          //键
+    ngx_str_t         value;        //值
+    u_char           *lowcase_key;  //key的小写字符串指针
 } ngx_table_elt_t;
 
 
@@ -109,8 +111,14 @@ ngx_int_t ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
     ngx_uint_t nelts);
 
 #define ngx_hash(key, c)   ((ngx_uint_t) key * 31 + c)
+
+// 计算散列值
 ngx_uint_t ngx_hash_key(u_char *data, size_t len);
+
+// 小写后再计算hash
 ngx_uint_t ngx_hash_key_lc(u_char *data, size_t len);
+
+// 小写化的同时计算出散列值
 ngx_uint_t ngx_hash_strlow(u_char *dst, u_char *src, size_t n);
 
 
