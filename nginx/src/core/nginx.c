@@ -193,13 +193,13 @@ ngx_module_t  ngx_core_module = {
 // 模块计数器，声明在ngx_conf_file.h
 ngx_uint_t          ngx_max_module;
 
-// 解析命令行的标志变量
+// 解析命令行的标志变量,ngx_get_options()设置
 
 static ngx_uint_t   ngx_show_help;          // 显示帮助信息
 static ngx_uint_t   ngx_show_version;       // 显示版本信息
 static ngx_uint_t   ngx_show_configure;     // 显示编译配置信息
 
-// 启动时的参数
+// 启动时的参数,ngx_get_options()设置
 
 static u_char      *ngx_prefix;             // -p参数，工作路径
 static u_char      *ngx_conf_file;          // -c参数，配置文件
@@ -225,7 +225,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
-    // 解析命令行参数
+    // 解析命令行参数, 本文件内查找ngx_get_options
     if (ngx_get_options(argc, argv) != NGX_OK) {
         return 1;
     }
