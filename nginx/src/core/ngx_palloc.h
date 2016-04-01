@@ -77,21 +77,27 @@ typedef struct {
 } ngx_pool_cleanup_file_t;
 
 
-// 分配内存
+// 分配内存,不用内存池，使用malloc
+// 实现在os/unix/ngx_alloc.c
 void *ngx_alloc(size_t size, ngx_log_t *log);
 void *ngx_calloc(size_t size, ngx_log_t *log);
 
+// 创建/销毁内存池
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
 void ngx_destroy_pool(ngx_pool_t *pool);
 void ngx_reset_pool(ngx_pool_t *pool);
 
 // 分配对齐的内存，速度快，可能有少量浪费
 void *ngx_palloc(ngx_pool_t *pool, size_t size);
+
 // 分配未对齐的内存
 void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
+
 // 使用ngx_palloc分配内存，并将内存块清零
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
+
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
+
 // 把内存归还给内存池，通常无需调用
 ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
 
