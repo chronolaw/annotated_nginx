@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+
 
 /*
  * Copyright (C) Igor Sysoev
@@ -12,6 +14,7 @@
 #include <ngx_config.h>
 
 
+// 对核心的数据结构定义为_t类型，方便使用
 typedef struct ngx_module_s      ngx_module_t;
 typedef struct ngx_conf_s        ngx_conf_t;
 typedef struct ngx_cycle_s       ngx_cycle_t;
@@ -25,6 +28,7 @@ typedef struct ngx_event_s       ngx_event_t;
 typedef struct ngx_event_aio_s   ngx_event_aio_t;
 typedef struct ngx_connection_s  ngx_connection_t;
 
+// 1.8版开始正式支持线程，比旧版有较大的改动，使用传统的线程池
 #if (NGX_THREADS)
 typedef struct ngx_thread_task_s  ngx_thread_task_t;
 #endif
@@ -33,15 +37,17 @@ typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
 typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 
 
-#define  NGX_OK          0
-#define  NGX_ERROR      -1
-#define  NGX_AGAIN      -2
-#define  NGX_BUSY       -3
-#define  NGX_DONE       -4
-#define  NGX_DECLINED   -5
-#define  NGX_ABORT      -6
+// 通用的nginx错误码，也可以自己定义新错误码，但必须是负数
+#define  NGX_OK          0      //无错误
+#define  NGX_ERROR      -1      //最常见的错误，含义不明确
+#define  NGX_AGAIN      -2      //未准备好，需要重试
+#define  NGX_BUSY       -3      //设备忙
+#define  NGX_DONE       -4      //已经完成部分工作，但还未完成，需后续操作
+#define  NGX_DECLINED   -5      //请求已经处理，拒绝执行
+#define  NGX_ABORT      -6      //严重错误
 
 
+// 必须的nginx头文件
 #include <ngx_errno.h>
 #include <ngx_atomic.h>
 #include <ngx_thread.h>
