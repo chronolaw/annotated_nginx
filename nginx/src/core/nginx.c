@@ -26,6 +26,7 @@ static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
+// debug point枚举定义，宏的定义在ngx_cycle.h
 static ngx_conf_enum_t  ngx_debug_points[] = {
     { ngx_string("stop"), NGX_DEBUG_POINTS_STOP },
     { ngx_string("abort"), NGX_DEBUG_POINTS_ABORT },
@@ -45,7 +46,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, daemon),
       NULL },
 
-    // 起动master/worker进程机制, on/off
+    // 启动master/worker进程机制, on/off
     { ngx_string("master_process"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -83,14 +84,14 @@ static ngx_command_t  ngx_core_commands[] = {
 
     { ngx_string("debug_points"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_enum_slot,
+      ngx_conf_set_enum_slot,                   //特殊的set_enum函数
       0,
       offsetof(ngx_core_conf_t, debug_points),
       &ngx_debug_points },
 
     { ngx_string("user"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE12,
-      ngx_set_user,
+      ngx_set_user,                             //设置user
       0,
       0,
       NULL },
@@ -167,10 +168,11 @@ static ngx_command_t  ngx_core_commands[] = {
 
 
 // ngx_core_module的函数指针表，创建配置结构体
+// 两个函数都在本文件内
 static ngx_core_module_t  ngx_core_module_ctx = {
     ngx_string("core"),
-    ngx_core_module_create_conf,
-    ngx_core_module_init_conf
+    ngx_core_module_create_conf,        //创建配置结构体
+    ngx_core_module_init_conf           //初始化结构体参数
 };
 
 
@@ -212,13 +214,14 @@ static char **ngx_os_environ;
 
 
 // nginx启动的入口函数
+// 1)解析命令行参数,显示帮助信息
 int ngx_cdecl
 main(int argc, char *const *argv)
 {
     ngx_int_t         i;
     ngx_log_t        *log;
-    ngx_cycle_t      *cycle, init_cycle;
-    ngx_core_conf_t  *ccf;
+    ngx_cycle_t      *cycle, init_cycle;    //cycle结构体
+    ngx_core_conf_t  *ccf;      //获得ngx_core_module的配置结构体
 
     ngx_debug_init();
 
@@ -264,7 +267,7 @@ main(int argc, char *const *argv)
                 );
         }
 
-        if (ngx_show_configure) {
+        if (ngx_show_configure) {       //输出编译配置信息
 
 #ifdef NGX_COMPILER
             ngx_write_stderr("built by " NGX_COMPILER NGX_LINEFEED);
@@ -293,21 +296,27 @@ main(int argc, char *const *argv)
 
         // 1.9.x ngx_show_version_info()结束
 
-        if (!ngx_test_config) {
+        if (!ngx_test_config) {     //如果是-t参数，那么接下来要走流程检查配置但不启动
             return 0;
         }
     }
 
     /* TODO */ ngx_max_sockets = -1;
 
+    // ngx_times.c,初始化各个cache时间变量
+    // 调用ngx_time_update()，得到当前的时间
     ngx_time_init();
 
 #if (NGX_PCRE)
-    ngx_regex_init();
+    ngx_regex_init();       // 正则表达式库初始化
 #endif
 
+    // 定义在os/unix/ngx_process_cycle.c : ngx_pid_t     ngx_pid;
+    // ngx_process.h : #define ngx_getpid   getpid
+    // 获取当前进程也就是master进程的pid
     ngx_pid = ngx_getpid();
 
+    // 初始化log
     log = ngx_log_init(ngx_prefix);
     if (log == NULL) {
         return 1;
@@ -323,10 +332,14 @@ main(int argc, char *const *argv)
      * ngx_process_options()
      */
 
+    // 设置最开始的cycle
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
+
+    // ngx_cycle指针指向第一个cycle结构体
     ngx_cycle = &init_cycle;
 
+    //创建cycle使用的内存池，用于之后所有的内存分配，必须成功
     init_cycle.pool = ngx_create_pool(1024, log);
     if (init_cycle.pool == NULL) {
         return 1;
@@ -961,6 +974,7 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
 {
     ngx_core_conf_t  *ccf;
 
+    // 分配内存，注意三pcalloc，内存全为0
     ccf = ngx_pcalloc(cycle->pool, sizeof(ngx_core_conf_t));
     if (ccf == NULL) {
         return NULL;
@@ -976,6 +990,8 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
      *     ccf->cpu_affinity = NULL;
      */
 
+    // 需要设置初始值的参数必须置为unset
+    // ngx_conf_init_value系列宏只识别unset
     ccf->daemon = NGX_CONF_UNSET;
     ccf->master = NGX_CONF_UNSET;
     ccf->timer_resolution = NGX_CONF_UNSET_MSEC;
@@ -1010,12 +1026,12 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 {
     ngx_core_conf_t  *ccf = conf;
 
-    ngx_conf_init_value(ccf->daemon, 1);
-    ngx_conf_init_value(ccf->master, 1);
-    ngx_conf_init_msec_value(ccf->timer_resolution, 0);
+    ngx_conf_init_value(ccf->daemon, 1);            //默认启用守护进程
+    ngx_conf_init_value(ccf->master, 1);            //默认启用master进程
+    ngx_conf_init_msec_value(ccf->timer_resolution, 0);     //时间分辨率为0
 
-    ngx_conf_init_value(ccf->worker_processes, 1);
-    ngx_conf_init_value(ccf->debug_points, 0);
+    ngx_conf_init_value(ccf->worker_processes, 1);  //默认只有一个worker
+    ngx_conf_init_value(ccf->debug_points, 0);      //不使用debug point
 
 #if (NGX_HAVE_CPU_AFFINITY)
 
@@ -1040,7 +1056,7 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 #endif
 
 
-    if (ccf->pid.len == 0) {
+    if (ccf->pid.len == 0) {        //如果不设置pid指令，使用默认的NGX_PID_PATH
         ngx_str_set(&ccf->pid, NGX_PID_PATH);
     }
 
