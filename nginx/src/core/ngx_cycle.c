@@ -17,6 +17,7 @@ static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
 static void ngx_clean_old_cycles(ngx_event_t *ev);
 
 
+// nginx生命周期使用的超重要对象
 volatile ngx_cycle_t  *ngx_cycle;
 ngx_array_t            ngx_old_cycles;
 
@@ -36,6 +37,7 @@ static ngx_connection_t  dumb;
 /* STUB */
 
 
+// 在main里调用
 ngx_cycle_t *
 ngx_init_cycle(ngx_cycle_t *old_cycle)
 {

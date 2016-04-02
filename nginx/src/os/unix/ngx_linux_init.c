@@ -15,6 +15,7 @@ u_char  ngx_linux_kern_osrelease[50];
 int     ngx_linux_rtsig_max;
 
 
+// nginx在linux里实际使用的操作系统接口调用
 static ngx_os_io_t ngx_linux_io = {
     ngx_unix_recv,
     ngx_readv_chain,

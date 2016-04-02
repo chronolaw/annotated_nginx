@@ -193,16 +193,18 @@ ngx_module_t  ngx_core_module = {
 };
 
 
-// 模块计数器，声明在ngx_conf_file.h
+// 模块计数器，声明在ngx_conf_file.h, 在main里统计得到总数
 ngx_uint_t          ngx_max_module;
 
 // 解析命令行的标志变量,ngx_get_options()设置
+// 仅在本文件里使用，woker等进程无关
 
 static ngx_uint_t   ngx_show_help;          // 显示帮助信息
 static ngx_uint_t   ngx_show_version;       // 显示版本信息
 static ngx_uint_t   ngx_show_configure;     // 显示编译配置信息
 
 // 启动时的参数,ngx_get_options()设置
+// 仅在本文件里使用，woker等进程无关
 
 static u_char      *ngx_prefix;             // -p参数，工作路径
 static u_char      *ngx_conf_file;          // -c参数，配置文件
@@ -214,7 +216,10 @@ static char **ngx_os_environ;
 
 
 // nginx启动的入口函数
+// 相关文件ngx_process_cycle.c/ngx_posix_init.c
+// 设置重要的指针volatile ngx_cycle_t  *ngx_cycle;
 // 1)解析命令行参数,显示帮助信息
+// 2)初始化操作系统调用接口函数ngx_os_io = ngx_linux_io;
 int ngx_cdecl
 main(int argc, char *const *argv)
 {
@@ -336,6 +341,9 @@ main(int argc, char *const *argv)
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
 
+    // 定义在ngx_cycle.c,
+    // volatile ngx_cycle_t  *ngx_cycle;
+    // nginx生命周期使用的超重要对象
     // ngx_cycle指针指向第一个cycle结构体
     ngx_cycle = &init_cycle;
 
@@ -360,6 +368,7 @@ main(int argc, char *const *argv)
     // 初始化ngx_os_io结构体，设置基本的收发函数
     // 基本的页大小,ngx_pagesize = getpagesize()
     // 初始化随机数
+    // ngx_os_io = ngx_linux_io;重要的操作,设置为linux的接口函数
     if (ngx_os_init(log) != NGX_OK) {
         return 1;
     }
@@ -368,6 +377,7 @@ main(int argc, char *const *argv)
      * ngx_crc32_table_init() requires ngx_cacheline_size set in ngx_os_init()
      */
 
+    // 初始化用于crc32计算的表，在ngx_crc32.c
     if (ngx_crc32_table_init() != NGX_OK) {
         return 1;
     }
@@ -376,11 +386,17 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 开始计算所有的静态模块数量
+    // ngx_modules是nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
     ngx_max_module = 0;
     for (i = 0; ngx_modules[i]; i++) {
         ngx_modules[i]->index = ngx_max_module++;
     }
 
+    // ngx_cycle.c
+    // 初始化cycle,800多行
+    // 由之前最基本的init_cycle产生出真正使用的cycle
+    // 解析配置文件，配置所有的模块
     cycle = ngx_init_cycle(&init_cycle);
     if (cycle == NULL) {
         if (ngx_test_config) {
@@ -391,6 +407,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 如果用了-t参数要测试配置，在这里就结束了
     if (ngx_test_config) {
         if (!ngx_quiet_mode) {
             ngx_log_stderr(0, "configuration file %s test is successful",
@@ -400,20 +417,29 @@ main(int argc, char *const *argv)
         return 0;
     }
 
+    // 如果用了-s参数，那么就要发送reload/stop等信号，然后结束
     if (ngx_signal) {
         return ngx_signal_process(cycle, ngx_signal);
     }
 
+    // ngx_posix_init.c
+    // 使用NGX_LOG_NOTICE记录操作系统的一些信息
     ngx_os_status(cycle->log);
 
+    // 定义在ngx_cycle.c,
+    // volatile ngx_cycle_t  *ngx_cycle;
+    // nginx生命周期使用的超重要对象
     ngx_cycle = cycle;
 
+    // 检查core模块的配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // master on且单进程
     if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
         ngx_process = NGX_PROCESS_MASTER;
     }
 
+// win32不注解
 #if !(NGX_WIN32)
 
     if (ngx_init_signals(cycle->log) != NGX_OK) {
@@ -434,6 +460,8 @@ main(int argc, char *const *argv)
 
 #endif
 
+    // ngx_cycle.c
+    // 把ngx_pid字符串化，写入pid文件
     if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
         return 1;
     }
@@ -451,6 +479,7 @@ main(int argc, char *const *argv)
 
     ngx_use_stderr = 0;
 
+    // 启动单进程或者master/worker多进程，内部会调用fork
     if (ngx_process == NGX_PROCESS_SINGLE) {
         ngx_single_process_cycle(cycle);
 
@@ -715,6 +744,7 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 }
 
 
+// nginx自己实现的命令行参数解析
 static ngx_int_t
 ngx_get_options(int argc, char *const *argv)
 {
@@ -838,6 +868,7 @@ ngx_get_options(int argc, char *const *argv)
 }
 
 
+// 保存茉莉花参数到全局变量ngx_argc/ngx_argv
 static ngx_int_t
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
