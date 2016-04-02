@@ -11,5 +11,7 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 请参考《Nginx模块开发指南：使用C++11和Boost程序库》。
 
 # 已注解
-* core
-* event (todo)
+* [core](/nginx/src/core)
+* [event](/nginx/src/event) - todo
+
+* [nginx.c](/nginx/src/core/nginx.c)
