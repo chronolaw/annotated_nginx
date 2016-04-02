@@ -46,6 +46,7 @@ ngx_os_specific_init(ngx_log_t *log)
     (void) ngx_cpystrn(ngx_linux_kern_osrelease, (u_char *) u.release,
                        sizeof(ngx_linux_kern_osrelease));
 
+// rtsig功能在1.9.x里已经删除
 #if (NGX_HAVE_RTSIG)
     {
     int        name[2];
@@ -72,6 +73,7 @@ ngx_os_specific_init(ngx_log_t *log)
     }
 #endif
 
+    // 重要的操作,设置为linux的接口函数
     ngx_os_io = ngx_linux_io;
 
     return NGX_OK;

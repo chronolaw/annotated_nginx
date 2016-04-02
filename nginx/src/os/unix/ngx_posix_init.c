@@ -29,6 +29,12 @@ ngx_os_io_t ngx_os_io = {
 };
 
 
+// 在nginx.c的main()调用
+// 初始化ngx_os_io结构体，设置基本的收发函数
+// 基本的页大小,ngx_pagesize = getpagesize()
+// 初始化随机数
+// 实际工作在ngx_linux_init.c的ngx_os_specific_init()完成
+// 关键操作ngx_os_io = ngx_linux_io;设置为linux的接口函数
 ngx_int_t
 ngx_os_init(ngx_log_t *log)
 {

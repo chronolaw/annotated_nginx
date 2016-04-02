@@ -345,14 +345,21 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 分配内存，拷贝参数，没有使用内存池
+    // 拷贝到全局变量ngx_argc/ngx.argv
     if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
         return 1;
     }
 
+    // 设置cycle->prefix/cycle->conf_prefix等成员
     if (ngx_process_options(&init_cycle) != NGX_OK) {
         return 1;
     }
 
+    // os/unix/ngx_posix_init.c
+    // 初始化ngx_os_io结构体，设置基本的收发函数
+    // 基本的页大小,ngx_pagesize = getpagesize()
+    // 初始化随机数
     if (ngx_os_init(log) != NGX_OK) {
         return 1;
     }
@@ -844,9 +851,11 @@ ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
     size_t     len;
     ngx_int_t  i;
 
+    // 定义在os/unix/ngx_process.c
     ngx_os_argv = (char **) argv;
     ngx_argc = argc;
 
+    // 分配内存，拷贝参数，没有使用内存池
     ngx_argv = ngx_alloc((argc + 1) * sizeof(char *), cycle->log);
     if (ngx_argv == NULL) {
         return NGX_ERROR;
