@@ -129,7 +129,10 @@ struct ngx_open_file_s {
 // 重要的数据结构，定义nginx模块
 // 1.9.11后有变化，改到了ngx_module.h，可以定义动态模块，使用了spare0等字段
 struct ngx_module_s {
+    // 每类模块各自的index
     ngx_uint_t            ctx_index;
+
+    // 在ngx_modules数组里的唯一索引，main()里赋值
     ngx_uint_t            index;
 
     ngx_uint_t            spare0;
@@ -139,10 +142,16 @@ struct ngx_module_s {
 
     ngx_uint_t            version;
 
+    //模块不同含义不同,通常是函数指针表
     void                 *ctx;
+
+    // 模块支持的指令，数组形式，最后用空对象表示结束
     ngx_command_t        *commands;
+
+    // 模块的类型标识，相当于RTTI,如CORE/HTTP/MAIL等
     ngx_uint_t            type;
 
+    // 以下7个函数会在进程的启动或结束阶段被调用
     ngx_int_t           (*init_master)(ngx_log_t *log);
 
     ngx_int_t           (*init_module)(ngx_cycle_t *cycle);

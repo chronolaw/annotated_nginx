@@ -216,10 +216,15 @@ static char **ngx_os_environ;
 
 
 // nginx启动的入口函数
-// 相关文件ngx_process_cycle.c/ngx_posix_init.c
+// 相关文件ngx_process_cycle.c/ngx_posix_init.c/ngx_process.c
 // 设置重要的指针volatile ngx_cycle_t  *ngx_cycle;
+//
 // 1)解析命令行参数,显示帮助信息
 // 2)初始化操作系统调用接口函数ngx_os_io = ngx_linux_io;
+// 3)根据命令行参数等建立一个基本的cycle
+// 4)初始化模块数组ngx_modules
+// 5)核心操作，调用ngx_init_cycle创建进程使用的cycle
+// 6)启动单进程或多进程
 int ngx_cdecl
 main(int argc, char *const *argv)
 {
@@ -390,6 +395,7 @@ main(int argc, char *const *argv)
     // ngx_modules是nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
     ngx_max_module = 0;
     for (i = 0; ngx_modules[i]; i++) {
+        // 这里赋值每个模块的index成员
         ngx_modules[i]->index = ngx_max_module++;
     }
 
