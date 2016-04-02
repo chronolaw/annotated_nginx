@@ -34,6 +34,7 @@ static ngx_conf_enum_t  ngx_debug_points[] = {
 
 
 // ngx_core_module定义的核心指令，都在main域配置
+// 配置结构体是ngx_core_conf_t，定义在ngx_cycle.h
 static ngx_command_t  ngx_core_commands[] = {
 
     // 守护进程, on/off
