@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,6 +21,7 @@
 #define NGX_CMD_REOPEN         5
 
 
+// 用于ngx_process，标记进程的状态
 #define NGX_PROCESS_SINGLE     0
 #define NGX_PROCESS_MASTER     1
 #define NGX_PROCESS_SIGNALLER  2
@@ -38,6 +40,7 @@ void ngx_master_process_cycle(ngx_cycle_t *cycle);
 void ngx_single_process_cycle(ngx_cycle_t *cycle);
 
 
+// 声明为extern，供其他文件使用
 extern ngx_uint_t      ngx_process;
 extern ngx_pid_t       ngx_pid;
 extern ngx_pid_t       ngx_new_binary;
@@ -45,6 +48,7 @@ extern ngx_uint_t      ngx_inherited;
 extern ngx_uint_t      ngx_daemonized;
 extern ngx_uint_t      ngx_exiting;
 
+// 声明为extern，供其他文件使用
 extern sig_atomic_t    ngx_reap;
 extern sig_atomic_t    ngx_sigio;
 extern sig_atomic_t    ngx_sigalrm;

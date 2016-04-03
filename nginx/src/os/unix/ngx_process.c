@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -37,6 +38,7 @@ ngx_int_t        ngx_last_process;
 ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 // 命令行-s参数关联数组
+// 所有信号都用ngx_signal_handler处理
 ngx_signal_t  signals[] = {
     { ngx_signal_value(NGX_RECONFIGURE_SIGNAL),
       "SIG" ngx_value(NGX_RECONFIGURE_SIGNAL),
@@ -307,6 +309,7 @@ ngx_init_signals(ngx_log_t *log)
 }
 
 
+// 处理unix信号
 void
 ngx_signal_handler(int signo)
 {
@@ -619,6 +622,7 @@ ngx_os_signal_process(ngx_cycle_t *cycle, char *name, ngx_int_t pid)
     ngx_signal_t  *sig;
 
     // 字符串比较，找到对应的信号，调用kill发送
+    // signals是本文件前面定义的一个数组
     for (sig = signals; sig->signo != 0; sig++) {
         if (ngx_strcmp(name, sig->name) == 0) {
             if (kill(pid, sig->signo) != -1) {

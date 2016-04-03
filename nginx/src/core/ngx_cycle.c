@@ -41,6 +41,7 @@ static ngx_connection_t  dumb;
 
 // 在main里调用,太长，以后可能会简化
 // 从old_cycle(init_cycle)里复制必要的信息，创建新cycle
+// 当reconfigure的时候old_cycle就是当前的cycle
 // 初始化core模块
 ngx_cycle_t *
 ngx_init_cycle(ngx_cycle_t *old_cycle)
@@ -954,6 +955,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 }
 
 
+// 写pid到文件
 ngx_int_t
 ngx_create_pidfile(ngx_str_t *name, ngx_log_t *log)
 {

@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -28,18 +29,24 @@ static void ngx_cache_manager_process_handler(ngx_event_t *ev);
 static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 
 
+// 标记nginx进程的状态
+// NGX_PROCESS_MASTER/NGX_PROCESS_WORKER/NGX_PROCESS_SINGLE
+// 一开始是0，也就是NGX_PROCESS_SINGLE
 ngx_uint_t    ngx_process;
+
+// 记录nginx master进程的pid，在main()里使用
 ngx_pid_t     ngx_pid;
 
+// 原子变量，用于进程中检查信号
 sig_atomic_t  ngx_reap;
 sig_atomic_t  ngx_sigio;
 sig_atomic_t  ngx_sigalrm;
-sig_atomic_t  ngx_terminate;
-sig_atomic_t  ngx_quit;
+sig_atomic_t  ngx_terminate;    //结束进程
+sig_atomic_t  ngx_quit;         //处理完所有请求再结束进程
 sig_atomic_t  ngx_debug_quit;
-ngx_uint_t    ngx_exiting;
-sig_atomic_t  ngx_reconfigure;
-sig_atomic_t  ngx_reopen;
+ngx_uint_t    ngx_exiting;      //nginx进程正在退出过程中
+sig_atomic_t  ngx_reconfigure;  //重新加载配置文件，也就是reload
+sig_atomic_t  ngx_reopen;       //重新打开所有文件
 
 sig_atomic_t  ngx_change_binary;
 ngx_pid_t     ngx_new_binary;
@@ -51,6 +58,7 @@ ngx_uint_t    ngx_noaccepting;
 ngx_uint_t    ngx_restart;
 
 
+// master进程的名字
 static u_char  master_process[] = "master process";
 
 
@@ -296,6 +304,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
 
 // main()函数里调用，仅启动一个进程
+// master_process off;
 void
 ngx_single_process_cycle(ngx_cycle_t *cycle)
 {
@@ -320,7 +329,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
     for ( ;; ) {
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
-        // 处理事件的核心函数
+        // 处理事件的核心函数, event模块里
         ngx_process_events_and_timers(cycle);
 
         // 检查是否处于退出状态
@@ -338,9 +347,10 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 
         // 重新配置，以当前cycle重新初始化
         if (ngx_reconfigure) {
-            ngx_reconfigure = 0;
+            ngx_reconfigure = 0;    //标志量清零
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
 
+            // 以当前cycle重新初始化
             cycle = ngx_init_cycle(cycle);
             if (cycle == NULL) {
                 cycle = (ngx_cycle_t *) ngx_cycle;

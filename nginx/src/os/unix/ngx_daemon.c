@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -9,23 +10,29 @@
 #include <ngx_core.h>
 
 
+// main()里调用，守护进程化
 ngx_int_t
 ngx_daemon(ngx_log_t *log)
 {
     int  fd;
 
+    // 调用fork()，返回0是子进程，非0是父进程
     switch (fork()) {
+    // 负数出错
     case -1:
         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "fork() failed");
         return NGX_ERROR;
 
+    // 子进程，继续后面的程序
     case 0:
         break;
 
+    // 父进程，直接结束进程
     default:
         exit(0);
     }
 
+    // 子进程是新进程，需要重新获取pid
     ngx_pid = ngx_getpid();
 
     if (setsid() == -1) {
@@ -42,6 +49,7 @@ ngx_daemon(ngx_log_t *log)
         return NGX_ERROR;
     }
 
+    // 关闭标准输入输出
     if (dup2(fd, STDIN_FILENO) == -1) {
         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "dup2(STDIN) failed");
         return NGX_ERROR;

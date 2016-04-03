@@ -326,6 +326,7 @@ main(int argc, char *const *argv)
     // 定义在os/unix/ngx_process_cycle.c : ngx_pid_t     ngx_pid;
     // ngx_process.h : #define ngx_getpid   getpid
     // 获取当前进程也就是master进程的pid
+    // 如果是master/worker，会fork出新的子进程，见os/unix/ngx_daemon.c
     ngx_pid = ngx_getpid();
 
     // 初始化log
@@ -419,6 +420,7 @@ main(int argc, char *const *argv)
     // 如果用了-t参数要测试配置，在这里就结束了
     // 定义在ngx_cycle.c
     if (ngx_test_config) {
+        //非安静模式，输出测试信息
         if (!ngx_quiet_mode) {
             ngx_log_stderr(0, "configuration file %s test is successful",
                            cycle->conf_file.data);
@@ -435,7 +437,7 @@ main(int argc, char *const *argv)
     }
 
     // ngx_posix_init.c
-    // 使用NGX_LOG_NOTICE记录操作系统的一些信息
+    // 使用NGX_LOG_NOTICE记录操作系统的一些信息,通常不会显示
     ngx_os_status(cycle->log);
 
     // 定义在ngx_cycle.c,
@@ -447,18 +449,25 @@ main(int argc, char *const *argv)
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     // master on且单进程
+    // 如果master_process off那么就不是master进程
     if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
+        // 设置为master进程状态
         ngx_process = NGX_PROCESS_MASTER;
     }
 
-// win32不注解
+// unix/linux将进程守护进程化
 #if !(NGX_WIN32)
 
+    // os/unix/ngx_process.c
+    // 使用signals数组，初始化信号处理handler
     if (ngx_init_signals(cycle->log) != NGX_OK) {
         return 1;
     }
 
+    // 守护进程
     if (!ngx_inherited && ccf->daemon) {
+        // os/unix/ngx_daemon.c
+        // 经典的daemon操作，使用fork
         if (ngx_daemon(cycle->log) != NGX_OK) {
             return 1;
         }
@@ -474,6 +483,7 @@ main(int argc, char *const *argv)
 
     // ngx_cycle.c
     // 把ngx_pid字符串化，写入pid文件
+    // 在daemon后，此时的pid是真正的master进程pid
     if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
         return 1;
     }
@@ -493,6 +503,7 @@ main(int argc, char *const *argv)
 
     // 启动单进程或者master/worker多进程，内部会调用fork
     if (ngx_process == NGX_PROCESS_SINGLE) {
+        // 如果master_process off那么就不是master进程
         // ngx_process_cycle.c
         ngx_single_process_cycle(cycle);
 
