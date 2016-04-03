@@ -145,6 +145,7 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       NULL },
 
+// old threads 在1.9.x里已经被删除，不再使用
 #if (NGX_OLD_THREADS)
 
     { ngx_string("worker_threads"),
@@ -168,7 +169,7 @@ static ngx_command_t  ngx_core_commands[] = {
 
 
 // ngx_core_module的函数指针表，创建配置结构体
-// 两个函数都在本文件内
+// 两个函数都在本文件内,只是简单地创建并初始化成员
 static ngx_core_module_t  ngx_core_module_ctx = {
     ngx_string("core"),
     ngx_core_module_create_conf,        //创建配置结构体
@@ -198,14 +199,14 @@ ngx_uint_t          ngx_max_module;
 
 // 解析命令行的标志变量,ngx_get_options()设置
 // 仅在本文件里使用，woker等进程无关
-
 static ngx_uint_t   ngx_show_help;          // 显示帮助信息
 static ngx_uint_t   ngx_show_version;       // 显示版本信息
 static ngx_uint_t   ngx_show_configure;     // 显示编译配置信息
 
 // 启动时的参数,ngx_get_options()设置
 // 仅在本文件里使用，woker等进程无关
-
+// 前三个是u_char是因为要赋值给ngx_str_t
+// ngx_signal用char*是因为要做字符串比较，不需要存储
 static u_char      *ngx_prefix;             // -p参数，工作路径
 static u_char      *ngx_conf_file;          // -c参数，配置文件
 static u_char      *ngx_conf_params;        // -g参数
@@ -240,6 +241,7 @@ main(int argc, char *const *argv)
     }
 
     // 解析命令行参数, 本文件内查找ngx_get_options
+    // 设置ngx_show_version/ngx_show_help等变量
     if (ngx_get_options(argc, argv) != NGX_OK) {
         return 1;
     }

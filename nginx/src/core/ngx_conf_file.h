@@ -152,17 +152,28 @@ struct ngx_module_s {
     ngx_uint_t            type;
 
     // 以下7个函数会在进程的启动或结束阶段被调用
+
+    // init_master目前nginx不会调用
     ngx_int_t           (*init_master)(ngx_log_t *log);
 
+    // 在ngx_init_cycle里被调用
     ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
 
+    // 在ngx_single_process_cycle/ngx_worker_process_init里调用
     ngx_int_t           (*init_process)(ngx_cycle_t *cycle);
+
+    // init_thread目前nginx不会调用
     ngx_int_t           (*init_thread)(ngx_cycle_t *cycle);
+
+    // exit_thread目前nginx不会调用
     void                (*exit_thread)(ngx_cycle_t *cycle);
+
+    // 在ngx_worker_process_exit调用
     void                (*exit_process)(ngx_cycle_t *cycle);
 
     void                (*exit_master)(ngx_cycle_t *cycle);
 
+    // 下面7个成员通常用用NGX_MODULE_V1_PADDING填充
     uintptr_t             spare_hook0;
     uintptr_t             spare_hook1;
     uintptr_t             spare_hook2;
