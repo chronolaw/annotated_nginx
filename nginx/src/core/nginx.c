@@ -403,6 +403,7 @@ main(int argc, char *const *argv)
     // 初始化cycle,800多行
     // 由之前最基本的init_cycle产生出真正使用的cycle
     // 解析配置文件，配置所有的模块
+    // 创建共享内存，打开文件，监听配置的端口
     cycle = ngx_init_cycle(&init_cycle);
     if (cycle == NULL) {
         if (ngx_test_config) {
@@ -414,6 +415,7 @@ main(int argc, char *const *argv)
     }
 
     // 如果用了-t参数要测试配置，在这里就结束了
+    // 定义在ngx_cycle.c
     if (ngx_test_config) {
         if (!ngx_quiet_mode) {
             ngx_log_stderr(0, "configuration file %s test is successful",
