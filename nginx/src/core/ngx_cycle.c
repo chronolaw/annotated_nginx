@@ -530,7 +530,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* handle the listening sockets */
 
-    // 打开监听端口
+    // 准备监听端口列表
     if (old_cycle->listening.nelts) {
         ls = old_cycle->listening.elts;
         for (i = 0; i < old_cycle->listening.nelts; i++) {
@@ -628,6 +628,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
     }
 
+    // ngx_connection.c
+    // 开始监听端口，设置socket参数
     if (ngx_open_listening_sockets(cycle) != NGX_OK) {
         goto failed;
     }
