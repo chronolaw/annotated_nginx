@@ -68,6 +68,7 @@ static ngx_log_t        ngx_exit_log;
 static ngx_open_file_t  ngx_exit_log_file;
 
 
+// main()函数里调用，启动master/worker进程
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
@@ -103,31 +104,41 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigemptyset(&set);
 
 
+    // static u_char  master_process[] = "master process";
+    // 计算master进程的名字
     size = sizeof(master_process);
 
+    // 加上命令行参数，注意使用的是nginx拷贝后的参数
     for (i = 0; i < ngx_argc; i++) {
         size += ngx_strlen(ngx_argv[i]) + 1;
     }
 
+    // 分配名字的内存
     title = ngx_pnalloc(cycle->pool, size);
     if (title == NULL) {
         /* fatal */
         exit(2);
     }
 
+    // 拷贝字符串
     p = ngx_cpymem(title, master_process, sizeof(master_process) - 1);
     for (i = 0; i < ngx_argc; i++) {
         *p++ = ' ';
         p = ngx_cpystrn(p, (u_char *) ngx_argv[i], size);
     }
 
+    // 设置进程名
     ngx_setproctitle(title);
 
 
+    // 取core模块配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 启动worker进程，数量由配置决定
     ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
+
+    // cache进程
     ngx_start_cache_manager_processes(cycle, 0);
 
     ngx_new_binary = 0;
@@ -135,6 +146,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigio = 0;
     live = 1;
 
+    // master进程的无限循环，只处理信号
     for ( ;; ) {
         if (delay) {
             if (ngx_sigalrm) {
@@ -279,10 +291,11 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
-    }
+    }   //master进程无限循环结束
 }
 
 
+// main()函数里调用，仅启动一个进程
 void
 ngx_single_process_cycle(ngx_cycle_t *cycle)
 {
@@ -293,6 +306,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
         exit(2);
     }
 
+    // 调用所有模块的init_process，即进程启动时hook
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->init_process) {
             if (ngx_modules[i]->init_process(cycle) == NGX_ERROR) {
@@ -302,13 +316,17 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
         }
     }
 
+    // 无限循环，对外提供服务
     for ( ;; ) {
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
+        // 处理事件的核心函数
         ngx_process_events_and_timers(cycle);
 
+        // 检查是否处于退出状态
         if (ngx_terminate || ngx_quit) {
 
+            // 所有模块的退出hook
             for (i = 0; ngx_modules[i]; i++) {
                 if (ngx_modules[i]->exit_process) {
                     ngx_modules[i]->exit_process(cycle);
@@ -318,6 +336,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
             ngx_master_process_exit(cycle);
         }
 
+        // 重新配置，以当前cycle重新初始化
         if (ngx_reconfigure) {
             ngx_reconfigure = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
@@ -331,6 +350,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
             ngx_cycle = cycle;
         }
 
+        // 重新打开所有文件
         if (ngx_reopen) {
             ngx_reopen = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
@@ -340,6 +360,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 }
 
 
+// 被ngx_master_process_cycle()调用
 static void
 ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 {
@@ -354,6 +375,7 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     for (i = 0; i < n; i++) {
 
+        // os/unix/ngx_process.c产生进程
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
                           (void *) (intptr_t) i, "worker process", type);
 

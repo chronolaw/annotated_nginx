@@ -1016,6 +1016,7 @@ ngx_delete_pidfile(ngx_cycle_t *cycle)
 }
 
 
+// main()里调用，如果用了-s参数，那么就要发送reload/stop等信号
 ngx_int_t
 ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 {
@@ -1027,13 +1028,16 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "signal process started");
 
+    // 获取core模块配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     ngx_memzero(&file, sizeof(ngx_file_t));
 
+    // 获取pid文件名
     file.name = ccf->pid;
     file.log = cycle->log;
 
+    // 打开pid文件
     file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
                             NGX_FILE_OPEN, NGX_FILE_DEFAULT_ACCESS);
 
@@ -1043,6 +1047,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
         return 1;
     }
 
+    // 读取文件内容到buf
     n = ngx_read_file(&file, buf, NGX_INT64_LEN + 2, 0);
 
     if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
@@ -1056,6 +1061,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     while (n-- && (buf[n] == CR || buf[n] == LF)) { /* void */ }
 
+    // 转化为数字pid
     pid = ngx_atoi(buf, ++n);
 
     if (pid == NGX_ERROR) {
@@ -1065,6 +1071,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
         return 1;
     }
 
+    // 调用os/unix/ngx_process.c里的函数
     return ngx_os_signal_process(cycle, sig, pid);
 
 }

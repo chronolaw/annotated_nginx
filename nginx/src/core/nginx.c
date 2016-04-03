@@ -223,7 +223,7 @@ static char **ngx_os_environ;
 // 2)初始化操作系统调用接口函数ngx_os_io = ngx_linux_io;
 // 3)根据命令行参数等建立一个基本的cycle
 // 4)初始化模块数组ngx_modules
-// 5)核心操作，调用ngx_init_cycle创建进程使用的cycle
+// 5)核心操作，调用ngx_init_cycle创建进程使用的cycle,解析配置文件,启动监听端口
 // 6)启动单进程或多进程
 int ngx_cdecl
 main(int argc, char *const *argv)
@@ -427,6 +427,8 @@ main(int argc, char *const *argv)
 
     // 如果用了-s参数，那么就要发送reload/stop等信号，然后结束
     if (ngx_signal) {
+        // ngx_cycle.c
+        // 最后调用os/unix/ngx_process.c里的函数ngx_os_signal_process()
         return ngx_signal_process(cycle, ngx_signal);
     }
 
@@ -489,9 +491,11 @@ main(int argc, char *const *argv)
 
     // 启动单进程或者master/worker多进程，内部会调用fork
     if (ngx_process == NGX_PROCESS_SINGLE) {
+        // ngx_process_cycle.c
         ngx_single_process_cycle(cycle);
 
     } else {
+        // ngx_process_cycle.c
         ngx_master_process_cycle(cycle);
     }
 
