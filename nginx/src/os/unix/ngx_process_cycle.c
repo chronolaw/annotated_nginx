@@ -342,10 +342,11 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
                 }
             }
 
+            // 删除pid，模块清理，关闭监听端口
             ngx_master_process_exit(cycle);
         }
 
-        // 重新配置，以当前cycle重新初始化
+        // 重新配置，以当前cycle重新初始化，即reload
         if (ngx_reconfigure) {
             ngx_reconfigure = 0;    //标志量清零
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
@@ -711,6 +712,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
 }
 
 
+// 删除pid，模块清理，关闭监听端口
 static void
 ngx_master_process_exit(ngx_cycle_t *cycle)
 {

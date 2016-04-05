@@ -390,7 +390,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
-    // 检查NGINX环境变量，获取之前监听的端口
+    // 检查NGINX环境变量，获取之前监听的socket
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
         return 1;
     }
@@ -544,8 +544,9 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-    // 从环境变量字符串里切分出端口
+    // 从环境变量字符串里切分出socket
     for (p = inherited, v = p; *p; p++) {
+        // 分隔符是:/;
         if (*p == ':' || *p == ';') {
             s = ngx_atoi(v, p - v);
             if (s == NGX_ERROR) {
