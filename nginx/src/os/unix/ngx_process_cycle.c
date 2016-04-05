@@ -18,18 +18,34 @@
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
 
+// cache相关的暂不研究
 static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
     ngx_uint_t respawn);
 static void ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch);
+
+// master进程调用，遍历ngx_processes数组，用kill发送信号
 static void ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo);
+
 static ngx_uint_t ngx_reap_children(ngx_cycle_t *cycle);
 
 // 删除pid，模块清理，关闭监听端口
 static void ngx_master_process_exit(ngx_cycle_t *cycle);
 
+// 传递给ngx_spawn_process()，是worker进程的核心功能
+// 调用ngx_worker_process_init()/ngx_worker_process_exit()
 static void ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data);
+
+// 读取核心配置，设置cpu优先级,core dump信息,unix运行的group/user
+// 切换工作路径,根据pid设置随机数种子
+// 调用所有模块的init_process,让模块进程初始化
 static void ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker);
+
+// 被ngx_worker_process_cycle()调用
+// 调用所有模块的exit_process，进程结束hook
+// 内部直接exit(0)退出
 static void ngx_worker_process_exit(ngx_cycle_t *cycle);
+
+// cache相关的暂不研究
 static void ngx_channel_handler(ngx_event_t *ev);
 static void ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data);
 static void ngx_cache_manager_process_handler(ngx_event_t *ev);
@@ -504,6 +520,7 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
 }
 
 
+// master进程调用，遍历ngx_processes数组，用kill发送信号
 static void
 ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 {
@@ -542,6 +559,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
     ch.fd = -1;
 
 
+    // 遍历ngx_processes数组，用kill发送信号
     for (i = 0; i < ngx_last_process; i++) {
 
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
@@ -585,6 +603,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
         ngx_log_debug2(NGX_LOG_DEBUG_CORE, cycle->log, 0,
                        "kill (%P, %d)", ngx_processes[i].pid, signo);
 
+        // kill发送信号
         if (kill(ngx_processes[i].pid, signo) == -1) {
             err = ngx_errno;
             ngx_log_error(NGX_LOG_ALERT, cycle->log, err,
@@ -779,22 +798,32 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 }
 
 
+// 传递给ngx_spawn_process()，是worker进程的核心功能
+// data实际上是进程号, (void *) (intptr_t) i
 static void
 ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
+    // 把data再转换为进程序号
     ngx_int_t worker = (intptr_t) data;
 
     ngx_uint_t         i;
     ngx_connection_t  *c;
 
+    // 设置进程状态
     ngx_process = NGX_PROCESS_WORKER;
 
+    // 读取核心配置，设置cpu优先级,core dump信息,unix运行的group/user
+    // 切换工作路径,根据pid设置随机数种子
+    // 调用所有模块的init_process,让模块进程初始化
     ngx_worker_process_init(cycle, worker);
 
+    // 设置进程名字
     ngx_setproctitle("worker process");
 
+    // 无限循环，处理事件和信号
     for ( ;; ) {
 
+        // 进程正在退出,即quit
         if (ngx_exiting) {
 
             c = cycle->connections;
@@ -815,32 +844,46 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 
+                // 调用所有模块的exit_process，进程结束hook
+                // 内部直接exit(0)退出
                 ngx_worker_process_exit(cycle);
             }
         }
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
+        // 处理事件的核心函数, event模块里
         ngx_process_events_and_timers(cycle);
 
+        // 收到了-s stop，停止进程
         if (ngx_terminate) {
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 
+            // 调用所有模块的exit_process，进程结束hook
+            // 内部直接exit(0)退出
             ngx_worker_process_exit(cycle);
         }
 
+        // 收到了-s quit，关闭监听端口后再停止进程（优雅关闭）
         if (ngx_quit) {
             ngx_quit = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
                           "gracefully shutting down");
+
+            // 改进程名字
             ngx_setproctitle("worker process is shutting down");
 
             if (!ngx_exiting) {
+                // in ngx_connection.c
+                // 遍历监听端口列表，逐个删除监听事件
                 ngx_close_listening_sockets(cycle);
+
+                // 设置ngx_exiting标志，继续走循环
                 ngx_exiting = 1;
             }
         }
 
+        // 收到了-s reopen，重新打开文件
         if (ngx_reopen) {
             ngx_reopen = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
@@ -850,6 +893,11 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 }
 
 
+// 被ngx_worker_process_cycle()调用
+// 参数worker是进程的序号
+// 设置cpu优先级,core dump信息,unix运行的group/user
+// 切换工作路径,根据pid设置随机数种子
+// 调用所有模块的init_process,让模块进程初始化
 static void
 ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 {
@@ -866,8 +914,10 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         exit(2);
     }
 
+    // 获取核心配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 设置cpu优先级
     if (worker >= 0 && ccf->priority != 0) {
         if (setpriority(PRIO_PROCESS, 0, ccf->priority) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
@@ -875,6 +925,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         }
     }
 
+    // 设置core dump信息
     if (ccf->rlimit_nofile != NGX_CONF_UNSET) {
         rlmt.rlim_cur = (rlim_t) ccf->rlimit_nofile;
         rlmt.rlim_max = (rlim_t) ccf->rlimit_nofile;
@@ -910,6 +961,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
     }
 #endif
 
+    // 设置unix运行的group/user
     if (geteuid() == 0) {
         if (setgid(ccf->group) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -951,6 +1003,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 
 #endif
 
+    // 切换工作路径
     if (ccf->working_directory.len) {
         if (chdir((char *) ccf->working_directory.data) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
@@ -967,6 +1020,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
                       "sigprocmask() failed");
     }
 
+    // 根据pid设置随机数种子
     srandom((ngx_pid << 16) ^ ngx_time());
 
     /*
@@ -978,6 +1032,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         ls[i].previous = NULL;
     }
 
+    // 调用所有模块的init_process,模块进程初始化hook
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->init_process) {
             if (ngx_modules[i]->init_process(cycle) == NGX_ERROR) {
@@ -1026,12 +1081,16 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 }
 
 
+// 被ngx_worker_process_cycle()调用
+// 调用所有模块的exit_process，进程结束hook
+// 内部直接exit(0)退出
 static void
 ngx_worker_process_exit(ngx_cycle_t *cycle)
 {
     ngx_uint_t         i;
     ngx_connection_t  *c;
 
+    // 调用所有模块的exit_process，进程结束hook
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->exit_process) {
             ngx_modules[i]->exit_process(cycle);
@@ -1067,6 +1126,7 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
      * ngx_cycle->pool is already destroyed.
      */
 
+    // ngx_cycle指向ngx_exit_cycle，生命期结束
     ngx_exit_log = *ngx_log_get_file_log(ngx_cycle->log);
 
     ngx_exit_log_file.fd = ngx_exit_log.file->fd;
@@ -1194,6 +1254,9 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
     /* Set a moderate number of connections for a helper process. */
     cycle->connection_n = 512;
 
+    // 读取核心配置，设置cpu优先级,core dump信息,unix运行的group/user
+    // 切换工作路径,根据pid设置随机数种子
+    // 调用所有模块的init_process,让模块进程初始化
     ngx_worker_process_init(cycle, -1);
 
     ngx_memzero(&ev, sizeof(ngx_event_t));
@@ -1221,6 +1284,7 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
             ngx_reopen_files(cycle, -1);
         }
 
+        // 处理事件的核心函数, event模块里
         ngx_process_events_and_timers(cycle);
     }
 }
