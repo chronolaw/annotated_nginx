@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -190,18 +191,35 @@ struct ngx_connection_s {
 };
 
 
+// http/ngx_http.c ngx_http_add_listening()里调用
+// 添加到cycle的监听端口数组
 ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
     socklen_t socklen);
+
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
+
+// ngx_cycle.c : init_cycle()里被调用
+// 创建socket, bind/listen
 ngx_int_t ngx_open_listening_sockets(ngx_cycle_t *cycle);
+
+// 配置监听端口的rcvbuf/sndbuf等参数，调用setsockopt()
 void ngx_configure_listening_sockets(ngx_cycle_t *cycle);
+
+// 在ngx_master_process_exit里被调用(os/unix/ngx_process_cycle.c)
+// 遍历监听端口列表，逐个删除监听事件
 void ngx_close_listening_sockets(ngx_cycle_t *cycle);
+
+// 关闭连接
 void ngx_close_connection(ngx_connection_t *c);
+
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     ngx_uint_t port);
 ngx_int_t ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text);
 
+// 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
 ngx_connection_t *ngx_get_connection(ngx_socket_t s, ngx_log_t *log);
+
+// 释放一个连接，加入空闲链表
 void ngx_free_connection(ngx_connection_t *c);
 
 void ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable);

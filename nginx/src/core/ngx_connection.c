@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -16,6 +17,8 @@ ngx_os_io_t  ngx_io;
 static void ngx_drain_connections(void);
 
 
+// http/ngx_http.c ngx_http_add_listening()里调用
+// 添加到cycle的监听端口数组
 ngx_listening_t *
 ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 {
@@ -24,6 +27,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     struct sockaddr  *sa;
     u_char            text[NGX_SOCKADDR_STRLEN];
 
+    // 添加到cycle的监听端口数组
     ls = ngx_array_push(&cf->cycle->listening);
     if (ls == NULL) {
         return NULL;
@@ -302,6 +306,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 
 // ngx_cycle.c : init_cycle()里被调用
+// 创建socket, bind/listen
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
@@ -504,6 +509,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 }
 
 
+// 配置监听端口的rcvbuf/sndbuf等参数，调用setsockopt()
 void
 ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 {
@@ -828,6 +834,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 }
 
 
+// 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
 ngx_connection_t *
 ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 {
@@ -845,6 +852,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         return NULL;
     }
 
+    // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
     c = ngx_cycle->free_connections;
 
     if (c == NULL) {
@@ -860,6 +868,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         return NULL;
     }
 
+    // 调整空闲链表的指针，复用data成员
     ngx_cycle->free_connections = c->data;
     ngx_cycle->free_connection_n--;
 
@@ -867,39 +876,50 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         ngx_cycle->files[s] = c;
     }
 
+    // 暂时保存读写事件对象
     rev = c->read;
     wev = c->write;
 
+    // 清空连接对象
     ngx_memzero(c, sizeof(ngx_connection_t));
 
+    // 恢复读写事件对象
     c->read = rev;
     c->write = wev;
+
+    // 设置连接的socket
     c->fd = s;
     c->log = log;
 
+    // 置instance标志，用于检查连接是否失效
     instance = rev->instance;
 
     ngx_memzero(rev, sizeof(ngx_event_t));
     ngx_memzero(wev, sizeof(ngx_event_t));
 
+    // 置instance标志，用于检查连接是否失效
     rev->instance = !instance;
     wev->instance = !instance;
 
     rev->index = NGX_INVALID_INDEX;
     wev->index = NGX_INVALID_INDEX;
 
+    // 读写事件对象的data保存了连接对象
     rev->data = c;
     wev->data = c;
 
+    // 默认写事件可用
     wev->write = 1;
 
     return c;
 }
 
 
+// 释放一个连接，加入空闲链表
 void
 ngx_free_connection(ngx_connection_t *c)
 {
+    // 调整空闲链表的指针，复用data成员
     c->data = ngx_cycle->free_connections;
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
@@ -910,6 +930,7 @@ ngx_free_connection(ngx_connection_t *c)
 }
 
 
+// 关闭连接
 void
 ngx_close_connection(ngx_connection_t *c)
 {

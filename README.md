@@ -12,15 +12,24 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 
 # 已注解
 
-##目录
+###目录
 * [core](/nginx/src/core)
 * [event](/nginx/src/event) - todo
 * [http](/nginx/src/http) - todo
 * [os/unix](/nginx/src/os/unix) - todo
 
-##部分关键源码
+###部分关键源码
+
+#####core目录
 * [nginx.c](/nginx/src/core/nginx.c)
 * [ngx_conf_file.h](nginx/src/core/ngx_conf_file.h)
+* [ngx_connection.c](/nginx/src/core/ngx_connection.c)
+
+#####event目录
+
+#####http目录
+
+#####os/unix目录
 * [ngx_process.c](nginx/src/os/unix/ngx_process.c)
 * [ngx_process_cycle.c](nginx/src/os/unix/ngx_process_cycle.c)
 

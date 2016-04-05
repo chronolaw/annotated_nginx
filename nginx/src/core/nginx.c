@@ -504,6 +504,7 @@ main(int argc, char *const *argv)
     ngx_use_stderr = 0;
 
     // 启动单进程或者master/worker多进程，内部会调用fork
+    // 子进程完全复制父进程的cycle，包括打开的文件、共享内存、监听的端口
     if (ngx_process == NGX_PROCESS_SINGLE) {
         // 如果master_process off那么就不是master进程
         // ngx_process_cycle.c
