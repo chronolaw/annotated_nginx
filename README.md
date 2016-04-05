@@ -21,7 +21,10 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 ##部分关键源码
 * [nginx.c](/nginx/src/core/nginx.c)
 * [ngx_conf_file.h](nginx/src/core/ngx_conf_file.h)
+* [ngx_process.c](/os/unix/ngx_process.c)
+* [ngx_process_cycle.c](/os/unix/ngx_process_cycle.c)
 
 # 不注解
 
-mail
+* auto
+* mail
