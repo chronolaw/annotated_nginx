@@ -40,7 +40,7 @@ ngx_pid_t     ngx_pid;
 // 原子变量，用于进程中检查信号
 sig_atomic_t  ngx_reap;
 sig_atomic_t  ngx_sigio;
-sig_atomic_t  ngx_sigalrm;
+sig_atomic_t  ngx_sigalrm;      //更新时间的信号
 sig_atomic_t  ngx_terminate;    //结束进程
 sig_atomic_t  ngx_quit;         //处理完所有请求再结束进程
 sig_atomic_t  ngx_debug_quit;

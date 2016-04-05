@@ -390,6 +390,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 检查NGINX环境变量，获取之前监听的端口
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
         return 1;
     }
@@ -450,6 +451,7 @@ main(int argc, char *const *argv)
 
     // master on且单进程
     // 如果master_process off那么就不是master进程
+    // ngx_process定义在os/unix/ngx_process_cycle.c
     if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
         // 设置为master进程状态
         ngx_process = NGX_PROCESS_MASTER;
@@ -523,8 +525,10 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     ngx_int_t         s;
     ngx_listening_t  *ls;
 
+    // 获取环境变量，NGINX_VAR定义在nginx.h，值是"NGINX"
     inherited = (u_char *) getenv(NGINX_VAR);
 
+    // 无变量则直接
     if (inherited == NULL) {
         return NGX_OK;
     }
@@ -532,6 +536,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
                   "using inherited sockets from \"%s\"", inherited);
 
+    // 清空cycle的监听端口数组
     if (ngx_array_init(&cycle->listening, cycle->pool, 10,
                        sizeof(ngx_listening_t))
         != NGX_OK)
@@ -539,6 +544,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // 从环境变量字符串里切分出端口
     for (p = inherited, v = p; *p; p++) {
         if (*p == ':' || *p == ';') {
             s = ngx_atoi(v, p - v);
@@ -565,6 +571,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 
     ngx_inherited = 1;
 
+    // in ngx_connection.c
     return ngx_set_inherited_sockets(cycle);
 }
 
