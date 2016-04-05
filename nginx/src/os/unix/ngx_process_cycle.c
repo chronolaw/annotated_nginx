@@ -57,6 +57,9 @@ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 // 一开始是0，也就是NGX_PROCESS_SINGLE
 ngx_uint_t    ngx_process;
 
+// nginx 1.9.x增加新全局变量ngx_worker，即进程id号
+// ngx_uint_t    ngx_worker;
+
 // 记录nginx master进程的pid，在main()里使用
 ngx_pid_t     ngx_pid;
 
@@ -858,6 +861,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
     // 设置进程状态
     ngx_process = NGX_PROCESS_WORKER;
+
+    // nginx 1.9.x
+    //ngx_worker = worker;
 
     // 读取核心配置，设置cpu优先级,core dump信息,unix运行的group/user
     // 切换工作路径,根据pid设置随机数种子
