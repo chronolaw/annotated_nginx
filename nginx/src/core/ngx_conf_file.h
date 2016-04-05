@@ -97,14 +97,20 @@ struct ngx_command_s {
     // 预设有ngx_conf_set_flag_slot等，见本文件
     // cf：解析的环境结构体,重要的是cf->args，是指令字符串数组
     // cmd：该指令的结构体
-    // conf当前的配置结构体
+    // conf当前的配置结构体，需转型后才能使用
     char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-    //专门给http模块使用，决定存储在main/srv/loc的哪个层次
+    // 专门给http模块使用，决定存储在main/srv/loc的哪个层次
     // NGX_HTTP_MAIN_CONF/NGX_HTTP_SRV_CONF/NGX_HTTP_LOC_CONF
+    // 其他类型的模块不使用，直接为0
     ngx_uint_t            conf;
-    ngx_uint_t            offset;   //变量在conf结构体里的偏移量，可用offsetof得到
-    void                 *post;     //解析后处理的数据
+
+    // 变量在conf结构体里的偏移量，可用offsetof得到
+    // 主要用于nginx内置的命令解析函数，自己写命令解析函数可以置为0
+    ngx_uint_t            offset;
+
+    //解析后处理的数据
+    void                 *post;
 };
 
 // 空指令，用于在指令数组的最后当做哨兵，结束数组，避免指定长度，类似NULL的作用

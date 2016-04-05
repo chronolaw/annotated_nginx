@@ -751,6 +751,8 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 }
 
 
+// 在ngx_master_process_exit里被调用(os/unix/ngx_process_cycle.c)
+// 遍历监听端口列表，逐个删除监听事件
 void
 ngx_close_listening_sockets(ngx_cycle_t *cycle)
 {

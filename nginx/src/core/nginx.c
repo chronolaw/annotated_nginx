@@ -511,13 +511,16 @@ main(int argc, char *const *argv)
 
     } else {
         // ngx_process_cycle.c
+        // 启动多个worker进程
         ngx_master_process_cycle(cycle);
     }
 
+    // 只有退出无限循环才会走到这里，进程结束
     return 0;
 }
 
 
+// 检查NGINX环境变量，获取之前监听的socket
 static ngx_int_t
 ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 {

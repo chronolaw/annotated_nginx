@@ -12,14 +12,21 @@
 #include <ngx_channel.h>
 
 
+// 被ngx_master_process_cycle()调用
+// 启动worker进程，数量由配置决定，即worker_processes指令
+// 调用时传递的是#define NGX_PROCESS_RESPAWN       -3
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
+
 static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
     ngx_uint_t respawn);
 static void ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch);
 static void ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo);
 static ngx_uint_t ngx_reap_children(ngx_cycle_t *cycle);
+
+// 删除pid，模块清理，关闭监听端口
 static void ngx_master_process_exit(ngx_cycle_t *cycle);
+
 static void ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data);
 static void ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker);
 static void ngx_worker_process_exit(ngx_cycle_t *cycle);
@@ -76,7 +83,8 @@ static ngx_log_t        ngx_exit_log;
 static ngx_open_file_t  ngx_exit_log_file;
 
 
-// main()函数里调用，启动master/worker进程
+// main()函数里调用，启动worker进程
+// 监听信号
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
@@ -92,6 +100,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ngx_listening_t   *ls;
     ngx_core_conf_t   *ccf;
 
+    // 屏蔽一些信号,master进程不关注
     sigemptyset(&set);
     sigaddset(&set, SIGCHLD);
     sigaddset(&set, SIGALRM);
@@ -142,7 +151,8 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     // 取core模块配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
-    // 启动worker进程，数量由配置决定
+    // 启动worker进程，数量由配置决定，即worker_processes指令
+    // #define NGX_PROCESS_RESPAWN       -3
     ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
 
@@ -326,6 +336,9 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
     }
 
     // 无限循环，对外提供服务
+    // ngx_signal_handler处理unix信号
+    // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
+    // 由无限循环检查这些变量再处理
     for ( ;; ) {
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
@@ -372,6 +385,8 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 
 
 // 被ngx_master_process_cycle()调用
+// 启动worker进程，数量由配置决定，即worker_processes指令
+// 调用时传递的是#define NGX_PROCESS_RESPAWN       -3
 static void
 ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 {
@@ -382,18 +397,24 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     ngx_memzero(&ch, sizeof(ngx_channel_t));
 
+    // unix channel
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
     for (i = 0; i < n; i++) {
 
-        // os/unix/ngx_process.c产生进程
+        // os/unix/ngx_process.c产生进程，执行ngx_worker_process_cycle
+        // 创建的进程都在ngx_processes数组里
+        // 定义在os/unix/ngx_process.c
+        // ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
                           (void *) (intptr_t) i, "worker process", type);
 
+        // 设置channel信息
         ch.pid = ngx_processes[ngx_process_slot].pid;
         ch.slot = ngx_process_slot;
         ch.fd = ngx_processes[ngx_process_slot].channel[0];
 
+        // 建立channel，用于进程间通信
         ngx_pass_open_channel(cycle, &ch);
     }
 }
@@ -728,6 +749,8 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
         }
     }
 
+    // in ngx_connection.c
+    // 遍历监听端口列表，逐个删除监听事件
     ngx_close_listening_sockets(cycle);
 
     /*

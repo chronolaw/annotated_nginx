@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,21 +14,33 @@
 #include <ngx_setproctitle.h>
 
 
+// 重命名pid_t
 typedef pid_t       ngx_pid_t;
 
 #define NGX_INVALID_PID  -1
 
 typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
 
+// 存储进程信息
 typedef struct {
+    // 进程id
     ngx_pid_t           pid;
+
+    // waitpid()返回的状态
     int                 status;
+
+    // 进程间通信用的channle
     ngx_socket_t        channel[2];
 
+    // 进程执行的函数
     ngx_spawn_proc_pt   proc;
+
+    // proc函数的参数
     void               *data;
+
     char               *name;
 
+    // 进程当前的状态
     unsigned            respawn:1;
     unsigned            just_spawn:1;
     unsigned            detached:1;
@@ -44,10 +57,13 @@ typedef struct {
 } ngx_exec_ctx_t;
 
 
+// nginx最多支持1024个worker进程
 #define NGX_MAX_PROCESSES         1024
 
 #define NGX_PROCESS_NORESPAWN     -1
 #define NGX_PROCESS_JUST_SPAWN    -2
+
+// 产生worker进程时使用此宏
 #define NGX_PROCESS_RESPAWN       -3
 #define NGX_PROCESS_JUST_RESPAWN  -4
 #define NGX_PROCESS_DETACHED      -5
@@ -74,14 +90,21 @@ void ngx_debug_point(void);
 #endif
 
 
+// 在core/nginx.c ngx_save_argv()里存储命令行参数
 extern int            ngx_argc;
 extern char         **ngx_argv;
 extern char         **ngx_os_argv;
 
+// 记录nginx master进程的pid，在main()里使用
+// in os/unix/ngx_process_cycle.c
 extern ngx_pid_t      ngx_pid;
+
+// in os/unix/ngx_process.c
 extern ngx_socket_t   ngx_channel;
 extern ngx_int_t      ngx_process_slot;
 extern ngx_int_t      ngx_last_process;
+
+// 创建的进程都在ngx_processes数组里
 extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
 
 

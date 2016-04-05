@@ -12,6 +12,7 @@
 #include <ngx_channel.h>
 
 
+// 标记unix信号，handler=ngx_signal_handler
 typedef struct {
     int     signo;
     char   *signame;
@@ -22,7 +23,12 @@ typedef struct {
 
 
 static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);
+
+// 处理unix信号
+// 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
+// 由进程里的无限循环检查这些变量再处理
 static void ngx_signal_handler(int signo);
+
 static void ngx_process_get_status(void);
 static void ngx_unlock_mutexes(ngx_pid_t pid);
 
@@ -32,9 +38,18 @@ int              ngx_argc;
 char           **ngx_argv;
 char           **ngx_os_argv;
 
+// 全局变量，用于传出创建的进程索引号
+// 用在ngx_start_worker_processes()里
 ngx_int_t        ngx_process_slot;
+
+// 进程间通信的channel
 ngx_socket_t     ngx_channel;
+
+// 产生进程的计数器，初始值为0
+// 标记数组ngx_processes的最后使用的位置，遍历用
 ngx_int_t        ngx_last_process;
+
+// 创建的进程都在ngx_processes数组里
 ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 // 命令行-s参数关联数组
@@ -86,6 +101,11 @@ ngx_signal_t  signals[] = {
 };
 
 
+// 被ngx_start_worker_processes()调用，产生worker进程
+// 参数proc = ngx_worker_process_cycle
+// data = (void *) (intptr_t) i，即worker id
+// name = "worker process"
+// respawn = NGX_PROCESS_RESPAWN 即-3
 ngx_pid_t
 ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     char *name, ngx_int_t respawn)
@@ -94,16 +114,20 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     ngx_pid_t  pid;
     ngx_int_t  s;
 
+    // 决定进程在ngx_processes数组里的位置
+    // 产生新进程时respawn < 0
     if (respawn >= 0) {
         s = respawn;
 
     } else {
+        // 遍历进程数组，找到第一个“空”的位置，也角色pid无效的
         for (s = 0; s < ngx_last_process; s++) {
             if (ngx_processes[s].pid == -1) {
                 break;
             }
         }
 
+        // 序号不能超过nginx的最大值，即1024
         if (s == NGX_MAX_PROCESSES) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
                           "no more than %d processes can be spawned",
@@ -113,10 +137,12 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     }
 
 
+    // 创建进程间通信用的channel
     if (respawn != NGX_PROCESS_DETACHED) {
 
         /* Solaris 9 still has no AF_LOCAL */
 
+        // 创建socketpair，进程间通信用
         if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1)
         {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
@@ -129,6 +155,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
                        ngx_processes[s].channel[0],
                        ngx_processes[s].channel[1]);
 
+        // 进程间通信非阻塞
         if (ngx_nonblocking(ngx_processes[s].channel[0]) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           ngx_nonblocking_n " failed while spawning \"%s\"",
@@ -183,30 +210,39 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         ngx_processes[s].channel[1] = -1;
     }
 
+    // 设置全局变量，当前进程在数组ngx_processes里的位置
     ngx_process_slot = s;
 
 
+    // 调用fork产生子进程
     pid = fork();
 
     switch (pid) {
 
+    // -1产生子进程出错
     case -1:
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "fork() failed while spawning \"%s\"", name);
         ngx_close_channel(ngx_processes[s].channel, cycle->log);
         return NGX_INVALID_PID;
 
+    // 0是子进程，开始执行worker进程的核心函数
+    // ngx_worker_process_cycle，即无限循环处理事件
     case 0:
         ngx_pid = ngx_getpid();
+
+        // 这里是子进程的真正工作
         proc(cycle, data);
         break;
 
+    // 父进程得到子进程的pid
     default:
         break;
     }
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start %s %P", name, pid);
 
+    // 把子进程的pid存入数组，记录状态
     ngx_processes[s].pid = pid;
     ngx_processes[s].exited = 0;
 
@@ -214,6 +250,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         return pid;
     }
 
+    // 填充worker进程的其他状态
     ngx_processes[s].proc = proc;
     ngx_processes[s].data = data;
     ngx_processes[s].name = name;
@@ -252,6 +289,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         break;
     }
 
+    // ngx_last_process增加，用于之后产生新进程用
     if (s == ngx_last_process) {
         ngx_last_process++;
     }
@@ -310,6 +348,8 @@ ngx_init_signals(ngx_log_t *log)
 
 
 // 处理unix信号
+// 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
+// 由进程里的无限循环检查这些变量再处理
 void
 ngx_signal_handler(int signo)
 {
@@ -334,6 +374,7 @@ ngx_signal_handler(int signo)
 
     switch (ngx_process) {
 
+    // master/single进程可以处理的信号
     case NGX_PROCESS_MASTER:
     case NGX_PROCESS_SINGLE:
         switch (signo) {
@@ -400,6 +441,7 @@ ngx_signal_handler(int signo)
 
         break;
 
+    // worker能够处理的信号较少
     case NGX_PROCESS_WORKER:
     case NGX_PROCESS_HELPER:
         switch (signo) {
