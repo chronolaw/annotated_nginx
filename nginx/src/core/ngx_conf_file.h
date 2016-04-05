@@ -104,7 +104,7 @@ struct ngx_command_s {
     // NGX_HTTP_MAIN_CONF/NGX_HTTP_SRV_CONF/NGX_HTTP_LOC_CONF
     ngx_uint_t            conf;
     ngx_uint_t            offset;   //变量在conf结构体里的偏移量，可用offsetof得到
-    void                 *post;     //任意数据，可以在set函数里使用
+    void                 *post;     //解析后处理的数据
 };
 
 // 空指令，用于在指令数组的最后当做哨兵，结束数组，避免指定长度，类似NULL的作用
@@ -127,12 +127,16 @@ struct ngx_open_file_s {
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
 // 重要的数据结构，定义nginx模块
+// 重要的模块ngx_core_module/ngx_event_module/ngx_http_module
 // 1.9.11后有变化，改到了ngx_module.h，可以定义动态模块，使用了spare0等字段
 struct ngx_module_s {
-    // 每类模块各自的index
+    // 下面的几个成员通常使用宏NGX_MODULE_V1填充
+
+    // 每类(http/event)模块各自的index
     ngx_uint_t            ctx_index;
 
     // 在ngx_modules数组里的唯一索引，main()里赋值
+    // 使用计数器变量ngx_max_module
     ngx_uint_t            index;
 
     ngx_uint_t            spare0;
@@ -142,7 +146,13 @@ struct ngx_module_s {
 
     ngx_uint_t            version;
 
-    //模块不同含义不同,通常是函数指针表
+    // 模块不同含义不同,通常是函数指针表
+    // core模块的ctx
+    //typedef struct {
+    //    ngx_str_t             name;
+    //    void               *(*create_conf)(ngx_cycle_t *cycle);
+    //    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+    //} ngx_core_module_t;
     void                 *ctx;
 
     // 模块支持的指令，数组形式，最后用空对象表示结束
@@ -171,6 +181,7 @@ struct ngx_module_s {
     // 在ngx_worker_process_exit调用
     void                (*exit_process)(ngx_cycle_t *cycle);
 
+    // exit_master目前nginx不会调用
     void                (*exit_master)(ngx_cycle_t *cycle);
 
     // 下面7个成员通常用用NGX_MODULE_V1_PADDING填充
@@ -186,6 +197,7 @@ struct ngx_module_s {
 
 
 // 核心模块的ctx结构，比较简单，只有创建和初始化配置结构函数
+// create_conf函数返回的是void*指针
 typedef struct {
     ngx_str_t             name;
     void               *(*create_conf)(ngx_cycle_t *cycle);
@@ -215,7 +227,7 @@ struct ngx_conf_s {
     ngx_conf_file_t      *conf_file;
     ngx_log_t            *log;
 
-    void                 *ctx;
+    void                 *ctx;          //重要参数，解析时的上下文
     ngx_uint_t            module_type;
     ngx_uint_t            cmd_type;
 
