@@ -511,7 +511,8 @@ main(int argc, char *const *argv)
 
     } else {
         // ngx_process_cycle.c
-        // 启动多个worker进程
+        // 启动worker进程，数量由配置决定，即worker_processes指令
+        // 核心操作是sigsuspend，暂时挂起进程，不占用CPU，只有收到信号时才被唤醒
         ngx_master_process_cycle(cycle);
     }
 

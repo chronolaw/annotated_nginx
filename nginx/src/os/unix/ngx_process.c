@@ -27,9 +27,12 @@ static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);
 // 处理unix信号
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
+// 检查子进程结束，设置进程数组ngx_processes里的状态
 static void ngx_signal_handler(int signo);
 
+// 检查子进程结束，设置进程数组ngx_processes里的状态
 static void ngx_process_get_status(void);
+
 static void ngx_unlock_mutexes(ngx_pid_t pid);
 
 
@@ -50,6 +53,7 @@ ngx_socket_t     ngx_channel;
 ngx_int_t        ngx_last_process;
 
 // 创建的进程都在ngx_processes数组里
+// 此数组仅在master进程里使用，worker进程不使用
 ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 // 命令行-s参数关联数组
@@ -106,6 +110,7 @@ ngx_signal_t  signals[] = {
 // data = (void *) (intptr_t) i，即worker id
 // name = "worker process"
 // respawn = NGX_PROCESS_RESPAWN 即-3
+// #define NGX_PROCESS_JUST_SPAWN    -2
 ngx_pid_t
 ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     char *name, ngx_int_t respawn)
@@ -350,6 +355,7 @@ ngx_init_signals(ngx_log_t *log)
 // 处理unix信号
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
+// 检查子进程结束，设置进程数组ngx_processes里的状态
 void
 ngx_signal_handler(int signo)
 {
@@ -487,6 +493,7 @@ ngx_signal_handler(int signo)
                       "before either old or new binary's process");
     }
 
+    // 父进程收到了子进程结束的信号
     if (signo == SIGCHLD) {
         ngx_process_get_status();
     }
@@ -495,6 +502,7 @@ ngx_signal_handler(int signo)
 }
 
 
+// 检查子进程结束，设置进程数组ngx_processes里的状态
 static void
 ngx_process_get_status(void)
 {
@@ -508,6 +516,9 @@ ngx_process_get_status(void)
     one = 0;
 
     for ( ;; ) {
+        // 系统调用，活动结束的子进程
+        // WNOHANG 若pid指定的子进程没有结束，则waitpid()函数返回0，不予以等待。
+        // 若结束，则返回该子进程的ID。
         pid = waitpid(-1, &status, WNOHANG);
 
         if (pid == 0) {
@@ -549,8 +560,11 @@ ngx_process_get_status(void)
         one = 1;
         process = "unknown process";
 
+        // 在进程数组里找到结束的进程
         for (i = 0; i < ngx_last_process; i++) {
             if (ngx_processes[i].pid == pid) {
+
+                // 设置结束进程的结束状态
                 ngx_processes[i].status = status;
                 ngx_processes[i].exited = 1;
                 process = ngx_processes[i].name;
@@ -558,6 +572,8 @@ ngx_process_get_status(void)
             }
         }
 
+        // WTERMSIG宏测试被执行后，若成功返回被终止的子进程的信号值。
+        // 只记录log，无其他动作
         if (WTERMSIG(status)) {
 #ifdef WCOREDUMP
             ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
@@ -576,6 +592,7 @@ ngx_process_get_status(void)
                           process, pid, WEXITSTATUS(status));
         }
 
+        // 获取子进程的非正常返回值
         if (WEXITSTATUS(status) == 2 && ngx_processes[i].respawn) {
             ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
                           "%s %P exited with fatal code %d "

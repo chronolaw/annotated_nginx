@@ -101,6 +101,7 @@ static ngx_open_file_t  ngx_exit_log_file;
 
 // main()函数里调用，启动worker进程
 // 监听信号
+// 核心操作是sigsuspend，暂时挂起进程，不占用CPU，只有收到信号时才被唤醒
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
@@ -176,16 +177,18 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ngx_start_cache_manager_processes(cycle, 0);
 
     ngx_new_binary = 0;
-    delay = 0;
+    delay = 0;      //延时的计数器
     sigio = 0;
-    live = 1;
+    live = 1;       //是否有存活的子进程
 
     // master进程的无限循环，只处理信号
+    // 主要调用ngx_signal_worker_processes()发送信号
+    // ngx_start_worker_processes()产生新子进程
     for ( ;; ) {
         if (delay) {
             if (ngx_sigalrm) {
                 sigio = 0;
-                delay *= 2;
+                delay *= 2;     //延时加倍
                 ngx_sigalrm = 0;
             }
 
@@ -197,6 +200,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             itv.it_value.tv_sec = delay / 1000;
             itv.it_value.tv_usec = (delay % 1000 ) * 1000;
 
+            // 系统调用，设置发送SIGALRM的时间间隔
             if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
                 ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                               "setitimer() failed");
@@ -205,8 +209,11 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
 
+        // 核心操作是sigsuspend，暂时挂起进程，不占用CPU，只有收到信号时才被唤醒
+        // 收到SIGALRM就检查子进程是否都已经处理完了
         sigsuspend(&set);
 
+        // 更新一下时间
         ngx_time_update();
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
@@ -219,11 +226,16 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             live = ngx_reap_children(cycle);
         }
 
+        // 无存活子进程且收到stop/quit信号
         if (!live && (ngx_terminate || ngx_quit)) {
+            // 删除pid，模块清理，关闭监听端口
+            // 内部直接exit(0)退出
             ngx_master_process_exit(cycle);
         }
 
+        // 收到了-s stop，停止进程
         if (ngx_terminate) {
+            // 延时等待子进程关闭
             if (delay == 0) {
                 delay = 50;
             }
@@ -236,16 +248,26 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             sigio = ccf->worker_processes + 2 /* cache processes */;
 
             if (delay > 1000) {
+                // 超时太多，直接发送SIGKILL杀死进程
+                // master进程调用，遍历ngx_processes数组，用kill发送信号
                 ngx_signal_worker_processes(cycle, SIGKILL);
             } else {
+                // master进程调用，遍历ngx_processes数组，用kill发送信号
+                // 走到worker进程的ngx_signal_handler()
+                // 然后再是ngx_worker_process_cycle()的ngx_terminate
                 ngx_signal_worker_processes(cycle,
                                        ngx_signal_value(NGX_TERMINATE_SIGNAL));
             }
 
+            // 等待SIGALRM信号，检查子进程是否都结束
             continue;
         }
 
+        // 收到了-s quit，关闭监听端口后再停止进程（优雅关闭）
         if (ngx_quit) {
+            // master进程调用，遍历ngx_processes数组，用kill发送信号
+            // 走到worker进程的ngx_signal_handler()
+            // 然后再是ngx_worker_process_cycle()的ngx_quit
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
 
@@ -262,10 +284,14 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             continue;
         }
 
+        // 收到了-s reload重新配置
         if (ngx_reconfigure) {
             ngx_reconfigure = 0;
 
+            // 启动新的nginx二进制
             if (ngx_new_binary) {
+                // 启动worker进程，数量由配置决定，即worker_processes指令
+                // 调用时传递的是#define NGX_PROCESS_RESPAWN       -3
                 ngx_start_worker_processes(cycle, ccf->worker_processes,
                                            NGX_PROCESS_RESPAWN);
                 ngx_start_cache_manager_processes(cycle, 0);
@@ -276,6 +302,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
 
+            // nginx可执行程序不变，以当前cycle重新初始化
             cycle = ngx_init_cycle(cycle);
             if (cycle == NULL) {
                 cycle = (ngx_cycle_t *) ngx_cycle;
@@ -285,23 +312,40 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_cycle = cycle;
             ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                    ngx_core_module);
+
+            // 启动worker进程，数量由配置决定，即worker_processes指令
+            // 调用时传递的是#define NGX_PROCESS_JUST_RESPAWN       -2
+            // 这样新启动的进程不会发送shutdown信号
             ngx_start_worker_processes(cycle, ccf->worker_processes,
                                        NGX_PROCESS_JUST_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 1);
 
             /* allow new processes to start */
+            // 阻塞等待100毫秒
             ngx_msleep(100);
 
+            // 设置进程存活标志
             live = 1;
+
+            // 关闭原来的worker进程
+            // 新启动的进程不会发送shutdown信号
+            // master进程调用，遍历ngx_processes数组，用kill发送信号
+            // 走到worker进程的ngx_signal_handler()
+            // 然后再是ngx_worker_process_cycle()的ngx_quit
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
 
         if (ngx_restart) {
             ngx_restart = 0;
+
+            // 启动worker进程，数量由配置决定，即worker_processes指令
+            // 调用时传递的是#define NGX_PROCESS_RESPAWN       -3
             ngx_start_worker_processes(cycle, ccf->worker_processes,
                                        NGX_PROCESS_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 0);
+
+            // 设置进程存活标志
             live = 1;
         }
 
@@ -372,6 +416,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
             }
 
             // 删除pid，模块清理，关闭监听端口
+            // 内部直接exit(0)退出
             ngx_master_process_exit(cycle);
         }
 
@@ -576,6 +621,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
             continue;
         }
 
+        // 新启动的进程不会发送信号
         if (ngx_processes[i].just_spawn) {
             ngx_processes[i].just_spawn = 0;
             continue;
@@ -753,6 +799,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
 
 
 // 删除pid，模块清理，关闭监听端口
+// 内部直接exit(0)退出
 static void
 ngx_master_process_exit(ngx_cycle_t *cycle)
 {
