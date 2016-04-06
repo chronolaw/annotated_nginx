@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -42,6 +43,10 @@ sig_atomic_t          ngx_event_timer_alarm;
 static ngx_uint_t     ngx_event_max_module;
 
 ngx_uint_t            ngx_event_flags;
+
+// 全局的事件模块访问接口，是一个函数表
+// 定义了若干宏简化对它的操作
+// 常用的有ngx_add_event/ngx_del_event
 ngx_event_actions_t   ngx_event_actions;
 
 

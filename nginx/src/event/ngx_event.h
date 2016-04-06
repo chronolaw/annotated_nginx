@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -27,14 +28,21 @@ typedef struct {
 #endif
 
 
+// nginx事件模块的核心结构体
+// 表示一个nginx事件（读/写/超时）
+// 重要的成员是handler，即事件发生时调用的函数
 struct ngx_event_s {
+    // 事件相关的对象，通常是ngx_connection_t
     void            *data;
 
+    // 写事件，也就是说tcp连接是写状态，可以发送数据
     unsigned         write:1;
 
+    // 监听状态标志位
     unsigned         accept:1;
 
     /* used to detect the stale events in kqueue, rtsig, and epoll */
+    // 检测事件是否失效
     unsigned         instance:1;
 
     /*
@@ -56,7 +64,10 @@ struct ngx_event_s {
     unsigned         eof:1;
     unsigned         error:1;
 
+    // 事件是否已经超时
     unsigned         timedout:1;
+
+    // 事件是否在定时器里
     unsigned         timer_set:1;
 
     unsigned         delayed:1;
@@ -100,6 +111,7 @@ struct ngx_event_s {
     unsigned         available:1;
 #endif
 
+    // 事件发生时调用的函数
     ngx_event_handler_pt  handler;
 
 
@@ -117,9 +129,11 @@ struct ngx_event_s {
 
     ngx_log_t       *log;
 
+    // 红黑树节点成员，用于把事件加入定时器
     ngx_rbtree_node_t   timer;
 
     /* the posted queue */
+    // 队列成员，加入延后处理的队列
     ngx_queue_t      queue;
 
     unsigned         closed:1;
@@ -182,6 +196,7 @@ struct ngx_event_aio_s {
 #endif
 
 
+// 全局的事件模块访问接口，是一个函数表
 typedef struct {
     ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
     ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
@@ -202,6 +217,9 @@ typedef struct {
 } ngx_event_actions_t;
 
 
+// 全局的事件模块访问接口，是一个函数表
+// 定义了若干宏简化对它的操作
+// 常用的有ngx_add_event/ngx_del_event
 extern ngx_event_actions_t   ngx_event_actions;
 
 
@@ -406,6 +424,9 @@ extern ngx_event_actions_t   ngx_event_actions;
 #endif
 
 
+// 全局的事件模块访问接口，是一个函数表
+// 定义了若干宏简化对它的操作
+// 常用的有ngx_add_event/ngx_del_event
 #define ngx_process_events   ngx_event_actions.process_events
 #define ngx_done_events      ngx_event_actions.done
 
