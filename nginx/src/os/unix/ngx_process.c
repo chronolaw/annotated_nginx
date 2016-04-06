@@ -306,6 +306,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 }
 
 
+// 执行外部程序
 ngx_pid_t
 ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
 {
@@ -391,11 +392,13 @@ ngx_signal_handler(int signo)
     case NGX_PROCESS_SINGLE:
         switch (signo) {
 
+        // 优雅关闭, -s quit
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
             ngx_quit = 1;
             action = ", shutting down";
             break;
 
+        // 直接关闭, -s stop
         case ngx_signal_value(NGX_TERMINATE_SIGNAL):
         case SIGINT:
             ngx_terminate = 1;
@@ -409,11 +412,13 @@ ngx_signal_handler(int signo)
             }
             break;
 
+        // 重新加载配置文件, -s reload
         case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
             ngx_reconfigure = 1;
             action = ", reconfiguring";
             break;
 
+        // 重新打开文件， -s reopen
         case ngx_signal_value(NGX_REOPEN_SIGNAL):
             ngx_reopen = 1;
             action = ", reopening logs";
@@ -438,6 +443,7 @@ ngx_signal_handler(int signo)
             action = ", changing binary";
             break;
 
+        // SIGALRM,更新时间
         case SIGALRM:
             ngx_sigalrm = 1;
             break;
@@ -446,7 +452,10 @@ ngx_signal_handler(int signo)
             ngx_sigio = 1;
             break;
 
+        // 子进程结束，可能发生了意外
         case SIGCHLD:
+            // 将导致master进程ngx_master_process_cycle()调用ngx_reap_children()
+            // 重新产生子进程
             ngx_reap = 1;
             break;
         }
@@ -463,22 +472,27 @@ ngx_signal_handler(int signo)
                 break;
             }
             ngx_debug_quit = 1;
+
+        // 优雅关闭, -s quit
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
             ngx_quit = 1;
             action = ", shutting down";
             break;
 
+        // 直接关闭, -s stop
         case ngx_signal_value(NGX_TERMINATE_SIGNAL):
         case SIGINT:
             ngx_terminate = 1;
             action = ", exiting";
             break;
 
+        // 重新打开文件， -s reopen
         case ngx_signal_value(NGX_REOPEN_SIGNAL):
             ngx_reopen = 1;
             action = ", reopening logs";
             break;
 
+        // 重新加载配置文件, -s reload
         case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
         case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
         case SIGIO:

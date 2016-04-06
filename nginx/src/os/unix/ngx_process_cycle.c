@@ -26,6 +26,7 @@ static void ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch);
 // master进程调用，遍历ngx_processes数组，用kill发送信号
 static void ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo);
 
+// 重新产生子进程
 static ngx_uint_t ngx_reap_children(ngx_cycle_t *cycle);
 
 // 删除pid，模块清理，关闭监听端口
@@ -120,7 +121,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ngx_listening_t   *ls;
     ngx_core_conf_t   *ccf;
 
-    // 屏蔽一些信号,master进程不关注
+    // 添加master进程关注的信号
     sigemptyset(&set);
     sigaddset(&set, SIGCHLD);
     sigaddset(&set, SIGALRM);
@@ -188,6 +189,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     // 主要调用ngx_signal_worker_processes()发送信号
     // ngx_start_worker_processes()产生新子进程
     for ( ;; ) {
+        // 延时等待子进程关闭，每次进入加倍等待
         if (delay) {
             if (ngx_sigalrm) {
                 sigio = 0;
@@ -222,10 +224,13 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "wake up, sigio %i", sigio);
 
+        // 子进程可能发生了意外结束
+        // 在os/unix/ngx_process.c ngx_signal_handler()里设置
         if (ngx_reap) {
             ngx_reap = 0;
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
+            // 重新产生子进程
             live = ngx_reap_children(cycle);
         }
 
@@ -274,6 +279,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
 
+            // 关闭所有监听端口
             ls = cycle->listening.elts;
             for (n = 0; n < cycle->listening.nelts; n++) {
                 if (ngx_close_socket(ls[n].fd) == -1) {
@@ -674,6 +680,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 }
 
 
+// 重新产生子进程
 static ngx_uint_t
 ngx_reap_children(ngx_cycle_t *cycle)
 {
@@ -688,6 +695,8 @@ ngx_reap_children(ngx_cycle_t *cycle)
     ch.fd = -1;
 
     live = 0;
+
+    // 遍历进程数组，检查所有有效的进程
     for (i = 0; i < ngx_last_process; i++) {
 
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
@@ -700,10 +709,13 @@ ngx_reap_children(ngx_cycle_t *cycle)
                        ngx_processes[i].respawn,
                        ngx_processes[i].just_spawn);
 
+        // -1表示进程无效，忽略
         if (ngx_processes[i].pid == -1) {
             continue;
         }
 
+        // 找到被意外结束的进程
+        // ngx_process_get_status()里设置, os/unix/ngx_process.c
         if (ngx_processes[i].exited) {
 
             if (!ngx_processes[i].detached) {
@@ -739,6 +751,8 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 && !ngx_terminate
                 && !ngx_quit)
             {
+                // 使用进程数组里保存的信息重新产生新的进程
+                // 仍然在原来的位置
                 if (ngx_spawn_process(cycle, ngx_processes[i].proc,
                                       ngx_processes[i].data,
                                       ngx_processes[i].name, i)
