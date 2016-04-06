@@ -43,11 +43,14 @@ typedef struct {
 
 // 初始化字符串，只能用于初始化，str必须是个字面值
 #define ngx_string(str)     { sizeof(str) - 1, (u_char *) str }
+
 // 空字符串
 #define ngx_null_string     { 0, NULL }
+
 // 运行时设置字符串，str是指针（地址）
 #define ngx_str_set(str, text)                                               \
     (str)->len = sizeof(text) - 1; (str)->data = (u_char *) text
+
 // 把字符串置为空字符串，运行时设置，str是指针
 #define ngx_str_null(str)   (str)->len = 0; (str)->data = NULL
 
@@ -158,6 +161,7 @@ ngx_copy(u_char *dst, u_char *src, size_t len)
 
 // 拷贝字符串
 u_char *ngx_cpystrn(u_char *dst, u_char *src, size_t n);
+
 //在内存池里复制一个新的字符串
 u_char *ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src);
 
@@ -188,6 +192,7 @@ ngx_int_t ngx_dns_strcmp(u_char *s1, u_char *s2);
 ngx_int_t ngx_filename_cmp(u_char *s1, u_char *s2, size_t n);
 
 // 字符串转换为数字
+// 也可以使用C++11的stoi()或者boost::lexical_cast
 ngx_int_t ngx_atoi(u_char *line, size_t n);
 ngx_int_t ngx_atofp(u_char *line, size_t n, size_t point);
 ssize_t ngx_atosz(u_char *line, size_t n);
@@ -251,6 +256,7 @@ void ngx_sort(void *base, size_t n, size_t size,
 #define ngx_qsort             qsort
 
 
+// 预处理字符串化，相当于BOOST_STRINGIZE()
 #define ngx_value_helper(n)   #n
 #define ngx_value(n)          ngx_value_helper(n)
 
