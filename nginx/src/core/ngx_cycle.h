@@ -61,6 +61,7 @@ struct ngx_cycle_s {
     ngx_connection_t        **files;
 
     // 空闲连接，使用指针串成单向链表
+    // 指向第一个空闲连接，即头节点
     ngx_connection_t         *free_connections;
 
     // 空闲连接的数量
@@ -68,7 +69,7 @@ struct ngx_cycle_s {
 
     ngx_queue_t               reusable_connections_queue;
 
-    // 监听的端口数组
+    // 监听的端口数组, in ngx_connection.h
     ngx_array_t               listening;
 
     // 打开的目录
@@ -87,6 +88,7 @@ struct ngx_cycle_s {
     ngx_uint_t                files_n;
 
     // 连接池,大小是connection_n
+    // 每个连接都有一个读事件和写事件，使用数组序号对应
     ngx_connection_t         *connections;
 
     // 读事件数组，大小与connections相同，并且一一对应

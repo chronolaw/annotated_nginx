@@ -16,19 +16,38 @@
 
 typedef struct ngx_listening_s  ngx_listening_t;
 
+// 监听端口数据结构
+// 存储在ngx_cycle_t::listening数组里
+// 由http模块用listen指令添加
 struct ngx_listening_s {
+
+    // socket描述符（句柄）
     ngx_socket_t        fd;
 
+    // sockaddr指针
     struct sockaddr    *sockaddr;
+
+    // sockaddr长度
     socklen_t           socklen;    /* size of sockaddr */
+
+    // addr_text的最大长度
     size_t              addr_text_max_len;
+
+    // 文本形式的地址
     ngx_str_t           addr_text;
 
+    // socket的类型，SOCK_STREAM 表示TCP，
     int                 type;
 
+    // TCP的backlog队列，即等待连接的队列
     int                 backlog;
+
+    // 接收缓冲区大小
     int                 rcvbuf;
+
+    // 发送缓冲区大小
     int                 sndbuf;
+
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                 keepidle;
     int                 keepintvl;
@@ -36,6 +55,8 @@ struct ngx_listening_s {
 #endif
 
     /* handler of accepted connection */
+    // 重要函数，tcp连接成功时的回调函数
+    // 对于http模块是ngx_http_request.c:ngx_http_init_connection
     ngx_connection_handler_pt   handler;
 
     void               *servers;  /* array of ngx_http_in_addr_t, for example */
@@ -43,15 +64,20 @@ struct ngx_listening_s {
     ngx_log_t           log;
     ngx_log_t          *logp;
 
+    // 内存池的初始大小
     size_t              pool_size;
     /* should be here because of the AcceptEx() preread */
     size_t              post_accept_buffer_size;
     /* should be here because of the deferred accept */
     ngx_msec_t          post_accept_timeout;
 
+    // 链表指针，多个ngx_listening_t组成一个单向链表
     ngx_listening_t    *previous;
+
+    // 监听端口对应的连接对象
     ngx_connection_t   *connection;
 
+    // 以下是一些标志位
     unsigned            open:1;
     unsigned            remain:1;
     unsigned            ignore:1;
@@ -116,24 +142,42 @@ typedef enum {
 #define NGX_SPDY_BUFFERED      0x02
 
 
+// 连接结构体，表示nginx里的一个tcp连接
+// 每个连接都有一个读事件和写事件，使用数组序号对应
 struct ngx_connection_s {
+    // data成员有两种用法
+    // 未使用（空闲）时作为链表的后继指针，连接在ngx_cycle_t::free_connections里
+    // 在http模块里保存ngx_http_request_t对象，标记连接对应的http请求
     void               *data;
+
+    // 连接对应的读事件，存储在ngx_cycle_t::read_events
     ngx_event_t        *read;
+
+    // 连接对应的写事件，存储在ngx_cycle_t::write_events
     ngx_event_t        *write;
 
+    // 连接的socket描述符（句柄）
     ngx_socket_t        fd;
 
+    // 接收数据的函数指针
     ngx_recv_pt         recv;
+
+    // 发送数据的函数指针
     ngx_send_pt         send;
+
     ngx_recv_chain_pt   recv_chain;
     ngx_send_chain_pt   send_chain;
 
+    // 连接对应的ngx_listening_t监听对象
     ngx_listening_t    *listening;
 
+    // 连接上已经发送的字节数
     off_t               sent;
 
+    // 用于记录日志的log
     ngx_log_t          *log;
 
+    // 连接的内存池
     ngx_pool_t         *pool;
 
     struct sockaddr    *sockaddr;
@@ -151,6 +195,7 @@ struct ngx_connection_s {
 
     ngx_buf_t          *buffer;
 
+    // 侵入式队列，加入到ngx_cycle
     ngx_queue_t         queue;
 
     ngx_atomic_uint_t   number;

@@ -536,7 +536,7 @@ ngx_process_get_status(void)
     one = 0;
 
     for ( ;; ) {
-        // 系统调用，活动结束的子进程
+        // 系统调用，获得结束的子进程
         // WNOHANG 若pid指定的子进程没有结束，则waitpid()函数返回0，不予以等待。
         // 若结束，则返回该子进程的ID。
         pid = waitpid(-1, &status, WNOHANG);
