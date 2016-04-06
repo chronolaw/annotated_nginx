@@ -91,12 +91,15 @@ struct ngx_cycle_s {
 
     // 连接池,大小是connection_n
     // 每个连接都有一个读事件和写事件，使用数组序号对应
+    // 由ngx_event_core_module的ngx_event_process_init()创建
     ngx_connection_t         *connections;
 
     // 读事件数组，大小与connections相同，并且一一对应
+    // 由ngx_event_core_module的ngx_event_process_init()创建
     ngx_event_t              *read_events;
 
     // 写事件数组，大小与connections相同，并且一一对应
+    // 由ngx_event_core_module的ngx_event_process_init()创建
     ngx_event_t              *write_events;
 
     // 保存之前的cycle，如init_cycle

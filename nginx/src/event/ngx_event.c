@@ -24,7 +24,11 @@ extern ngx_module_t ngx_select_module;
 
 static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
 static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
+
+// 进程初始化时调用，即每个worker里都会执行
+// 初始化cycle里的连接和事件数组
 static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
+
 static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -193,8 +197,12 @@ ngx_module_t  ngx_event_core_module = {
     ngx_event_core_commands,               /* module directives */
     NGX_EVENT_MODULE,                      /* module type */
     NULL,                                  /* init master */
+
     ngx_event_module_init,                 /* init module */
+
+    // 初始化cycle里的连接和事件数组
     ngx_event_process_init,                /* init process */
+
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -576,6 +584,8 @@ ngx_timer_signal_handler(int signo)
 #endif
 
 
+// 进程初始化时调用，即每个worker里都会执行
+// 初始化cycle里的连接和事件数组
 static ngx_int_t
 ngx_event_process_init(ngx_cycle_t *cycle)
 {
@@ -613,6 +623,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_events);
 
+    // 初始化定时器红黑树
     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -683,6 +694,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #endif
 
+    // 创建连接池数组，大小是cycle->connection_n
+    // 直接使用malloc分配内存，没有使用内存池
     cycle->connections =
         ngx_alloc(sizeof(ngx_connection_t) * cycle->connection_n, cycle->log);
     if (cycle->connections == NULL) {
@@ -691,6 +704,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
     c = cycle->connections;
 
+    // 创建读事件池数组，大小是cycle->connection_n
     cycle->read_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
                                    cycle->log);
     if (cycle->read_events == NULL) {
@@ -703,6 +717,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         rev[i].instance = 1;
     }
 
+    // 创建写事件池数组，大小是cycle->connection_n
     cycle->write_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
                                     cycle->log);
     if (cycle->write_events == NULL) {
@@ -717,18 +732,30 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     i = cycle->connection_n;
     next = NULL;
 
+    // 把连接对象与读写事件关联起来
+    // 注意i是数组的末尾，从最后遍历
     do {
         i--;
 
+        // 使用data成员，把连接对象串成链表
         c[i].data = next;
+
+        // 读写事件
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
+
+        // 连接的描述符是-1，表示无效
         c[i].fd = (ngx_socket_t) -1;
 
+        // next指针指向数组的前一个元素
         next = &c[i];
     } while (i);
 
+    // 连接对象已经串成链表，现在设置空闲链表指针
+    // 此时next指向连接对象数组的第一个元素
     cycle->free_connections = next;
+
+    // 连接没有使用，全是空闲连接
     cycle->free_connection_n = cycle->connection_n;
 
     /* for each listening socket */
