@@ -18,7 +18,8 @@ static void ngx_drain_connections(void);
 
 
 // http/ngx_http.c:ngx_http_add_listening()里调用
-// 添加到cycle的监听端口数组
+// 添加到cycle的监听端口数组，只是添加，没有其他动作
+// 添加后需要用ngx_open_listening_sockets()才能打开端口监听
 ngx_listening_t *
 ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 {
@@ -81,6 +82,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     ls->fd = (ngx_socket_t) -1;
     ls->type = SOCK_STREAM;
 
+    // os/unix/ngx_linux_config.h:#define NGX_LISTEN_BACKLOG        511
     ls->backlog = NGX_LISTEN_BACKLOG;
     ls->rcvbuf = -1;
     ls->sndbuf = -1;
@@ -310,6 +312,8 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 // ngx_cycle.c : init_cycle()里被调用
 // 创建socket, bind/listen
+// 之后会调用ngx_configure_listening_sockets()
+// 配置监听端口的rcvbuf/sndbuf等参数，调用setsockopt()
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
@@ -335,6 +339,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
         /* for each listening socket */
 
+        // 遍历监听端口链表
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
 
@@ -342,6 +347,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // 已经打开的端口不再处理
             if (ls[i].fd != (ngx_socket_t) -1) {
                 continue;
             }
@@ -402,6 +408,8 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             /* TODO: close on exit */
 
             if (!(ngx_event_flags & NGX_USE_AIO_EVENT)) {
+
+                // 设置为nonblocking，使用FIONBIO
                 if (ngx_nonblocking(s) == -1) {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
                                   ngx_nonblocking_n " %V failed",
@@ -512,6 +520,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 }
 
 
+// ngx_init_cycle()里调用，在ngx_open_listening_sockets()之后
 // 配置监听端口的rcvbuf/sndbuf等参数，调用setsockopt()
 void
 ngx_configure_listening_sockets(ngx_cycle_t *cycle)
@@ -524,11 +533,13 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
     struct accept_filter_arg   af;
 #endif
 
+    // 遍历监听端口链表
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
         ls[i].log = *ls[i].logp;
 
+        // rcvbuf
         if (ls[i].rcvbuf != -1) {
             if (setsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF,
                            (const void *) &ls[i].rcvbuf, sizeof(int))
@@ -540,6 +551,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
             }
         }
 
+        // sndbuf
         if (ls[i].sndbuf != -1) {
             if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF,
                            (const void *) &ls[i].sndbuf, sizeof(int))
@@ -551,6 +563,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
             }
         }
 
+        // keepalive
         if (ls[i].keepalive) {
             value = (ls[i].keepalive == 1) ? 1 : 0;
 
@@ -654,6 +667,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         }
 #endif
 
+        // 已经监听标志, backlog
         if (ls[i].listen) {
 
             /* change backlog via listen() */
@@ -776,6 +790,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
     ngx_accept_mutex_held = 0;
     ngx_use_accept_mutex = 0;
 
+    // 遍历监听端口链表
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
@@ -801,6 +816,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
                 }
             }
 
+            // 释放连接，加入空闲链表
             ngx_free_connection(c);
 
             c->fd = (ngx_socket_t) -1;
@@ -873,6 +889,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     // 调整空闲链表的指针，复用data成员
     ngx_cycle->free_connections = c->data;
+
+    // 空闲连接计数器减少
     ngx_cycle->free_connection_n--;
 
     if (ngx_cycle->files) {
@@ -946,23 +964,29 @@ ngx_close_connection(ngx_connection_t *c)
         return;
     }
 
+    // 读事件在定时器里，需要删除
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
 
+    // 写事件在定时器里，需要删除
     if (c->write->timer_set) {
         ngx_del_timer(c->write);
     }
 
+    // in event/ngx_event.h
+    // 宏，实际上是ngx_event_actions.del_conn
     if (ngx_del_conn) {
         ngx_del_conn(c, NGX_CLOSE_EVENT);
 
     } else {
         if (c->read->active || c->read->disabled) {
+            // 宏，实际上是ngx_event_actions.del
             ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
         }
 
         if (c->write->active || c->write->disabled) {
+            // 宏，实际上是ngx_event_actions.del
             ngx_del_event(c->write, NGX_WRITE_EVENT, NGX_CLOSE_EVENT);
         }
     }
@@ -978,15 +1002,18 @@ ngx_close_connection(ngx_connection_t *c)
     c->read->closed = 1;
     c->write->closed = 1;
 
+    // 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
     ngx_reusable_connection(c, 0);
 
     log_error = c->log_error;
 
+    // 释放连接，加入空闲链表
     ngx_free_connection(c);
 
     fd = c->fd;
     c->fd = (ngx_socket_t) -1;
 
+    // 关闭socket
     if (ngx_close_socket(fd) == -1) {
 
         err = ngx_socket_errno;
@@ -1019,6 +1046,7 @@ ngx_close_connection(ngx_connection_t *c)
 }
 
 
+// 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
 void
 ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
 {

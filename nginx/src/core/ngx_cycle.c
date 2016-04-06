@@ -635,7 +635,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         goto failed;
     }
 
+    // 如果是-t则不配置监听端口参数
     if (!ngx_test_config) {
+        // ngx_connection.c
+        // 配置rcvbuf/sndbuf等监听端口的参数
         ngx_configure_listening_sockets(cycle);
     }
 
