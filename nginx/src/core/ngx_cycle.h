@@ -41,6 +41,13 @@ struct ngx_shm_zone_s {
 struct ngx_cycle_s {
 
     // 存储所有模块的配置结构体，是个二维数组
+    // 0 = ngx_core_module
+    // 1 = ngx_errlog_module
+    // 3 = ngx_event_module
+    // 4 = ngx_event_core_module
+    // 5 = ngx_epoll_module
+    // 7 = ngx_http_module
+    // 8 = ngx_http_core_module
     void                  ****conf_ctx;
 
     // 内存池
@@ -53,19 +60,30 @@ struct ngx_cycle_s {
 
     ngx_connection_t        **files;
 
-    // 空闲连接
+    // 空闲连接，使用指针串成单向链表
     ngx_connection_t         *free_connections;
+
+    // 空闲连接的数量
     ngx_uint_t                free_connection_n;
 
     ngx_queue_t               reusable_connections_queue;
 
     // 监听的端口数组
     ngx_array_t               listening;
+
+    // 打开的目录
     ngx_array_t               paths;
+
+    // 打开的文件
     ngx_list_t                open_files;
+
+    // 共享内存
     ngx_list_t                shared_memory;
 
+    // 连接数组的数量
+    // 由worker_connections指定，在event模块里设置
     ngx_uint_t                connection_n;
+
     ngx_uint_t                files_n;
 
     // 连接池,大小是connection_n
@@ -77,6 +95,7 @@ struct ngx_cycle_s {
     // 写事件数组，大小与connections相同，并且一一对应
     ngx_event_t              *write_events;
 
+    // 保存之前的cycle，如init_cycle
     ngx_cycle_t              *old_cycle;
 
     //启动nginx时的环境参数，配置文件，工作路径等
