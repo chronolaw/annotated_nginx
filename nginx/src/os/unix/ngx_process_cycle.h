@@ -41,8 +41,14 @@ void ngx_single_process_cycle(ngx_cycle_t *cycle);
 
 
 // 声明为extern，供其他文件使用
+
+// 创建的进程都在ngx_processes数组里
+// 此数组仅在master进程里使用，worker进程不使用
 extern ngx_uint_t      ngx_process;
+
+// 记录nginx master进程的pid，在main()里使用
 extern ngx_pid_t       ngx_pid;
+
 extern ngx_pid_t       ngx_new_binary;
 extern ngx_uint_t      ngx_inherited;
 extern ngx_uint_t      ngx_daemonized;

@@ -125,7 +125,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         s = respawn;
 
     } else {
-        // 遍历进程数组，找到第一个“空”的位置，也角色pid无效的
+        // 遍历进程数组，找到第一个“空”的位置，也就是pid无效的
         for (s = 0; s < ngx_last_process; s++) {
             if (ngx_processes[s].pid == -1) {
                 break;
@@ -237,6 +237,8 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         ngx_pid = ngx_getpid();
 
         // 这里是子进程的真正工作
+        // proc = ngx_worker_process_cycle
+        // data = (void *) (intptr_t) i，即worker id
         proc(cycle, data);
         break;
 
@@ -256,6 +258,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     }
 
     // 填充worker进程的其他状态
+    // name = "worker process"
     ngx_processes[s].proc = proc;
     ngx_processes[s].data = data;
     ngx_processes[s].name = name;
@@ -306,6 +309,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 ngx_pid_t
 ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
 {
+    // 产生进程执行ngx_execute_proc
     return ngx_spawn_process(cycle, ngx_execute_proc, ctx, ctx->name,
                              NGX_PROCESS_DETACHED);
 }
@@ -316,6 +320,7 @@ ngx_execute_proc(ngx_cycle_t *cycle, void *data)
 {
     ngx_exec_ctx_t  *ctx = data;
 
+    // 系统调用execve()
     if (execve(ctx->path, ctx->argv, ctx->envp) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "execve() failed while executing %s \"%s\"",
@@ -326,6 +331,7 @@ ngx_execute_proc(ngx_cycle_t *cycle, void *data)
 }
 
 
+// 初始化signals数组
 ngx_int_t
 ngx_init_signals(ngx_log_t *log)
 {

@@ -19,6 +19,7 @@ typedef pid_t       ngx_pid_t;
 
 #define NGX_INVALID_PID  -1
 
+// 进程的执行函数，在ngx_spawn_process()里调用
 typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
 
 // 存储进程信息
@@ -36,11 +37,12 @@ typedef struct {
     ngx_spawn_proc_pt   proc;
 
     // proc函数的参数
+    // 对于worker进程data是workerid，即进程的序号
     void               *data;
 
     char               *name;
 
-    // 进程当前的状态
+    // 进程当前的状态，用于关闭时用
     unsigned            respawn:1;
     unsigned            just_spawn:1;
     unsigned            detached:1;
@@ -49,6 +51,7 @@ typedef struct {
 } ngx_process_t;
 
 
+// 执行二进制可执行文件
 typedef struct {
     char         *path;
     char         *name;
@@ -66,6 +69,7 @@ typedef struct {
 // 产生worker进程时使用此宏
 #define NGX_PROCESS_RESPAWN       -3
 #define NGX_PROCESS_JUST_RESPAWN  -4
+
 #define NGX_PROCESS_DETACHED      -5
 
 
@@ -76,10 +80,19 @@ typedef struct {
 #endif
 
 
+// 被ngx_start_worker_processes()调用，产生worker进程
+// 参数proc = ngx_worker_process_cycle
+// data = (void *) (intptr_t) i，即worker id
+// name = "worker process"
 ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle,
     ngx_spawn_proc_pt proc, void *data, char *name, ngx_int_t respawn);
+
+// 执行外部程序
 ngx_pid_t ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx);
+
+// 初始化signals数组
 ngx_int_t ngx_init_signals(ngx_log_t *log);
+
 void ngx_debug_point(void);
 
 
@@ -100,8 +113,16 @@ extern char         **ngx_os_argv;
 extern ngx_pid_t      ngx_pid;
 
 // in os/unix/ngx_process.c
+
+// 进程间通信的channel
 extern ngx_socket_t   ngx_channel;
+
+// 全局变量，用于传出创建的进程索引号
+// 用在ngx_start_worker_processes()里
 extern ngx_int_t      ngx_process_slot;
+
+// 产生进程的计数器，初始值为0
+// 标记数组ngx_processes的最后使用的位置，遍历用
 extern ngx_int_t      ngx_last_process;
 
 // 创建的进程都在ngx_processes数组里
