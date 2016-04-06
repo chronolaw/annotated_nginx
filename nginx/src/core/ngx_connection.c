@@ -17,7 +17,7 @@ ngx_os_io_t  ngx_io;
 static void ngx_drain_connections(void);
 
 
-// http/ngx_http.c ngx_http_add_listening()里调用
+// http/ngx_http.c:ngx_http_add_listening()里调用
 // 添加到cycle的监听端口数组
 ngx_listening_t *
 ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
@@ -35,6 +35,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 
     ngx_memzero(ls, sizeof(ngx_listening_t));
 
+    // 根据socklen分配sockaddr的内存空间
     sa = ngx_palloc(cf->pool, socklen);
     if (sa == NULL) {
         return NULL;
@@ -45,6 +46,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     ls->sockaddr = sa;
     ls->socklen = socklen;
 
+    // 准备addr的字符串形式
     len = ngx_sock_ntop(sa, socklen, text, NGX_SOCKADDR_STRLEN, 1);
     ls->addr_text.len = len;
 
@@ -73,6 +75,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
         return NULL;
     }
 
+    // 拷贝addr的字符串形式
     ngx_memcpy(ls->addr_text.data, text, len);
 
     ls->fd = (ngx_socket_t) -1;

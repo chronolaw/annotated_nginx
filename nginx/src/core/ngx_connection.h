@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+// 本文件包含两个重要结构体
+// ngx_listening_t和ngx_connection_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -18,6 +20,7 @@ typedef struct ngx_listening_s  ngx_listening_t;
 
 // 监听端口数据结构
 // 存储在ngx_cycle_t::listening数组里
+// 主要成员: fd,backlog,rcvbuf,sndbuf,handler
 // 由http模块用listen指令添加
 struct ngx_listening_s {
 
@@ -66,6 +69,7 @@ struct ngx_listening_s {
 
     // 内存池的初始大小
     size_t              pool_size;
+
     /* should be here because of the AcceptEx() preread */
     size_t              post_accept_buffer_size;
     /* should be here because of the deferred accept */
@@ -85,7 +89,10 @@ struct ngx_listening_s {
     unsigned            bound:1;       /* already bound */
     unsigned            inherited:1;   /* inherited from previous process */
     unsigned            nonblocking_accept:1;
+
+    // 是否已经被监听
     unsigned            listen:1;
+
     unsigned            nonblocking:1;
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
@@ -144,6 +151,7 @@ typedef enum {
 
 // 连接结构体，表示nginx里的一个tcp连接
 // 每个连接都有一个读事件和写事件，使用数组序号对应
+// nginx里的连接对象都保存在ngx_cycle_t::connections数组里
 struct ngx_connection_s {
     // data成员有两种用法
     // 未使用（空闲）时作为链表的后继指针，连接在ngx_cycle_t::free_connections里
@@ -180,8 +188,11 @@ struct ngx_connection_s {
     // 连接的内存池
     ngx_pool_t         *pool;
 
+    // 客户端的sockaddr
     struct sockaddr    *sockaddr;
     socklen_t           socklen;
+
+    // 客户端的sockaddr，文本形式
     ngx_str_t           addr_text;
 
     ngx_str_t           proxy_protocol_addr;
@@ -190,16 +201,22 @@ struct ngx_connection_s {
     ngx_ssl_connection_t  *ssl;
 #endif
 
+    // 本地监听端口的socketaddr，也就是listening中的sockaddr
     struct sockaddr    *local_sockaddr;
     socklen_t           local_socklen;
 
+    // 接收客户端发送数据的缓冲区
+    // 与listening中的rcvbuf不同，这个是nginx应用层的
     ngx_buf_t          *buffer;
 
-    // 侵入式队列，加入到ngx_cycle
+    // 侵入式队列，加入到ngx_cycle_t::reusable_connections_queue
+    // 复用连接对象
     ngx_queue_t         queue;
 
+    // 连接使用次数
     ngx_atomic_uint_t   number;
 
+    // 处理的请求次数
     ngx_uint_t          requests;
 
     unsigned            buffered:8;
@@ -207,15 +224,28 @@ struct ngx_connection_s {
     unsigned            log_error:3;     /* ngx_connection_log_error_e */
 
     unsigned            unexpected_eof:1;
+
+    // 是否已经超时
     unsigned            timedout:1;
+
+    // 是否已经出错
     unsigned            error:1;
+
+    // 是否tcp连接已经被销毁
     unsigned            destroyed:1;
 
+    // 连接处于空闲状态
     unsigned            idle:1;
+
+    // 连接可以复用，对应上面的queue成员
     unsigned            reusable:1;
+
+    // tcp连接已经关闭
     unsigned            close:1;
 
+    // 正在发送文件
     unsigned            sendfile:1;
+
     unsigned            sndlowat:1;
     unsigned            tcp_nodelay:2;   /* ngx_connection_tcp_nodelay_e */
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */

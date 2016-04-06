@@ -218,6 +218,7 @@ typedef struct {
 } ngx_conf_file_t;
 
 
+// 解析配置的函数指针
 typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
     ngx_command_t *dummy, void *conf);
 
@@ -225,9 +226,13 @@ typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
 // 配置解析的环境结构体
 struct ngx_conf_s {
     char                 *name;
-    ngx_array_t          *args;         //保存解析到的指令字符串,0是指令名，其他的是参数
 
+    //保存解析到的指令字符串,0是指令名，其他的是参数
+    ngx_array_t          *args;
+
+    // 当前配置的cycle结构体，用于添加监听端口
     ngx_cycle_t          *cycle;
+
     ngx_pool_t           *pool;
     ngx_pool_t           *temp_pool;
     ngx_conf_file_t      *conf_file;
@@ -237,7 +242,9 @@ struct ngx_conf_s {
     ngx_uint_t            module_type;
     ngx_uint_t            cmd_type;
 
+    // 解析配置的函数指针
     ngx_conf_handler_pt   handler;
+
     char                 *handler_conf;
 };
 
