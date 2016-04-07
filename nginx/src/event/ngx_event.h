@@ -30,6 +30,7 @@ typedef struct {
 
 // nginx事件模块的核心结构体
 // 表示一个nginx事件（读/写/超时）
+// data表示事件相关的对象，通常是ngx_connection_t，用c = ev->data;
 // 重要的成员是handler，即事件发生时调用的函数
 struct ngx_event_s {
     // 事件相关的对象，通常是ngx_connection_t
@@ -44,6 +45,7 @@ struct ngx_event_s {
 
     /* used to detect the stale events in kqueue, rtsig, and epoll */
     // 检测事件是否失效
+    // 存储在epoll数据结构体里的指针低位
     unsigned         instance:1;
 
     /*
@@ -127,6 +129,7 @@ struct ngx_event_s {
 
 #endif
 
+    // 在epoll通知机制里用作简单的计数器ngx_epoll_notify_handler
     ngx_uint_t       index;
 
     ngx_log_t       *log;
@@ -203,9 +206,15 @@ struct ngx_event_aio_s {
 // epoll的实现在modules/ngx_epoll_module.c
 typedef struct {
     // 添加事件,事件发生时epoll调用可以获取
+    // epoll添加事件
+    // 检查事件关联的连接对象，决定是新添加还是修改
+    // 避免误删除了读写事件的关注
     ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
     // 删除事件,epoll不再关注该事件
+    // epoll删除事件
+    // 检查事件关联的连接对象，决定是完全删除还是修改
+    // 避免误删除了读写事件的关注
     ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
     // 同add
@@ -215,12 +224,17 @@ typedef struct {
     ngx_int_t  (*disable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
     // 添加一个连接，也就是读写事件都添加
+    // epoll关注连接的读写事件
+    // 添加事件成功，读写事件都是活跃的，即已经使用
     ngx_int_t  (*add_conn)(ngx_connection_t *c);
 
     // 删除一个连接，该连接的读写事件都不再关注
+    // epoll删除连接的读写事件
+    // 删除事件成功，读写事件都不活跃
     ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
 
     // 目前仅多线程使用，通知
+    // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
     // 事件模型的核心功能，处理发生的事件
@@ -228,9 +242,15 @@ typedef struct {
                    ngx_uint_t flags);
 
     // 初始化事件模块
+    // 调用epoll_create初始化epoll机制
+    // 参数size=cycle->connection_n / 2，但并无实际意义
+    // 设置全局变量，操作系统提供的底层数据收发接口
+    // 初始化全局的事件模块访问接口，指向epoll的函数
+    // 默认使用et模式，边缘触发，高速
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
 
     // 事件模块结束时的收尾工作
+    // epoll模块结束工作，关闭epoll句柄和通知句柄，释放内存
     void       (*done)(ngx_cycle_t *cycle);
 } ngx_event_actions_t;
 

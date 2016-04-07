@@ -113,6 +113,9 @@ typedef struct {
 
 // 调用epoll_create初始化epoll机制
 // 参数size=cycle->connection_n / 2，但并无实际意义
+// 设置全局变量，操作系统提供的底层数据收发接口
+// 初始化全局的事件模块访问接口，指向epoll的函数
+// 默认使用et模式，边缘触发，高速
 static ngx_int_t ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer);
 
 #if (NGX_HAVE_EVENTFD)
@@ -126,16 +129,29 @@ static void ngx_epoll_notify_handler(ngx_event_t *ev);
 // epoll模块结束工作，关闭epoll句柄和通知句柄，释放内存
 static void ngx_epoll_done(ngx_cycle_t *cycle);
 
+// epoll添加事件
+// 检查事件关联的连接对象，决定是新添加还是修改
+// 避免误删除了读写事件的关注
 static ngx_int_t ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
+
+// epoll删除事件
+// 检查事件关联的连接对象，决定是完全删除还是修改
+// 避免误删除了读写事件的关注
 static ngx_int_t ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
+
 static ngx_int_t ngx_epoll_add_connection(ngx_connection_t *c);
 static ngx_int_t ngx_epoll_del_connection(ngx_connection_t *c,
     ngx_uint_t flags);
+
+// 使用epoll模拟了事件通知机制
+// 向文件里写一个数字，令文件可读，从而触发epoll事件
+// 参数handler是真正的业务回调函数
 #if (NGX_HAVE_EVENTFD)
 static ngx_int_t ngx_epoll_notify(ngx_event_handler_pt handler);
 #endif
+
 static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
 
@@ -188,6 +204,7 @@ static ngx_str_t      epoll_name = ngx_string("epoll");
 // epoll模块支持的指令，两个
 static ngx_command_t  ngx_epoll_commands[] = {
 
+    // event_list数组大小，存储内核返回的事件
     { ngx_string("epoll_events"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -359,6 +376,9 @@ failed:
 
 // 调用epoll_create初始化epoll机制
 // 参数size=cycle->connection_n / 2，但并无实际意义
+// 设置全局变量，操作系统提供的底层数据收发接口
+// 初始化全局的事件模块访问接口，指向epoll的函数
+// 默认使用et模式，边缘触发，高速
 static ngx_int_t
 ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 {
@@ -380,7 +400,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         }
 
 #if (NGX_HAVE_EVENTFD)
-        // 初始化多线程通知用的描述符
+        // 初始化多线程通知用的描述符和事件/连接
         if (ngx_epoll_notify_init(cycle->log) != NGX_OK) {
 
             // 如果初始化失败，那么notify指针置空
@@ -444,6 +464,7 @@ ngx_epoll_notify_init(ngx_log_t *log)
 
 #if (NGX_HAVE_SYS_EVENTFD_H)
     // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
+    // 当通知时写入一个数字，触发可读事件
     notify_fd = eventfd(0, 0);
 #else
     notify_fd = syscall(SYS_eventfd, 0);
@@ -503,6 +524,7 @@ ngx_epoll_notify_handler(ngx_event_t *ev)
 
     // 检查event对象里的index，如果小于0xffffffff则不做任何处理
     // 这样可以节约系统资源，避免多余的操作
+    // 注意有个++操作
     if (++ev->index == NGX_MAX_UINT32_VALUE) {
         ev->index = 0;
 
@@ -586,6 +608,9 @@ ngx_epoll_done(ngx_cycle_t *cycle)
 }
 
 
+// epoll添加事件
+// 检查事件关联的连接对象，决定是新添加还是修改
+// 避免误删除了读写事件的关注
 static ngx_int_t
 ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 {
@@ -595,25 +620,38 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     ngx_connection_t    *c;
     struct epoll_event   ee;
 
+    // 获取事件关联的连接对象
     c = ev->data;
 
+    // 计算epoll的标志位
     events = (uint32_t) event;
 
+    // prev是对应事件的标志
+    // 添加读事件则查看写事件
     if (event == NGX_READ_EVENT) {
         e = c->write;
         prev = EPOLLOUT;
+
+        // 读事件的epoll标志
 #if (NGX_READ_EVENT != EPOLLIN|EPOLLRDHUP)
         events = EPOLLIN|EPOLLRDHUP;
 #endif
 
+    // 添加写事件则查看读事件
     } else {
         e = c->read;
         prev = EPOLLIN|EPOLLRDHUP;
+
+        // 写事件的epoll标志
 #if (NGX_WRITE_EVENT != EPOLLOUT)
         events = EPOLLOUT;
 #endif
     }
 
+    // 如果另外的读写事件是活跃的那么就意味着已经加过了
+    // active的设置就在下面的代码里
+    // epoll的操作就是修改EPOLL_CTL_MOD
+    // 需要加上对应事件的读写标志，即prev
     if (e->active) {
         op = EPOLL_CTL_MOD;
         events |= prev;
@@ -622,19 +660,28 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
         op = EPOLL_CTL_ADD;
     }
 
+    // 加上flags标志，里面有ET
     ee.events = events | (uint32_t) flags;
+
+    // union的指针成员，关联到连接对象
+    // 因为目前的32位/64位的计算机指针地址低位都是0（字节对齐）
+    // 所以用最低位来存储instance标志，即一个bool值
+    // 在真正取出连接对象时需要把低位的信息去掉
     ee.data.ptr = (void *) ((uintptr_t) c | ev->instance);
 
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "epoll add event: fd:%d op:%d ev:%08XD",
                    c->fd, op, ee.events);
 
+    // 到这里，已经确定了是新添加还是修改epoll事件
+    // 执行系统调用，添加epoll关注事件
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
                       "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
+    // 添加事件成功，此事件就是活跃的，即已经使用
     ev->active = 1;
 #if 0
     ev->oneshot = (flags & NGX_ONESHOT_EVENT) ? 1 : 0;
@@ -644,6 +691,9 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 }
 
 
+// epoll删除事件
+// 检查事件关联的连接对象，决定是完全删除还是修改
+// 避免误删除了读写事件的关注
 static ngx_int_t
 ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 {
@@ -659,28 +709,45 @@ ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
      * before the closing the file descriptor
      */
 
+    // 是否是要求事件关闭
     if (flags & NGX_CLOSE_EVENT) {
+        // 设置active成员
         ev->active = 0;
         return NGX_OK;
     }
 
+    // 获取事件关联的连接对象
     c = ev->data;
 
+    // prev是对应事件的标志
+    // 添加读事件则查看写事件
     if (event == NGX_READ_EVENT) {
         e = c->write;
         prev = EPOLLOUT;
 
+    // 添加写事件则查看读事件
     } else {
         e = c->read;
         prev = EPOLLIN|EPOLLRDHUP;
     }
 
+
+    // 如果另外的读写事件是活跃的那么就意味着已经加过了
+    // active的设置就在下面的代码里
+    // epoll的操作就是修改EPOLL_CTL_MOD
+    // 需要加上对应事件的读写标志，即prev
     if (e->active) {
         op = EPOLL_CTL_MOD;
         ee.events = prev | (uint32_t) flags;
+
+        // union的指针成员，关联到连接对象
+        // 因为目前的32位/64位的计算机指针地址低位都是0（字节对齐）
+        // 所以用最低位来存储instance标志，即一个bool值
+        // 在真正取出连接对象时需要把低位的信息去掉
         ee.data.ptr = (void *) ((uintptr_t) c | ev->instance);
 
     } else {
+        // 对应的读写事件没有，那么就可以删除整个事件
         op = EPOLL_CTL_DEL;
         ee.events = 0;
         ee.data.ptr = NULL;
@@ -690,35 +757,48 @@ ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
                    "epoll del event: fd:%d op:%d ev:%08XD",
                    c->fd, op, ee.events);
 
+    // 到这里，已经确定了是删除还是修改epoll事件
+    // 执行系统调用，删除epoll关注事件
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
                       "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
+    // 删除事件成功，此事件不活跃，即已停止关注
     ev->active = 0;
 
     return NGX_OK;
 }
 
 
+// epoll关注连接的读写事件
+// 添加事件成功，读写事件都是活跃的，即已经使用
 static ngx_int_t
 ngx_epoll_add_connection(ngx_connection_t *c)
 {
     struct epoll_event  ee;
 
+    // 不区分读写，添加全部标志位，使用et模式
     ee.events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLRDHUP;
+
+    // union的指针成员，关联到连接对象
+    // 因为目前的32位/64位的计算机指针地址低位都是0（字节对齐）
+    // 所以用最低位来存储instance标志，即一个bool值
+    // 在真正取出连接对象时需要把低位的信息去掉
     ee.data.ptr = (void *) ((uintptr_t) c | c->read->instance);
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "epoll add connection: fd:%d ev:%08XD", c->fd, ee.events);
 
+    // 执行系统调用，直接添加epoll关注事件
     if (epoll_ctl(ep, EPOLL_CTL_ADD, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno,
                       "epoll_ctl(EPOLL_CTL_ADD, %d) failed", c->fd);
         return NGX_ERROR;
     }
 
+    // 添加事件成功，读写事件都是活跃的，即已经使用
     c->read->active = 1;
     c->write->active = 1;
 
@@ -726,6 +806,8 @@ ngx_epoll_add_connection(ngx_connection_t *c)
 }
 
 
+// epoll删除连接的读写事件
+// 删除事件成功，读写事件都不活跃
 static ngx_int_t
 ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
 {
@@ -739,6 +821,7 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
      */
 
     if (flags & NGX_CLOSE_EVENT) {
+        // 删除事件成功，读写事件都不活跃
         c->read->active = 0;
         c->write->active = 0;
         return NGX_OK;
@@ -747,16 +830,19 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "epoll del connection: fd:%d", c->fd);
 
+    // 直接删除所有的事件
     op = EPOLL_CTL_DEL;
     ee.events = 0;
     ee.data.ptr = NULL;
 
+    // 执行系统调用，直接删除epoll关注事件
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno,
                       "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
+    // 删除事件成功，读写事件都不活跃
     c->read->active = 0;
     c->write->active = 0;
 
@@ -766,13 +852,18 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
 
 #if (NGX_HAVE_EVENTFD)
 
+// 使用epoll模拟了事件通知机制
+// 向文件里写一个数字，令文件可读，从而触发epoll事件
+// 参数handler是真正的业务回调函数
 static ngx_int_t
 ngx_epoll_notify(ngx_event_handler_pt handler)
 {
     static uint64_t inc = 1;
 
+    // 设置真正的业务回调函数
     notify_event.data = handler;
 
+    // 向文件里写一个数字，令文件可读，从而触发epoll事件
     if ((size_t) write(notify_fd, &inc, sizeof(uint64_t)) != sizeof(uint64_t)) {
         ngx_log_error(NGX_LOG_ALERT, notify_event.log, ngx_errno,
                       "write() to eventfd %d failed", notify_fd);
@@ -785,6 +876,9 @@ ngx_epoll_notify(ngx_event_handler_pt handler)
 #endif
 
 
+// epoll模块核心功能，调用epoll_wait处理发生的事件
+// 使用event_list和nevents获取内核返回的事件
+// timer是无事件发生时最多等待的时间，即超时时间
 static ngx_int_t
 ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 {
@@ -802,17 +896,27 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "epoll timer: %M", timer);
 
+    // 调用epoll_wait处理发生的事件
+    // 使用event_list和nevents获取内核返回的事件
+    // 返回值events是实际获得的事件数量
     events = epoll_wait(ep, event_list, (int) nevents, timer);
 
+    // 检查是否发生了错误
+    // 如果调用epoll_wait获得了0个或多个事件，就没有错误
     err = (events == -1) ? ngx_errno : 0;
 
+    // 如果要求更新时间，或者收到了更新时间的信号
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
         ngx_time_update();
     }
 
+    // 错误处理
     if (err) {
+
+        // 错误是由信号中断引起的
         if (err == NGX_EINTR) {
 
+            // 如果是更新时间的信号，那么就不是错误
             if (ngx_event_timer_alarm) {
                 ngx_event_timer_alarm = 0;
                 return NGX_OK;
@@ -828,16 +932,22 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
         return NGX_ERROR;
     }
 
+    // 0个事件，说明nginx没有收到任何请求或者数据收发
     if (events == 0) {
+        // #define NGX_TIMER_INFINITE  (ngx_msec_t) -1
+        // 不是无限等待，在很短的时间里无事件发生，是正常现象
         if (timer != NGX_TIMER_INFINITE) {
             return NGX_OK;
         }
 
+        // 无限等待，却没有任何事件， 出错了
         ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
                       "epoll_wait() returned no events without timeout");
         return NGX_ERROR;
     }
 
+    // 调用epoll_wait获得了多个事件，存储在event_list里，共events个
+    // 遍历event_list数组，逐个处理事件
     for (i = 0; i < events; i++) {
         c = event_list[i].data.ptr;
 

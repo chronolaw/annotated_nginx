@@ -42,6 +42,8 @@ static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
 static ngx_uint_t     ngx_timer_resolution;
+
+// 在epoll的ngx_epoll_process_events里检查，更新时间的标志
 sig_atomic_t          ngx_event_timer_alarm;
 
 static ngx_uint_t     ngx_event_max_module;
