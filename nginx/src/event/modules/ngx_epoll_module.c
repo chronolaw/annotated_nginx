@@ -949,9 +949,16 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     // 调用epoll_wait获得了多个事件，存储在event_list里，共events个
     // 遍历event_list数组，逐个处理事件
     for (i = 0; i < events; i++) {
+
+        // 从epoll结构体的union.ptr获得连接对象指针
         c = event_list[i].data.ptr;
 
+        // 因为目前的32位/64位的计算机指针地址低位都是0（字节对齐）
+        // 所以用最低位来存储instance标志，即一个bool值
+        // 在真正取出连接对象时需要把低位的信息去掉
         instance = (uintptr_t) c & 1;
+
+        // 此时才是真正的连接对象指针
         c = (ngx_connection_t *) ((uintptr_t) c & (uintptr_t) ~1);
 
         rev = c->read;
