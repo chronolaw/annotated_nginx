@@ -37,6 +37,11 @@ struct ngx_shm_zone_s {
 
 
 // nginx核心数据结构，表示nginx的生命周期，含有许多重要参数
+// conf_ctx, 存储所有模块的配置结构体，是个二维数组
+// free_connections,空闲连接，使用指针串成单向链表
+// listening,监听的端口数组
+// connections/read_events/write_events,连接池,大小是connection_n
+// 启动nginx时的环境参数，配置文件，工作路径等
 // 每个进程都有这个结构
 struct ngx_cycle_s {
 
@@ -105,7 +110,7 @@ struct ngx_cycle_s {
     // 保存之前的cycle，如init_cycle
     ngx_cycle_t              *old_cycle;
 
-    //启动nginx时的环境参数，配置文件，工作路径等
+    // 启动nginx时的环境参数，配置文件，工作路径等
     ngx_str_t                 conf_file;
     ngx_str_t                 conf_param;
     ngx_str_t                 conf_prefix;
@@ -168,10 +173,20 @@ typedef struct {
 #define ngx_is_init_cycle(cycle)  (cycle->conf_ctx == NULL)
 
 
+// 在main里调用,太长，以后可能会简化
+// 从old_cycle(init_cycle)里复制必要的信息，创建新cycle
+// 当reconfigure的时候old_cycle就是当前的cycle
+// 初始化core模块
 ngx_cycle_t *ngx_init_cycle(ngx_cycle_t *old_cycle);
+
+// 写pid到文件
 ngx_int_t ngx_create_pidfile(ngx_str_t *name, ngx_log_t *log);
+
 void ngx_delete_pidfile(ngx_cycle_t *cycle);
+
+// main()里调用，如果用了-s参数，那么就要发送reload/stop等信号
 ngx_int_t ngx_signal_process(ngx_cycle_t *cycle, char *sig);
+
 void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user);
 char **ngx_set_environment(ngx_cycle_t *cycle, ngx_uint_t *last);
 ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
@@ -180,7 +195,9 @@ ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag);
 
 
+// nginx生命周期使用的超重要对象
 extern volatile ngx_cycle_t  *ngx_cycle;
+
 extern ngx_array_t            ngx_old_cycles;
 extern ngx_module_t           ngx_core_module;
 extern ngx_uint_t             ngx_test_config;

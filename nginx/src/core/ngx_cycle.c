@@ -20,6 +20,7 @@ static void ngx_clean_old_cycles(ngx_event_t *ev);
 
 // nginx生命周期使用的超重要对象
 volatile ngx_cycle_t  *ngx_cycle;
+
 ngx_array_t            ngx_old_cycles;
 
 static ngx_pool_t     *ngx_temp_pool;

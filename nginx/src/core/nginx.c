@@ -11,12 +11,20 @@
 #include <nginx.h>
 
 
+// 检查NGINX环境变量，获取之前监听的socket
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
+
+// nginx自己实现的命令行参数解析
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
+
 static ngx_int_t ngx_process_options(ngx_cycle_t *cycle);
 static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv);
+
+// ngx_core_module的函数指针表，创建配置结构体
 static void *ngx_core_module_create_conf(ngx_cycle_t *cycle);
 static char *ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf);
+
+// 解析user等核心配置指令
 static char *ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
