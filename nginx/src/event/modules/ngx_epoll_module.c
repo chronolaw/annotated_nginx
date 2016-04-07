@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,13 +11,15 @@
 #include <ngx_event.h>
 
 
+// 下面这段用于测试epoll功能
+// 代码与linux的基本相同，可以参考
 #if (NGX_TEST_BUILD_EPOLL)
 
 /* epoll declarations */
 
-#define EPOLLIN        0x001
+#define EPOLLIN        0x001        //有读事件发生，即可读
 #define EPOLLPRI       0x002
-#define EPOLLOUT       0x004
+#define EPOLLOUT       0x004        //有写事件发生，即可写
 #define EPOLLRDNORM    0x040
 #define EPOLLRDBAND    0x080
 #define EPOLLWRNORM    0x100
@@ -27,13 +30,14 @@
 
 #define EPOLLRDHUP     0x2000
 
-#define EPOLLET        0x80000000
+#define EPOLLET        0x80000000   //ET模式，即边缘触发
 #define EPOLLONESHOT   0x40000000
 
-#define EPOLL_CTL_ADD  1
-#define EPOLL_CTL_DEL  2
-#define EPOLL_CTL_MOD  3
+#define EPOLL_CTL_ADD  1            //添加事件
+#define EPOLL_CTL_DEL  2            //删除事件
+#define EPOLL_CTL_MOD  3            //修改事件
 
+// epoll系统调用使用的结构体
 typedef union epoll_data {
     void         *ptr;
     int           fd;
@@ -47,6 +51,7 @@ struct epoll_event {
 };
 
 
+// 初始化epoll，返回一个句柄，size无意义
 int epoll_create(int size);
 
 int epoll_create(int size)
@@ -55,6 +60,7 @@ int epoll_create(int size)
 }
 
 
+// 添加或删除事件，op=EPOLL_CTL_ADD/EPOLL_CTL_DEL/EPOLL_CTL_MOD
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
@@ -63,6 +69,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 }
 
 
+// 等待注册的事件发生
 int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout);
 
 int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout)
@@ -94,18 +101,27 @@ struct io_event {
 #endif /* NGX_TEST_BUILD_EPOLL */
 
 
+// epoll模块的配置结构体
 typedef struct {
+    // epoll系统调用，获取事件的数组大小
     ngx_uint_t  events;
+
     ngx_uint_t  aio_requests;
 } ngx_epoll_conf_t;
 
 
+// 调用epoll_create初始化epoll机制
+// 参数size=cycle->connection_n / 2，但并无实际意义
 static ngx_int_t ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer);
+
 #if (NGX_HAVE_EVENTFD)
 static ngx_int_t ngx_epoll_notify_init(ngx_log_t *log);
 static void ngx_epoll_notify_handler(ngx_event_t *ev);
 #endif
+
+// epoll模块结束工作，关闭epoll句柄和通知句柄，释放内存
 static void ngx_epoll_done(ngx_cycle_t *cycle);
+
 static ngx_int_t ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
 static ngx_int_t ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event,
@@ -123,15 +139,27 @@ static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 static void ngx_epoll_eventfd_handler(ngx_event_t *ev);
 #endif
 
+// 创建配置结构体
 static void *ngx_epoll_create_conf(ngx_cycle_t *cycle);
+
+// 初始化配置结构体
 static char *ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf);
 
+// epoll系统调用使用的句柄
 static int                  ep = -1;
+
+// epoll系统调用使用的数组，接收发生的事件
+// 大小由nevents确定
+// 相当于std::vector<epoll_event> event_list;
 static struct epoll_event  *event_list;
+
+// 数组的大小
 static ngx_uint_t           nevents;
 
 #if (NGX_HAVE_EVENTFD)
+// 用于多线程通知用的描述符
 static int                  notify_fd = -1;
+
 static ngx_event_t          notify_event;
 static ngx_connection_t     notify_conn;
 #endif
@@ -146,8 +174,11 @@ static ngx_connection_t     ngx_eventfd_conn;
 
 #endif
 
+// epoll模块的名字
+// 用在ngx_epoll_module_ctx里
 static ngx_str_t      epoll_name = ngx_string("epoll");
 
+// epoll模块支持的指令，两个
 static ngx_command_t  ngx_epoll_commands[] = {
 
     { ngx_string("epoll_events"),
@@ -168,11 +199,18 @@ static ngx_command_t  ngx_epoll_commands[] = {
 };
 
 
+// epoll模块的函数表
 ngx_event_module_t  ngx_epoll_module_ctx = {
+    // epoll模块的名字"epoll"
     &epoll_name,
+
+    // 创建配置结构体
     ngx_epoll_create_conf,               /* create configuration */
+
+    // 初始化配置结构体
     ngx_epoll_init_conf,                 /* init configuration */
 
+    // epoll的事件模块访问接口，是一个函数表
     {
         ngx_epoll_add_event,             /* add an event */
         ngx_epoll_del_event,             /* delete an event */
@@ -191,6 +229,7 @@ ngx_event_module_t  ngx_epoll_module_ctx = {
     }
 };
 
+// epoll模块定义
 ngx_module_t  ngx_epoll_module = {
     NGX_MODULE_V1,
     &ngx_epoll_module_ctx,               /* module context */
@@ -311,16 +350,22 @@ failed:
 #endif
 
 
+// 调用epoll_create初始化epoll机制
+// 参数size=cycle->connection_n / 2，但并无实际意义
 static ngx_int_t
 ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 {
     ngx_epoll_conf_t  *epcf;
 
+    // 获取epoll模块的配置
     epcf = ngx_event_get_conf(cycle->conf_ctx, ngx_epoll_module);
 
     if (ep == -1) {
+        // 创建epoll句柄
+        // 参数size=cycle->connection_n / 2，但并无实际意义
         ep = epoll_create(cycle->connection_n / 2);
 
+        // epoll初始化失败
         if (ep == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
                           "epoll_create() failed");
@@ -328,7 +373,10 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         }
 
 #if (NGX_HAVE_EVENTFD)
+        // 初始化多线程通知用的描述符
         if (ngx_epoll_notify_init(cycle->log) != NGX_OK) {
+
+            // 如果初始化失败，那么notify指针置空
             ngx_epoll_module_ctx.actions.notify = NULL;
         }
 #endif
@@ -340,11 +388,15 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 #endif
     }
 
+    // 检查当前事件数组的大小，最开始nevents是0
     if (nevents < epcf->events) {
+
+        // 如果是reload，那么就先释放，再重新分配内存
         if (event_list) {
             ngx_free(event_list);
         }
 
+        // 相当于vector.resize(cf.events)
         event_list = ngx_alloc(sizeof(struct epoll_event) * epcf->events,
                                cycle->log);
         if (event_list == NULL) {
@@ -352,13 +404,18 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         }
     }
 
+    // 设置正确的数组长度
     nevents = epcf->events;
 
+    // 设置全局变量，操作系统提供的底层数据收发接口
+    // ngx_posix_init.c里初始化为linux的底层接口
     ngx_io = ngx_os_io;
 
+    // 初始化全局的事件模块访问接口，指向epoll的函数
     ngx_event_actions = ngx_epoll_module_ctx.actions;
 
 #if (NGX_HAVE_CLEAR_EVENT)
+    // 默认使用et模式，边缘触发，高速
     ngx_event_flags = NGX_USE_CLEAR_EVENT
 #else
     ngx_event_flags = NGX_USE_LEVEL_EVENT
@@ -449,9 +506,11 @@ ngx_epoll_notify_handler(ngx_event_t *ev)
 #endif
 
 
+// epoll模块结束工作，关闭epoll句柄和通知句柄，释放内存
 static void
 ngx_epoll_done(ngx_cycle_t *cycle)
 {
+    // 关闭epoll句柄
     if (close(ep) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "epoll close() failed");
@@ -461,6 +520,7 @@ ngx_epoll_done(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_EVENTFD)
 
+    // 关闭通知句柄
     if (close(notify_fd) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "eventfd close() failed");
@@ -491,8 +551,10 @@ ngx_epoll_done(ngx_cycle_t *cycle)
 
 #endif
 
+    // 释放内存,vector.clear()
     ngx_free(event_list);
 
+    // 置为空指针和0，安全
     event_list = NULL;
     nevents = 0;
 }
@@ -940,6 +1002,7 @@ ngx_epoll_eventfd_handler(ngx_event_t *ev)
 #endif
 
 
+// 创建配置结构体
 static void *
 ngx_epoll_create_conf(ngx_cycle_t *cycle)
 {
@@ -950,6 +1013,7 @@ ngx_epoll_create_conf(ngx_cycle_t *cycle)
         return NULL;
     }
 
+    // 两个值都是数字，所以要置为-1
     epcf->events = NGX_CONF_UNSET;
     epcf->aio_requests = NGX_CONF_UNSET;
 
@@ -957,12 +1021,15 @@ ngx_epoll_create_conf(ngx_cycle_t *cycle)
 }
 
 
+// 初始化配置结构体
 static char *
 ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf)
 {
     ngx_epoll_conf_t *epcf = conf;
 
+    // 如果不使用epoll_events指令, epcf->events默认是512
     ngx_conf_init_uint_value(epcf->events, 512);
+
     ngx_conf_init_uint_value(epcf->aio_requests, 32);
 
     return NGX_CONF_OK;

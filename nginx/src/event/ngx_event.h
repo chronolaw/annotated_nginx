@@ -197,22 +197,38 @@ struct ngx_event_aio_s {
 
 
 // 全局的事件模块访问接口，是一个函数表
+// 由epoll/kqueue/select等模块实现
+// epoll的实现在modules/ngx_epoll_module.c
 typedef struct {
+    // 添加事件,事件发生时epoll调用可以获取
     ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+
+    // 删除事件,epoll不再关注该事件
     ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
+    // 同add
     ngx_int_t  (*enable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+
+    // 同del
     ngx_int_t  (*disable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
+    // 添加一个连接，也就是读写事件都添加
     ngx_int_t  (*add_conn)(ngx_connection_t *c);
+
+    // 删除一个连接，该连接的读写事件都不再关注
     ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
 
+    // 目前仅多线程使用，通知
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
+    // 事件模型的核心功能，处理发生的事件
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
                    ngx_uint_t flags);
 
+    // 初始化事件模块
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
+
+    // 事件模块结束时的收尾工作
     void       (*done)(ngx_cycle_t *cycle);
 } ngx_event_actions_t;
 
@@ -220,6 +236,8 @@ typedef struct {
 // 全局的事件模块访问接口，是一个函数表
 // 定义了若干宏简化对它的操作
 // 常用的有ngx_add_event/ngx_del_event
+// 在epoll模块的ngx_epoll_init里设置，指向epoll的函数
+// ngx_event_actions = ngx_epoll_module_ctx.actions;
 extern ngx_event_actions_t   ngx_event_actions;
 
 
@@ -239,6 +257,7 @@ extern ngx_event_actions_t   ngx_event_actions;
  * The event filter notifies only the changes and an initial level:
  * kqueue, epoll.
  */
+// clear event也就是et模式
 #define NGX_USE_CLEAR_EVENT      0x00000004
 
 /*
@@ -261,17 +280,20 @@ extern ngx_event_actions_t   ngx_event_actions;
 /*
  * The event filter is epoll.
  */
+// 在linux上我们通常使用epoll
 #define NGX_USE_EPOLL_EVENT      0x00000040
 
 /*
  * No need to add or delete the event filters: rtsig.
  */
+// rtsig在nginx 1.9.x里已经被删除
 #define NGX_USE_RTSIG_EVENT      0x00000080
 
 /*
  * No need to add or delete the event filters: overlapped, aio_read,
  * aioread, io_submit.
  */
+// aio在nginx 1.9.x里已经被删除
 #define NGX_USE_AIO_EVENT        0x00000100
 
 /*
@@ -338,6 +360,9 @@ extern ngx_event_actions_t   ngx_event_actions;
 #endif
 
 
+// 重定义事件宏，屏蔽系统差异
+
+// kqueue in freebsd/osx
 #if (NGX_HAVE_KQUEUE)
 
 #define NGX_READ_EVENT     EVFILT_READ
@@ -379,19 +404,28 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_ONESHOT_EVENT  1
 
 
+// linux使用epoll
 #elif (NGX_HAVE_EPOLL)
 
+// 读事件，即可读或者有accept连接
 #define NGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
+
+// 写事件，可写
 #define NGX_WRITE_EVENT    EPOLLOUT
 
+// 水平触发,仅用于accept接受连接
 #define NGX_LEVEL_EVENT    0
+
+// 边缘触发，高速模式
 #define NGX_CLEAR_EVENT    EPOLLET
+
 #define NGX_ONESHOT_EVENT  0x70000000
 #if 0
 #define NGX_ONESHOT_EVENT  EPOLLONESHOT
 #endif
 
 
+// poll
 #elif (NGX_HAVE_POLL)
 
 #define NGX_READ_EVENT     POLLIN
@@ -401,6 +435,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_ONESHOT_EVENT  1
 
 
+// select
 #else /* select */
 
 #define NGX_READ_EVENT     0
@@ -441,8 +476,22 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define ngx_del_timer        ngx_event_del_timer
 
 
+// os/unix/ngx_os.h
+// 操作系统提供的底层数据收发接口
+// ngx_posix_init.c里初始化为linux的底层接口
+// 在epoll模块的ngx_epoll_init里设置
+//
+//typedef struct {
+//    ngx_recv_pt        recv;
+//    ngx_recv_chain_pt  recv_chain;
+//    ngx_recv_pt        udp_recv;
+//    ngx_send_pt        send;
+//    ngx_send_chain_pt  send_chain;
+//    ngx_uint_t         flags;
+//} ngx_os_io_t;
 extern ngx_os_io_t  ngx_io;
 
+// 宏定义简化调用
 #define ngx_recv             ngx_io.recv
 #define ngx_recv_chain       ngx_io.recv_chain
 #define ngx_udp_recv         ngx_io.udp_recv
@@ -450,19 +499,29 @@ extern ngx_os_io_t  ngx_io;
 #define ngx_send_chain       ngx_io.send_chain
 
 
+// event模块的type标记
 #define NGX_EVENT_MODULE      0x544E5645  /* "EVNT" */
 #define NGX_EVENT_CONF        0x02000000
 
 
+// event模块的配置结构体
 typedef struct {
+    // nginx每个进程可使用的连接数量，即cycle里的连接池大小
     ngx_uint_t    connections;
+
+    // 使用的是哪个event模块
     ngx_uint_t    use;
 
+    // 是否尽可能多接受客户端请求，会影响进程间负载均衡
     ngx_flag_t    multi_accept;
+
+    // 是否使用负载均衡锁，在共享内存里的一个原子变量
     ngx_flag_t    accept_mutex;
 
+    // 负载均衡锁的等待时间，进程如果未获得锁会等一下再尝试
     ngx_msec_t    accept_mutex_delay;
 
+    // 事件模块的名字，如epoll/select/kqueue
     u_char       *name;
 
 #if (NGX_DEBUG)
@@ -471,18 +530,24 @@ typedef struct {
 } ngx_event_conf_t;
 
 
+// 事件模块的函数指针表
+// 核心是actions，即事件处理函数
 typedef struct {
+    // 事件模块的名字，如epoll/select/kqueue
     ngx_str_t              *name;
 
+    // 事件模块的配置相关函数比较简单
     void                 *(*create_conf)(ngx_cycle_t *cycle);
     char                 *(*init_conf)(ngx_cycle_t *cycle, void *conf);
 
+    // 事件模块访问接口，是一个函数表
     ngx_event_actions_t     actions;
 } ngx_event_module_t;
 
 
 extern ngx_atomic_t          *ngx_connection_counter;
 
+// 用共享内存实现的原子变量，负载均衡锁
 extern ngx_atomic_t          *ngx_accept_mutex_ptr;
 extern ngx_shmtx_t            ngx_accept_mutex;
 extern ngx_uint_t             ngx_use_accept_mutex;
@@ -492,6 +557,7 @@ extern ngx_msec_t             ngx_accept_mutex_delay;
 extern ngx_int_t              ngx_accept_disabled;
 
 
+// stat模块的统计用变量，也用共享内存实现
 #if (NGX_STAT_STUB)
 
 extern ngx_atomic_t  *ngx_stat_accepted;
@@ -515,6 +581,7 @@ extern ngx_module_t           ngx_events_module;
 extern ngx_module_t           ngx_event_core_module;
 
 
+// 函数宏，从cycle的conf_ctx里获得event模块的指针，然后再取数组序号
 #define ngx_event_get_conf(conf_ctx, module)                                  \
              (*(ngx_get_conf(conf_ctx, ngx_events_module))) [module.ctx_index];
 
