@@ -39,6 +39,7 @@
 
 // epoll系统调用使用的结构体
 typedef union epoll_data {
+    // union使用ptr成员，关联到连接对象
     void         *ptr;
     int           fd;
     uint32_t      u32;
@@ -115,7 +116,10 @@ typedef struct {
 static ngx_int_t ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer);
 
 #if (NGX_HAVE_EVENTFD)
+// 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
 static ngx_int_t ngx_epoll_notify_init(ngx_log_t *log);
+
+// 当发生通知事件时的回调函数，再回调真正的功能函数ev->data
 static void ngx_epoll_notify_handler(ngx_event_t *ev);
 #endif
 
@@ -148,7 +152,7 @@ static char *ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf);
 // epoll系统调用使用的句柄
 static int                  ep = -1;
 
-// epoll系统调用使用的数组，接收发生的事件
+// epoll系统调用使用的数组，存储内核返回的事件
 // 大小由nevents确定
 // 相当于std::vector<epoll_event> event_list;
 static struct epoll_event  *event_list;
@@ -160,7 +164,10 @@ static ngx_uint_t           nevents;
 // 用于多线程通知用的描述符
 static int                  notify_fd = -1;
 
+// 通知用的事件对象
 static ngx_event_t          notify_event;
+
+// 通知用的连接对象，并不关联实际的连接
 static ngx_connection_t     notify_conn;
 #endif
 
@@ -429,12 +436,14 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 
 #if (NGX_HAVE_EVENTFD)
 
+// 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
 static ngx_int_t
 ngx_epoll_notify_init(ngx_log_t *log)
 {
     struct epoll_event  ee;
 
 #if (NGX_HAVE_SYS_EVENTFD_H)
+    // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
     notify_fd = eventfd(0, 0);
 #else
     notify_fd = syscall(SYS_eventfd, 0);
@@ -448,17 +457,25 @@ ngx_epoll_notify_init(ngx_log_t *log)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, log, 0,
                    "notify eventfd: %d", notify_fd);
 
+    // 设置通知用的事件对象回调函数
     notify_event.handler = ngx_epoll_notify_handler;
     notify_event.log = log;
     notify_event.active = 1;
 
+    // 设置通知用的连接对象关联的描述符，不用于收发数据
     notify_conn.fd = notify_fd;
+
+    //只有读事件，写事件无意义
     notify_conn.read = &notify_event;
     notify_conn.log = log;
 
+    // 设置epoll事件属性，可读，边缘触发
     ee.events = EPOLLIN|EPOLLET;
+
+    // union使用ptr成员，关联到连接对象
     ee.data.ptr = &notify_conn;
 
+    // 调用epoll_ctl/EPOLL_CTL_ADD，添加epoll事件
     if (epoll_ctl(ep, EPOLL_CTL_ADD, notify_fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
                       "epoll_ctl(EPOLL_CTL_ADD, eventfd) failed");
@@ -475,6 +492,7 @@ ngx_epoll_notify_init(ngx_log_t *log)
 }
 
 
+// 当发生通知事件时的回调函数，再回调真正的功能函数ev->data
 static void
 ngx_epoll_notify_handler(ngx_event_t *ev)
 {
@@ -483,9 +501,12 @@ ngx_epoll_notify_handler(ngx_event_t *ev)
     ngx_err_t             err;
     ngx_event_handler_pt  handler;
 
+    // 检查event对象里的index，如果小于0xffffffff则不做任何处理
+    // 这样可以节约系统资源，避免多余的操作
     if (++ev->index == NGX_MAX_UINT32_VALUE) {
         ev->index = 0;
 
+        // 从描述符里读8个字节
         n = read(notify_fd, &count, sizeof(uint64_t));
 
         err = ngx_errno;
@@ -493,13 +514,18 @@ ngx_epoll_notify_handler(ngx_event_t *ev)
         ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                        "read() eventfd %d: %z count:%uL", notify_fd, n, count);
 
+        // 简单地检查一下写入的数字是否正确，只比较长度，不关心内容
         if ((size_t) n != sizeof(uint64_t)) {
             ngx_log_error(NGX_LOG_ALERT, ev->log, err,
                           "read() eventfd %d failed", notify_fd);
         }
     }
 
+    // 获取event对象的data成员，转换为函数指针
+    // ngx_core.h:typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
     handler = ev->data;
+
+    // 回调真正的功能函数
     handler(ev);
 }
 

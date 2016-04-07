@@ -33,6 +33,7 @@ typedef struct {
 // 重要的成员是handler，即事件发生时调用的函数
 struct ngx_event_s {
     // 事件相关的对象，通常是ngx_connection_t
+    // 在多线程通知里是ngx_event_handler_pt，即通知回调函数
     void            *data;
 
     // 写事件，也就是说tcp连接是写状态，可以发送数据
@@ -112,6 +113,7 @@ struct ngx_event_s {
 #endif
 
     // 事件发生时调用的函数
+    // ngx_core.h:typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
     ngx_event_handler_pt  handler;
 
 
