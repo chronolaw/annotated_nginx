@@ -14,7 +14,7 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 
 ###源码目录快捷入口
 * [core](/nginx/src/core) - 20%
-* [event](/nginx/src/event) - 5%
+* [event](/nginx/src/event) - 20%，只注解核心模块和epoll，kqueue等不关注
 * [http](/nginx/src/http) - todo
 * [os/unix](/nginx/src/os/unix) - 10%
 
@@ -28,6 +28,7 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 ######event目录
 * [ngx_event.h](/nginx/src/event/ngx_event.h)
 * [ngx_event.c](/nginx/src/event/ngx_event.c)
+* [ngx_epoll_module.c](/nginx/src/event/modules/ngx_epoll_module.c)
 
 ######http目录
 
@@ -48,6 +49,7 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 * [ngx_event.h](/nginx/src/event/ngx_event.h)
 * [ngx_event.c](/nginx/src/event/ngx_event.c)
+* [ngx_epoll_module.c](/nginx/src/event/modules/ngx_epoll_module.c)
 
 ######多线程机制
 
