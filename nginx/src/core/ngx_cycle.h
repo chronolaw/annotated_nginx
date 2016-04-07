@@ -153,14 +153,16 @@ typedef struct {
      ngx_array_t              env;
      char                   **environment;
 
+// 旧的线程实现，1.9.x已经删除，不应该使用
 #if (NGX_OLD_THREADS)
-     ngx_int_t                worker_threads;       //旧的线程实现，不应该使用
+     ngx_int_t                worker_threads;
      size_t                   thread_stack_size;
 #endif
 
 } ngx_core_conf_t;
 
 
+// 旧的线程实现，1.9.x已经删除，不应该使用
 #if (NGX_OLD_THREADS)
 
 typedef struct {
