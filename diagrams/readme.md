@@ -1,4 +1,4 @@
 #uml图示
 
 进程uml
-![nginx_process](diagrams/nginx_process.jpg)
+![nginx_process](nginx_process.jpg)
