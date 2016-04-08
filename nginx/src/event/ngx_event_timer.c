@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,7 +11,10 @@
 #include <ngx_event.h>
 
 
+// 定时器红黑树
 ngx_rbtree_t              ngx_event_timer_rbtree;
+
+// 定时器红黑树的哨兵节点
 static ngx_rbtree_node_t  ngx_event_timer_sentinel;
 
 /*
@@ -19,6 +23,8 @@ static ngx_rbtree_node_t  ngx_event_timer_sentinel;
  * a minimum timer value only
  */
 
+// 初始化定时器
+// 实际上就是初始化一个红黑树结构
 ngx_int_t
 ngx_event_timer_init(ngx_log_t *log)
 {

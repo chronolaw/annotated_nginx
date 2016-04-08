@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -19,12 +20,16 @@
 #define NGX_TIMER_LAZY_DELAY  300
 
 
+// 初始化定时器
+// 实际上就是初始化一个红黑树结构
 ngx_int_t ngx_event_timer_init(ngx_log_t *log);
+
 ngx_msec_t ngx_event_find_timer(void);
 void ngx_event_expire_timers(void);
 void ngx_event_cancel_timers(void);
 
 
+// 定时器红黑树
 extern ngx_rbtree_t  ngx_event_timer_rbtree;
 
 
