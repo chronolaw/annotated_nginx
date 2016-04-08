@@ -213,6 +213,8 @@ ngx_module_t  ngx_event_core_module = {
 };
 
 
+// 处理socket读写事件和定时器事件
+// 调用epoll模块的ngx_epoll_process_events
 void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
 {

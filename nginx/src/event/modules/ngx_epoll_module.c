@@ -152,6 +152,11 @@ static ngx_int_t ngx_epoll_del_connection(ngx_connection_t *c,
 static ngx_int_t ngx_epoll_notify(ngx_event_handler_pt handler);
 #endif
 
+// epoll模块核心功能，调用epoll_wait处理发生的事件
+// 使用event_list和nevents获取内核返回的事件
+// timer是无事件发生时最多等待的时间，即超时时间
+// 函数可以分为两部分，一是用epoll获得事件，二是处理事件
+// 在ngx_process_events_and_timers里被调用
 static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
 
@@ -879,6 +884,7 @@ ngx_epoll_notify(ngx_event_handler_pt handler)
 // epoll模块核心功能，调用epoll_wait处理发生的事件
 // 使用event_list和nevents获取内核返回的事件
 // timer是无事件发生时最多等待的时间，即超时时间
+// 函数可以分为两部分，一是用epoll获得事件，二是处理事件
 static ngx_int_t
 ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 {
@@ -961,8 +967,11 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
         // 此时才是真正的连接对象指针
         c = (ngx_connection_t *) ((uintptr_t) c & (uintptr_t) ~1);
 
+        // 优先查看连接里的读事件
         rev = c->read;
 
+        // fd == -1描述符无效
+        // instance不对，连接有错误
         if (c->fd == -1 || rev->instance != instance) {
 
             /*
@@ -975,12 +984,14 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             continue;
         }
 
+        // 获取epoll的事件标志
         revents = event_list[i].events;
 
         ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "epoll: fd:%d ev:%04XD d:%p",
                        c->fd, revents, event_list[i].data.ptr);
 
+        // EPOLLERR|EPOLLHUP是发生了错误
         if (revents & (EPOLLERR|EPOLLHUP)) {
             ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                            "epoll_wait() error on fd:%d ev:%04XD",
@@ -995,6 +1006,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
         }
 #endif
 
+        // 发生了错误，但没有EPOLLIN|EPOLLOUT的读写事件
         if ((revents & (EPOLLERR|EPOLLHUP))
              && (revents & (EPOLLIN|EPOLLOUT)) == 0)
         {
@@ -1004,9 +1016,11 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
              * active handler
              */
 
+            // 加上一个读写事件，保证后续有handler可以处理
             revents |= EPOLLIN|EPOLLOUT;
         }
 
+        // 有读事件，且读事件是可用的
         if ((revents & EPOLLIN) && rev->active) {
 
 #if (NGX_HAVE_EPOLLRDHUP)
@@ -1015,23 +1029,33 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             }
 #endif
 
+            // 读事件可用
             rev->ready = 1;
 
+            // 检查此事件是否要延后处理
             if (flags & NGX_POST_EVENTS) {
+                // 是否是接受请求的事件，两个延后处理队列
                 queue = rev->accept ? &ngx_posted_accept_events
                                     : &ngx_posted_events;
 
+                // 暂不处理，而是加入延后处理队列
+                // 加快事件的处理速度，避免其他进程的等待
                 ngx_post_event(rev, queue);
 
             } else {
+                // 不延后，立即调用读事件的handler回调函数处理事件
                 rev->handler(rev);
             }
         }
 
+        // 读事件处理完后再查看连接里的写事件
         wev = c->write;
 
+        // 有写事件，且写事件是可用的
         if ((revents & EPOLLOUT) && wev->active) {
 
+            // fd == -1描述符无效
+            // instance不对，连接有错误
             if (c->fd == -1 || wev->instance != instance) {
 
                 /*
@@ -1044,16 +1068,22 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                 continue;
             }
 
+            // 写事件可用
             wev->ready = 1;
 
+            // 检查此事件是否要延后处理
             if (flags & NGX_POST_EVENTS) {
+                // 暂不处理，而是加入延后处理队列
+                // 加快事件的处理速度，避免其他进程的等待
+                // 写事件只有一个队列
                 ngx_post_event(wev, &ngx_posted_events);
 
             } else {
+                // 不延后，立即调用写事件的handler回调函数处理事件
                 wev->handler(wev);
             }
         }
-    }
+    }       //for循环结束，处理完epoll_wait获得的内核事件
 
     return NGX_OK;
 }
