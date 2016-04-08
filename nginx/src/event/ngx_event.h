@@ -616,7 +616,12 @@ ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
 u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 
+// 处理socket读写事件和定时器事件
+// 获取负载均衡锁，监听端口接受连接
+// 调用epoll模块的ngx_epoll_process_events
+// 然后处理在延后队列里的所有事件
 void ngx_process_events_and_timers(ngx_cycle_t *cycle);
+
 ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
 ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 

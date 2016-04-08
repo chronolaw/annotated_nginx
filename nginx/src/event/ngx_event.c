@@ -11,9 +11,12 @@
 #include <ngx_event.h>
 
 
+// 默认的epoll数组长度
 #define DEFAULT_CONNECTIONS  512
 
 
+// 各内置事件模块
+// rtsig在1.9.x里已经删除
 extern ngx_module_t ngx_kqueue_module;
 extern ngx_module_t ngx_eventport_module;
 extern ngx_module_t ngx_devpoll_module;
@@ -215,7 +218,9 @@ ngx_module_t  ngx_event_core_module = {
 
 
 // 处理socket读写事件和定时器事件
+// 获取负载均衡锁，监听端口接受连接
 // 调用epoll模块的ngx_epoll_process_events
+// 然后处理在延后队列里的所有事件
 void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
 {
@@ -258,7 +263,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
             ngx_accept_disabled--;
 
         } else {
-            // 尝试获取负载均衡锁，监听端口
+            // 尝试获取负载均衡锁，开始监听端口
+            // 如未获取则不监听端口
+            // 内部调用ngx_enable_accept_events/ngx_disable_accept_events
             if (ngx_trylock_accept_mutex(cycle) == NGX_ERROR) {
                 return;
             }
@@ -274,9 +281,13 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
             } else {
                 // 未获取到锁
+                // 要求epoll无限等待，或者等待时间超过配置的ngx_accept_mutex_delay
                 if (timer == NGX_TIMER_INFINITE
                     || timer > ngx_accept_mutex_delay)
                 {
+                    // epoll的超时时间最大就是ngx_accept_mutex_delay
+                    // ngx_accept_mutex_delay = ecf->accept_mutex_delay;
+                    // 如果时间精度设置的太粗，那么就使用这个时间
                     timer = ngx_accept_mutex_delay;
                 }
             }
@@ -293,7 +304,6 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 使用event_list和nevents获取内核返回的事件
     // timer是无事件发生时最多等待的时间，即超时时间
     // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
-    // 在ngx_process_events_and_timers里被调用
     (void) ngx_process_events(cycle, timer, flags);
 
     // 在ngx_process_events里缓存的时间肯定已经更新
@@ -312,7 +322,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
 
-    // 如果消耗了一点儿时间，那么看看是否定时器里有过期的
+    // 如果消耗了一点时间，那么看看是否定时器里有过期的
     if (delta) {
         ngx_event_expire_timers();
     }

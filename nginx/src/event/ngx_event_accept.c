@@ -10,8 +10,13 @@
 #include <ngx_event.h>
 
 
+// 遍历监听端口列表，加入epoll连接事件，开始接受请求
 static ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle);
+
+// 遍历监听端口列表，删除epoll监听连接事件，不接受请求
 static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle);
+
+// 发生了错误，关闭一个连接
 static void ngx_close_accepted_connection(ngx_connection_t *c);
 
 
@@ -33,6 +38,7 @@ ngx_event_accept(ngx_event_t *ev)
 #endif
 
     if (ev->timedout) {
+        // 遍历监听端口列表，加入epoll连接事件
         if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
             return;
         }
@@ -112,6 +118,7 @@ ngx_event_accept(ngx_event_t *ev)
             }
 
             if (err == NGX_EMFILE || err == NGX_ENFILE) {
+                // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
                 if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle)
                     != NGX_OK)
                 {
@@ -367,26 +374,36 @@ ngx_event_accept(ngx_event_t *ev)
 }
 
 
+// 尝试获取负载均衡锁，监听端口
+// 如未获取则不监听端口
+// 内部调用ngx_enable_accept_events/ngx_disable_accept_events
 ngx_int_t
 ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 {
+    // 尝试锁定共享内存锁
     if (ngx_shmtx_trylock(&ngx_accept_mutex)) {
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "accept mutex locked");
 
+        // 锁成功
+        // ngx_accept_events在epoll里不使用
         if (ngx_accept_mutex_held
             && ngx_accept_events == 0
+            // rtsig在nginx 1.9.x已经删除
             && !(ngx_event_flags & NGX_USE_RTSIG_EVENT))
         {
             return NGX_OK;
         }
 
+        // 遍历监听端口列表，加入epoll连接事件，开始接受请求
         if (ngx_enable_accept_events(cycle) == NGX_ERROR) {
+            // 立即解锁，函数结束
             ngx_shmtx_unlock(&ngx_accept_mutex);
             return NGX_ERROR;
         }
 
+        // 设置已经获得锁的标志
         ngx_accept_events = 0;
         ngx_accept_mutex_held = 1;
 
@@ -396,11 +413,14 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "accept mutex lock failed: %ui", ngx_accept_mutex_held);
 
+    // 未获得锁
     if (ngx_accept_mutex_held) {
+        // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
         if (ngx_disable_accept_events(cycle) == NGX_ERROR) {
             return NGX_ERROR;
         }
 
+        // 设置未获得锁的标志
         ngx_accept_mutex_held = 0;
     }
 
@@ -408,6 +428,7 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 }
 
 
+// 遍历监听端口列表，加入epoll连接事件，开始接受请求
 static ngx_int_t
 ngx_enable_accept_events(ngx_cycle_t *cycle)
 {
@@ -415,15 +436,18 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
     ngx_listening_t   *ls;
     ngx_connection_t  *c;
 
+    // 遍历监听端口列表
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
         c = ls[i].connection;
 
+        // 如果连接已经监听（读事件激活）那么就跳过
         if (c->read->active) {
             continue;
         }
 
+        // rtsig在nginx 1.9.x已经删除
         if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
 
             if (ngx_add_conn(c) == NGX_ERROR) {
@@ -431,6 +455,8 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
             }
 
         } else {
+            // #define ngx_add_event        ngx_event_actions.add
+            // 加入读事件，即接受连接事件
             if (ngx_add_event(c->read, NGX_READ_EVENT, 0) == NGX_ERROR) {
                 return NGX_ERROR;
             }
@@ -441,6 +467,7 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
 }
 
 
+// 遍历监听端口列表，删除epoll监听连接事件，不接受请求
 static ngx_int_t
 ngx_disable_accept_events(ngx_cycle_t *cycle)
 {
@@ -448,21 +475,26 @@ ngx_disable_accept_events(ngx_cycle_t *cycle)
     ngx_listening_t   *ls;
     ngx_connection_t  *c;
 
+    // 遍历监听端口列表
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
         c = ls[i].connection;
 
+        // 如果连接没有监听（读事件不激活）那么就跳过
         if (!c->read->active) {
             continue;
         }
 
+        // rtsig在nginx 1.9.x已经删除
         if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
             if (ngx_del_conn(c, NGX_DISABLE_EVENT) == NGX_ERROR) {
                 return NGX_ERROR;
             }
 
         } else {
+            // 删除读事件，即不接受连接事件
+            // NGX_DISABLE_EVENT暂时无用
             if (ngx_del_event(c->read, NGX_READ_EVENT, NGX_DISABLE_EVENT)
                 == NGX_ERROR)
             {
@@ -475,21 +507,27 @@ ngx_disable_accept_events(ngx_cycle_t *cycle)
 }
 
 
+// 发生了错误，关闭一个连接
 static void
 ngx_close_accepted_connection(ngx_connection_t *c)
 {
     ngx_socket_t  fd;
 
+    // 释放连接，加入空闲链表
+    // in core/ngx_connection.c
     ngx_free_connection(c);
 
+    // 连接的描述符置为无效
     fd = c->fd;
     c->fd = (ngx_socket_t) -1;
 
+    // 关闭socket
     if (ngx_close_socket(fd) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_socket_errno,
                       ngx_close_socket_n " failed");
     }
 
+    // 释放连接相关的所有内存
     if (c->pool) {
         ngx_destroy_pool(c->pool);
     }
