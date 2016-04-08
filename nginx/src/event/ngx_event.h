@@ -80,6 +80,8 @@ struct ngx_event_s {
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
     unsigned         pending_eof:1;
 
+    // 事件是否已经加入延后处理队列中
+    // 操作函数宏ngx_post_event/ngx_delete_posted_event
     unsigned         posted:1;
 
 #if (NGX_WIN32)

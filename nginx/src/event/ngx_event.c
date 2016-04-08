@@ -41,6 +41,7 @@ static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
+// nginx更新缓存时间的精度，如果设置了会定时发送sigalarm信号更新时间
 static ngx_uint_t     ngx_timer_resolution;
 
 // 在epoll的ngx_epoll_process_events里检查，更新时间的标志
@@ -221,12 +222,18 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     ngx_uint_t  flags;
     ngx_msec_t  timer, delta;
 
+    // ccf->timer_resolution
+    // nginx更新缓存时间的精度，如果设置了会定时发送sigalarm信号更新时间
     if (ngx_timer_resolution) {
+        // 要求epoll无限等待事件的发生，直至被sigalarm信号中断
         timer = NGX_TIMER_INFINITE;
         flags = 0;
 
     } else {
+        // 在定时器红黑树里找到最小的时间，二叉树查找很快
         timer = ngx_event_find_timer();
+
+        // NGX_UPDATE_TIME要求epoll等待这个时间，然后主动更新时间
         flags = NGX_UPDATE_TIME;
 
 // nginx 1.9.x不再使用old threads代码
@@ -239,19 +246,34 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
+    // 负载均衡锁标志量
     if (ngx_use_accept_mutex) {
+        // ngx_accept_disabled = ngx_cycle->connection_n / 8
+        //                      - ngx_cycle->free_connection_n;
+        // ngx_accept_disabled是总连接数的1/8-空闲连接数
+        // 也就是说空闲连接数小于总数的1/8,那么就暂时停止接受连接
         if (ngx_accept_disabled > 0) {
+
+            // 但也不能永远不接受连接，毕竟还是有空闲连接的，所以每次要减一
             ngx_accept_disabled--;
 
         } else {
+            // 尝试获取负载均衡锁，监听端口
             if (ngx_trylock_accept_mutex(cycle) == NGX_ERROR) {
                 return;
             }
 
+            // 确实已经获得了锁，接下来的epoll的事件需要加入延后队列处理
+            // 这样可以尽快释放锁给其他进程，提高运行效率
             if (ngx_accept_mutex_held) {
+
+                // 加上NGX_POST_EVENTS标志
+                // epoll获得的所有事件都会加入到ngx_posted_events
+                // 待释放锁后再逐个处理
                 flags |= NGX_POST_EVENTS;
 
             } else {
+                // 未获取到锁
                 if (timer == NGX_TIMER_INFINITE
                     || timer > ngx_accept_mutex_delay)
                 {
@@ -261,6 +283,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }
 
+    // 获取当前的时间，毫秒数
     delta = ngx_current_msec;
 
     // #define ngx_process_events   ngx_event_actions.process_events
@@ -273,21 +296,29 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 在ngx_process_events_and_timers里被调用
     (void) ngx_process_events(cycle, timer, flags);
 
+    // 在ngx_process_events里缓存的时间肯定已经更新
+    // 计算得到epoll一次调用消耗的毫秒数
     delta = ngx_current_msec - delta;
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "timer delta: %M", delta);
 
+    // 先处理连接事件，通常只有一个accept的连接
+    // in ngx_event_posted.c
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
 
+    // 释放锁，其他进程可以获取，再监听端口
     if (ngx_accept_mutex_held) {
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
 
+    // 如果消耗了一点儿时间，那么看看是否定时器里有过期的
     if (delta) {
         ngx_event_expire_timers();
     }
 
+    // 接下来处理延后队列里的事件，即调用事件的handler(ev)
+    // in ngx_event_posted.c
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 

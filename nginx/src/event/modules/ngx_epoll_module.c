@@ -1062,6 +1062,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
                 // 暂不处理，而是加入延后处理队列
                 // 加快事件的处理速度，避免其他进程的等待
+                // in ngx_event_posted.h,函数宏
                 ngx_post_event(rev, queue);
 
             } else {
@@ -1098,6 +1099,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                 // 暂不处理，而是加入延后处理队列
                 // 加快事件的处理速度，避免其他进程的等待
                 // 写事件只有一个队列
+                // in ngx_event_posted.h,函数宏
                 ngx_post_event(wev, &ngx_posted_events);
 
             } else {
