@@ -28,7 +28,7 @@
 #define EPOLLERR       0x008
 #define EPOLLHUP       0x010
 
-#define EPOLLRDHUP     0x2000
+#define EPOLLRDHUP     0x2000       //RDHUP也属于读事件
 
 #define EPOLLET        0x80000000   //ET模式，即边缘触发
 #define EPOLLONESHOT   0x40000000
@@ -38,6 +38,8 @@
 #define EPOLL_CTL_MOD  3            //修改事件
 
 // epoll系统调用使用的结构体
+// nginx只使用ptr，存储连接对象的指针
+// 指针最低位用做标志位，存储instance
 typedef union epoll_data {
     // union使用ptr成员，关联到连接对象
     void         *ptr;
@@ -71,6 +73,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 
 
 // 等待注册的事件发生
+// 内核把发生的事件拷贝到events数组里，返回值是数量
 int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout);
 
 int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout)
@@ -82,6 +85,7 @@ int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout)
 #define SYS_eventfd       323
 #endif
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
 #define SYS_io_setup      245
@@ -105,8 +109,10 @@ struct io_event {
 // epoll模块的配置结构体
 typedef struct {
     // epoll系统调用，获取事件的数组大小
+    // 对应指令epoll_events
     ngx_uint_t  events;
 
+    // aio暂不研究
     ngx_uint_t  aio_requests;
 } ngx_epoll_conf_t;
 
@@ -141,7 +147,12 @@ static ngx_int_t ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event,
 static ngx_int_t ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
 
+// epoll关注连接的读写事件
+// 添加事件成功，读写事件都是活跃的，即已经使用
 static ngx_int_t ngx_epoll_add_connection(ngx_connection_t *c);
+
+// epoll删除连接的读写事件
+// 删除事件成功，读写事件都不活跃
 static ngx_int_t ngx_epoll_del_connection(ngx_connection_t *c,
     ngx_uint_t flags);
 
@@ -155,11 +166,12 @@ static ngx_int_t ngx_epoll_notify(ngx_event_handler_pt handler);
 // epoll模块核心功能，调用epoll_wait处理发生的事件
 // 使用event_list和nevents获取内核返回的事件
 // timer是无事件发生时最多等待的时间，即超时时间
-// 函数可以分为两部分，一是用epoll获得事件，二是处理事件
+// 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
 // 在ngx_process_events_and_timers里被调用
 static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 static void ngx_epoll_eventfd_handler(ngx_event_t *ev);
 #endif
@@ -170,7 +182,7 @@ static void *ngx_epoll_create_conf(ngx_cycle_t *cycle);
 // 初始化配置结构体
 static char *ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf);
 
-// epoll系统调用使用的句柄
+// epoll系统调用使用的句柄，由epoll_create()创建
 static int                  ep = -1;
 
 // epoll系统调用使用的数组，存储内核返回的事件
@@ -182,7 +194,7 @@ static struct epoll_event  *event_list;
 static ngx_uint_t           nevents;
 
 #if (NGX_HAVE_EVENTFD)
-// 用于多线程通知用的描述符
+// 用于多线程通知用的描述符，并不关联实际的socket或者文件
 static int                  notify_fd = -1;
 
 // 通知用的事件对象
@@ -192,6 +204,7 @@ static ngx_event_t          notify_event;
 static ngx_connection_t     notify_conn;
 #endif
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
 int                         ngx_eventfd = -1;
@@ -217,6 +230,7 @@ static ngx_command_t  ngx_epoll_commands[] = {
       offsetof(ngx_epoll_conf_t, events),
       NULL },
 
+    // aio暂不研究
     { ngx_string("worker_aio_requests"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -275,6 +289,7 @@ ngx_module_t  ngx_epoll_module = {
 };
 
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
 /*
@@ -413,6 +428,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         }
 #endif
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
         ngx_epoll_aio_init(cycle, epcf);
@@ -583,6 +599,7 @@ ngx_epoll_done(ngx_cycle_t *cycle)
 
 #endif
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
     if (ngx_eventfd != -1) {
@@ -863,6 +880,7 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
 static ngx_int_t
 ngx_epoll_notify(ngx_event_handler_pt handler)
 {
+    // 永远写入数字1，但类型是uint64_t，8个字节
     static uint64_t inc = 1;
 
     // 设置真正的业务回调函数
@@ -884,7 +902,8 @@ ngx_epoll_notify(ngx_event_handler_pt handler)
 // epoll模块核心功能，调用epoll_wait处理发生的事件
 // 使用event_list和nevents获取内核返回的事件
 // timer是无事件发生时最多等待的时间，即超时时间
-// 函数可以分为两部分，一是用epoll获得事件，二是处理事件
+// 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
+// 函数里不处理定时器，因为定时器不属于epoll事件
 static ngx_int_t
 ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 {
@@ -905,6 +924,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     // 调用epoll_wait处理发生的事件
     // 使用event_list和nevents获取内核返回的事件
     // 返回值events是实际获得的事件数量
+    // epoll_wait等待最多timer时间后返回
     events = epoll_wait(ep, event_list, (int) nevents, timer);
 
     // 检查是否发生了错误
@@ -912,7 +932,9 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     err = (events == -1) ? ngx_errno : 0;
 
     // 如果要求更新时间，或者收到了更新时间的信号
+    // 通常event模块调用时总会传递NGX_UPDATE_TIME，这时就会更新缓存的时间
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
+        // in ngx_times.c，系统调用，更新缓存事件
         ngx_time_update();
     }
 
@@ -1089,6 +1111,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 }
 
 
+// aio暂不研究
 #if (NGX_HAVE_FILE_AIO)
 
 static void

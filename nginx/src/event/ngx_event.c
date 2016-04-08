@@ -229,6 +229,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         timer = ngx_event_find_timer();
         flags = NGX_UPDATE_TIME;
 
+// nginx 1.9.x不再使用old threads代码
 #if (NGX_OLD_THREADS)
 
         if (timer == NGX_TIMER_INFINITE || timer > 500) {
@@ -262,6 +263,14 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     delta = ngx_current_msec;
 
+    // #define ngx_process_events   ngx_event_actions.process_events
+    // 实际上就是ngx_epoll_process_events
+    //
+    // epoll模块核心功能，调用epoll_wait处理发生的事件
+    // 使用event_list和nevents获取内核返回的事件
+    // timer是无事件发生时最多等待的时间，即超时时间
+    // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
+    // 在ngx_process_events_and_timers里被调用
     (void) ngx_process_events(cycle, timer, flags);
 
     delta = ngx_current_msec - delta;
