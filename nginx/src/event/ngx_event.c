@@ -70,6 +70,9 @@ ngx_uint_t            ngx_use_accept_mutex;
 ngx_uint_t            ngx_accept_events;
 ngx_uint_t            ngx_accept_mutex_held;
 ngx_msec_t            ngx_accept_mutex_delay;
+
+// ngx_accept_disabled是总连接数的1/8-空闲连接数
+// 也就是说空闲连接数小于总数的1/8,那么就暂时停止接受连接
 ngx_int_t             ngx_accept_disabled;
 
 

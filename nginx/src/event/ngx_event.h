@@ -611,8 +611,16 @@ extern ngx_module_t           ngx_event_core_module;
 
 
 
+// 监听端口上收到连接请求时的回调函数，即事件handler
+// 从cycle的连接池里获取连接
+// 关键操作 ls->handler(c);调用其他模块的业务handler
 void ngx_event_accept(ngx_event_t *ev);
+
+// 尝试获取负载均衡锁，监听端口
+// 如未获取则不监听端口
+// 内部调用ngx_enable_accept_events/ngx_disable_accept_events
 ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
+
 u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 

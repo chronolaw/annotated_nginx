@@ -168,9 +168,13 @@ struct ngx_connection_s {
     ngx_socket_t        fd;
 
     // 接收数据的函数指针
+    // ngx_event_accept.c:ngx_event_accept()里设置为ngx_recv
+    // ngx_posix_init.c里初始化为linux的底层接口
     ngx_recv_pt         recv;
 
     // 发送数据的函数指针
+    // ngx_event_accept.c:ngx_event_accept()里设置为ngx_send
+    // ngx_posix_init.c里初始化为linux的底层接口
     ngx_send_pt         send;
 
     ngx_recv_chain_pt   recv_chain;
@@ -213,7 +217,9 @@ struct ngx_connection_s {
     // 复用连接对象
     ngx_queue_t         queue;
 
-    // 连接使用次数
+    // 连接创建的计数器
+    // ngx_event_accept.c:ngx_event_accept()
+    // c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
     ngx_atomic_uint_t   number;
 
     // 处理的请求次数
