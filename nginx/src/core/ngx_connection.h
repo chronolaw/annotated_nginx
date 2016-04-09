@@ -252,7 +252,10 @@ struct ngx_connection_s {
     // 正在发送文件
     unsigned            sendfile:1;
 
+    // 是否已经设置发送数据时epoll的响应阈值
+    // ngx_event.c:ngx_send_lowat()
     unsigned            sndlowat:1;
+
     unsigned            tcp_nodelay:2;   /* ngx_connection_tcp_nodelay_e */
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
 

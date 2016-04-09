@@ -41,6 +41,8 @@ static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
 // 设置接受连接的回调函数为ngx_event_accept，可以接受连接
 static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
 
+// 解析events配置块
+// 设置事件模块的ctx_index
 static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 // 解析worker_connections指令
@@ -49,6 +51,7 @@ static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+// 解析use指令
 // 决定使用哪个事件模型，linux上通常是epoll
 static char *ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
@@ -82,6 +85,7 @@ ngx_uint_t            ngx_event_flags;
 ngx_event_actions_t   ngx_event_actions;
 
 
+// 连接计数器
 static ngx_atomic_t   connection_counter = 1;
 ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
@@ -492,6 +496,8 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
     if (lowat) {
         c = wev->data;
 
+        // 设置发送数据时epoll的响应阈值
+        // 当系统空闲缓冲超过lowat时触发epoll可写事件
         if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
             return NGX_ERROR;
         }
@@ -1068,6 +1074,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 }
 
 
+// 设置发送数据时epoll的响应阈值
+// 当系统空闲缓冲超过lowat时触发epoll可写事件
 ngx_int_t
 ngx_send_lowat(ngx_connection_t *c, size_t lowat)
 {
@@ -1082,12 +1090,14 @@ ngx_send_lowat(ngx_connection_t *c, size_t lowat)
 
 #endif
 
+    // 如果阈值是0,或者已经设置过了，就直接返回
     if (lowat == 0 || c->sndlowat) {
         return NGX_OK;
     }
 
     sndlowat = (int) lowat;
 
+    // 设置socket参数
     if (setsockopt(c->fd, SOL_SOCKET, SO_SNDLOWAT,
                    (const void *) &sndlowat, sizeof(int))
         == -1)
@@ -1097,12 +1107,15 @@ ngx_send_lowat(ngx_connection_t *c, size_t lowat)
         return NGX_ERROR;
     }
 
+    // 标志位
     c->sndlowat = 1;
 
     return NGX_OK;
 }
 
 
+// 解析events配置块
+// 设置事件模块的ctx_index
 static char *
 ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1112,12 +1125,16 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_conf_t            pcf;
     ngx_event_module_t   *m;
 
+    // 不允许出现两个events配置块
+    // conf实际上是个二维数组，所以是void**
     if (*(void **) conf) {
         return "is duplicate";
     }
 
     /* count the number of the event modules and set up their indices */
 
+    // 得到所有的事件模块数量
+    // 设置事件模块的ctx_index
     ngx_event_max_module = 0;
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
@@ -1127,18 +1144,23 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_modules[i]->ctx_index = ngx_event_max_module++;
     }
 
+    // ctx是void***，也就是void** *，即指向二维数组的指针
     ctx = ngx_pcalloc(cf->pool, sizeof(void *));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 分配存储事件模块配置的数组
     *ctx = ngx_pcalloc(cf->pool, ngx_event_max_module * sizeof(void *));
     if (*ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 在cycle里存储这个指针
     *(void **) conf = ctx;
 
+    // 对每一个事件模块调用create_conf创建配置结构体
+    // 事件模块的层次很简单，没有多级，所以二维数组就够了
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
             continue;
@@ -1146,6 +1168,7 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         m = ngx_modules[i]->ctx;
 
+        // 调用create_conf创建配置结构体
         if (m->create_conf) {
             (*ctx)[ngx_modules[i]->ctx_index] = m->create_conf(cf->cycle);
             if ((*ctx)[ngx_modules[i]->ctx_index] == NULL) {
@@ -1154,18 +1177,24 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    // 暂存当前的解析上下文
     pcf = *cf;
+
+    // 设置事件模块的新解析上下文
     cf->ctx = ctx;
     cf->module_type = NGX_EVENT_MODULE;
     cf->cmd_type = NGX_EVENT_CONF;
 
+    // 递归解析事件相关模块
     rv = ngx_conf_parse(cf, NULL);
 
+    // 恢复之前保存的解析上下文
     *cf = pcf;
 
     if (rv != NGX_CONF_OK)
         return rv;
 
+    // 解析完毕，需要初始化配置，即给默认值
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
             continue;

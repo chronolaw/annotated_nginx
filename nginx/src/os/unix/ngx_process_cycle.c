@@ -420,6 +420,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
         ngx_process_events_and_timers(cycle);
 
         // 检查是否处于退出状态
+        // 这里不使用ngx_exiting变量，直接关闭端口退出
         if (ngx_terminate || ngx_quit) {
 
             // 所有模块的退出hook
@@ -455,7 +456,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
             ngx_reopen_files(cycle, (ngx_uid_t) -1);
         }
-    }
+    } // 无限循环，对外提供服务
 }
 
 
@@ -972,7 +973,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
             ngx_reopen_files(cycle, -1);
         }
-    }
+    } // 无限循环，处理事件和信号
 }
 
 

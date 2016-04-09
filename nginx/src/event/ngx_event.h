@@ -654,6 +654,8 @@ u_char *ngx_acceptex_log_error(ngx_log_t *log, u_char *buf, size_t len);
 #endif
 
 
+// 设置发送数据时epoll的响应阈值
+// 当系统空闲缓冲超过lowat时触发epoll可写事件
 ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 
 
