@@ -17,6 +17,7 @@
 
 #define NGX_TIMER_INFINITE  (ngx_msec_t) -1
 
+// 允许有300毫秒的误差
 #define NGX_TIMER_LAZY_DELAY  300
 
 
@@ -33,6 +34,7 @@ void ngx_event_cancel_timers(void);
 extern ngx_rbtree_t  ngx_event_timer_rbtree;
 
 
+// 从定时器红黑树里删除事件
 static ngx_inline void
 ngx_event_del_timer(ngx_event_t *ev)
 {
@@ -40,6 +42,7 @@ ngx_event_del_timer(ngx_event_t *ev)
                    "event timer del: %d: %M",
                     ngx_event_ident(ev->data), ev->timer.key);
 
+    // 红黑树里删除节点
     ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
 
 #if (NGX_DEBUG)
@@ -48,18 +51,24 @@ ngx_event_del_timer(ngx_event_t *ev)
     ev->timer.parent = NULL;
 #endif
 
+    // 事件的标志清零
     ev->timer_set = 0;
 }
 
 
+// 向定时器红黑树里添加事件
 static ngx_inline void
 ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
 {
     ngx_msec_t      key;
     ngx_msec_int_t  diff;
 
+    // 红黑树key是毫秒时间戳
+    // 当前时间加上超时的时间
     key = ngx_current_msec + timer;
 
+    // 如果之前已经加入了定时器红黑树
+    // 那么就重新设置时间
     if (ev->timer_set) {
 
         /*
@@ -68,8 +77,11 @@ ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
          * to minimize the rbtree operations for fast connections.
          */
 
+        // 计算一下旧超时时间与新超时时间的差值
         diff = (ngx_msec_int_t) (key - ev->timer.key);
 
+        // #define NGX_TIMER_LAZY_DELAY  300
+        // 允许有300毫秒的误差
         if (ngx_abs(diff) < NGX_TIMER_LAZY_DELAY) {
             ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                            "event timer: %d, old: %M, new: %M",
@@ -77,17 +89,21 @@ ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
             return;
         }
 
+        // 删除定时器，然后重新加入
         ngx_del_timer(ev);
     }
 
+    // 设置事件的key
     ev->timer.key = key;
 
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "event timer add: %d: %M:%M",
                     ngx_event_ident(ev->data), timer, ev->timer.key);
 
+    // 加入红黑树
     ngx_rbtree_insert(&ngx_event_timer_rbtree, &ev->timer);
 
+    // 设置事件的定时器标志
     ev->timer_set = 1;
 }
 

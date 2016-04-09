@@ -494,9 +494,13 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
 
+// 事件通知
 #define ngx_notify           ngx_event_actions.notify
 
+// 向定时器红黑树里添加事件, ngx_event_timer.h
 #define ngx_add_timer        ngx_event_add_timer
+
+// 从定时器红黑树里删除事件, ngx_event_timer.h
 #define ngx_del_timer        ngx_event_del_timer
 
 
