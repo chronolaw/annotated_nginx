@@ -34,7 +34,7 @@ static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
 static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
 
 // 重要！
-// 进程初始化时调用，即每个worker里都会执行
+// fork之后，worker进程初始化时调用，即每个worker里都会执行
 // 初始化两个延后处理的事件队列,初始化定时器红黑树
 // 发送定时信号，更新时间用
 // 初始化cycle里的连接和事件数组
@@ -268,7 +268,8 @@ ngx_module_t  ngx_event_core_module = {
     ngx_event_module_init,                 /* init module */
 
     // 初始化cycle里的连接和事件数组
-    // 进程初始化时调用，即每个worker里都会执行
+    // fork之后，worker进程初始化时调用，即每个worker里都会执行
+    // 初始化两个延后处理的事件队列,初始化定时器红黑树
     // 发送定时信号，更新时间用
     // 初始化cycle里的连接和事件数组
     // 设置接受连接的回调函数为ngx_event_accept，可以接受连接
@@ -282,10 +283,12 @@ ngx_module_t  ngx_event_core_module = {
 };
 
 
+// 重要！！
+// 在ngx_process_cycle.c:ngx_single_process_cycle/ngx_worker_process_cycle里调用
 // 处理socket读写事件和定时器事件
 // 获取负载均衡锁，监听端口接受连接
 // 调用epoll模块的ngx_epoll_process_events
-// 然后处理在延后队列里的所有事件
+// 然后处理超时事件和在延后队列里的所有事件
 void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
 {
@@ -402,6 +405,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // 接下来处理延后队列里的事件，即调用事件的handler(ev)，收发数据
     // in ngx_event_posted.c
+    // 这里因为要处理大量的事件，而且是简单的顺序调用，所以可能会阻塞
+    // nginx大部分的工作量都在这里
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 
@@ -740,7 +745,7 @@ ngx_timer_signal_handler(int signo)
 #endif
 
 
-// 进程初始化时调用，即每个worker里都会执行
+// fork之后，worker进程初始化时调用，即每个worker里都会执行
 // 初始化两个延后处理的事件队列,初始化定时器红黑树
 // 发送定时信号，更新时间用
 // 初始化cycle里的连接和事件数组

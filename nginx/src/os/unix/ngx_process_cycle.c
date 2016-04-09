@@ -382,7 +382,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 
 
-// main()函数里调用，仅启动一个进程
+// main()函数里调用，仅启动一个进程，没有fork
 // master_process off;
 void
 ngx_single_process_cycle(ngx_cycle_t *cycle)
@@ -412,6 +412,11 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
         // 处理事件的核心函数, event模块里
+        // 处理socket读写事件和定时器事件
+        // 获取负载均衡锁，监听端口接受连接
+        // 调用epoll模块的ngx_epoll_process_events
+        // 然后处理超时事件和在延后队列里的所有事件
+        // nginx大部分的工作量都在这里
         ngx_process_events_and_timers(cycle);
 
         // 检查是否处于退出状态
@@ -891,6 +896,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
     for ( ;; ) {
 
         // 进程正在退出,即quit
+        // 收到了-s quit，关闭监听端口后再停止进程（优雅关闭）
         if (ngx_exiting) {
 
             c = cycle->connections;
@@ -905,8 +911,11 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 }
             }
 
+            // 取消定时器，调用handler处理
             ngx_event_cancel_timers();
 
+            // 定时器红黑树为空，即已经没有任何事件
+            // 否则表示还有事件未处理，暂不退出
             if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
             {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
@@ -920,9 +929,14 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
         // 处理事件的核心函数, event模块里
+        // 处理socket读写事件和定时器事件
+        // 获取负载均衡锁，监听端口接受连接
+        // 调用epoll模块的ngx_epoll_process_events
+        // 然后处理超时事件和在延后队列里的所有事件
+        // nginx大部分的工作量都在这里
         ngx_process_events_and_timers(cycle);
 
-        // 收到了-s stop，停止进程
+        // 收到了-s stop，直接停止进程
         if (ngx_terminate) {
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 
@@ -943,9 +957,11 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             if (!ngx_exiting) {
                 // in ngx_connection.c
                 // 遍历监听端口列表，逐个删除监听事件
+                // 不再接受新的连接请求
                 ngx_close_listening_sockets(cycle);
 
                 // 设置ngx_exiting标志，继续走循环
+                // 等所有事件都处理完了才能真正退出
                 ngx_exiting = 1;
             }
         }
@@ -1352,6 +1368,11 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
         }
 
         // 处理事件的核心函数, event模块里
+        // 处理socket读写事件和定时器事件
+        // 获取负载均衡锁，监听端口接受连接
+        // 调用epoll模块的ngx_epoll_process_events
+        // 然后处理超时事件和在延后队列里的所有事件
+        // nginx大部分的工作量都在这里
         ngx_process_events_and_timers(cycle);
     }
 }

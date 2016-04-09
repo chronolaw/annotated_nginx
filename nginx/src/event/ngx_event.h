@@ -631,10 +631,11 @@ ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
 u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 
+// 在ngx_single_process_cycle/ngx_worker_process_cycle里调用
 // 处理socket读写事件和定时器事件
 // 获取负载均衡锁，监听端口接受连接
 // 调用epoll模块的ngx_epoll_process_events
-// 然后处理在延后队列里的所有事件
+// 然后处理超时事件和在延后队列里的所有事件
 void ngx_process_events_and_timers(ngx_cycle_t *cycle);
 
 // 添加读事件的便捷接口，适合epoll/kqueue/select等各种事件模型
