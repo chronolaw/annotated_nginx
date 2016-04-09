@@ -117,7 +117,7 @@ typedef struct {
 } ngx_epoll_conf_t;
 
 
-// 调用epoll_create初始化epoll机制
+// 调用epoll_create初始化epoll机制, timer无意义
 // 参数size=cycle->connection_n / 2，但并无实际意义
 // 设置全局变量，操作系统提供的底层数据收发接口
 // 初始化全局的事件模块访问接口，指向epoll的函数
@@ -255,19 +255,50 @@ ngx_event_module_t  ngx_epoll_module_ctx = {
 
     // epoll的事件模块访问接口，是一个函数表
     {
+        // epoll添加事件
+        // 检查事件关联的连接对象，决定是新添加还是修改
+        // 避免误删除了读写事件的关注
         ngx_epoll_add_event,             /* add an event */
+
+        // epoll删除事件
+        // 检查事件关联的连接对象，决定是完全删除还是修改
+        // 避免误删除了读写事件的关注
         ngx_epoll_del_event,             /* delete an event */
+
         ngx_epoll_add_event,             /* enable an event */
         ngx_epoll_del_event,             /* disable an event */
+
+        // epoll关注连接的读写事件
+        // 添加事件成功，读写事件都是活跃的，即已经使用
         ngx_epoll_add_connection,        /* add an connection */
+
+        // epoll删除连接的读写事件
+        // 删除事件成功，读写事件都不活跃
         ngx_epoll_del_connection,        /* delete an connection */
+
 #if (NGX_HAVE_EVENTFD)
+        // 使用epoll模拟了事件通知机制
+        // 向文件里写一个数字，令文件可读，从而触发epoll事件
+        // 参数handler是真正的业务回调函数
         ngx_epoll_notify,                /* trigger a notify */
 #else
         NULL,                            /* trigger a notify */
 #endif
+        // epoll模块核心功能，调用epoll_wait处理发生的事件
+        // 使用event_list和nevents获取内核返回的事件
+        // timer是无事件发生时最多等待的时间，即超时时间
+        // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
+        // 函数里不处理定时器，因为定时器不属于epoll事件
         ngx_epoll_process_events,        /* process the events */
+
+        // 调用epoll_create初始化epoll机制, timer无意义
+        // 参数size=cycle->connection_n / 2，但并无实际意义
+        // 设置全局变量，操作系统提供的底层数据收发接口
+        // 初始化全局的事件模块访问接口，指向epoll的函数
+        // 默认使用et模式，边缘触发，高速
         ngx_epoll_init,                  /* init the events */
+
+        // epoll模块结束工作，关闭epoll句柄和通知句柄，释放内存
         ngx_epoll_done,                  /* done the events */
     }
 };
@@ -394,7 +425,7 @@ failed:
 #endif
 
 
-// 调用epoll_create初始化epoll机制
+// 调用epoll_create初始化epoll机制, timer无意义
 // 参数size=cycle->connection_n / 2，但并无实际意义
 // 设置全局变量，操作系统提供的底层数据收发接口
 // 初始化全局的事件模块访问接口，指向epoll的函数
@@ -933,6 +964,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
     // 如果要求更新时间，或者收到了更新时间的信号
     // 通常event模块调用时总会传递NGX_UPDATE_TIME，这时就会更新缓存的时间
+    // sigalarm信号的处理函数设置ngx_event_timer_alarm变量
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
         // in ngx_times.c，系统调用，更新缓存事件
         ngx_time_update();

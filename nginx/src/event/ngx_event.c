@@ -33,8 +33,12 @@ static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
 // 创建共享内存，存放负载均衡锁和统计用的原子变量
 static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
 
+// 重要！
 // 进程初始化时调用，即每个worker里都会执行
+// 初始化两个延后处理的事件队列,初始化定时器红黑树
+// 发送定时信号，更新时间用
 // 初始化cycle里的连接和事件数组
+// 设置接受连接的回调函数为ngx_event_accept，可以接受连接
 static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
 
 static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
@@ -85,10 +89,19 @@ ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 // 负载均衡锁指针，初始为空指针
 ngx_atomic_t         *ngx_accept_mutex_ptr;
 
+// 负载均衡锁
 ngx_shmtx_t           ngx_accept_mutex;
+
+// 负载均衡锁标志量
 ngx_uint_t            ngx_use_accept_mutex;
+
 ngx_uint_t            ngx_accept_events;
+
+// 是否已经持有负载均衡锁
 ngx_uint_t            ngx_accept_mutex_held;
+
+// 等待多少时间再次尝试获取负载均衡锁
+// ngx_accept_mutex_delay = ecf->accept_mutex_delay;
 ngx_msec_t            ngx_accept_mutex_delay;
 
 // ngx_accept_disabled是总连接数的1/8-空闲连接数
@@ -256,6 +269,9 @@ ngx_module_t  ngx_event_core_module = {
 
     // 初始化cycle里的连接和事件数组
     // 进程初始化时调用，即每个worker里都会执行
+    // 发送定时信号，更新时间用
+    // 初始化cycle里的连接和事件数组
+    // 设置接受连接的回调函数为ngx_event_accept，可以接受连接
     ngx_event_process_init,                /* init process */
 
     NULL,                                  /* init thread */
@@ -708,6 +724,9 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
 #if !(NGX_WIN32)
 
+// sigalarm信号的处理函数，只设置ngx_event_timer_alarm变量
+// 在epoll的ngx_epoll_process_events里检查，更新时间的标志
+// 信号处理函数应该尽量简单，避免阻塞进程
 static void
 ngx_timer_signal_handler(int signo)
 {
@@ -722,7 +741,10 @@ ngx_timer_signal_handler(int signo)
 
 
 // 进程初始化时调用，即每个worker里都会执行
+// 初始化两个延后处理的事件队列,初始化定时器红黑树
+// 发送定时信号，更新时间用
 // 初始化cycle里的连接和事件数组
+// 设置接受连接的回调函数为ngx_event_accept，可以接受连接
 static ngx_int_t
 ngx_event_process_init(ngx_cycle_t *cycle)
 {
@@ -734,15 +756,23 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ngx_event_conf_t    *ecf;
     ngx_event_module_t  *module;
 
+    // core模块的配置结构体
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    // event_core模块的配置结构体
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
 
+    // 使用master/worker多进程，使用负载均衡
     if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
+
+        // 设置全局变量
+        // 使用负载均衡，刚开始未持有锁，设置抢锁的等待事件
         ngx_use_accept_mutex = 1;
         ngx_accept_mutex_held = 0;
         ngx_accept_mutex_delay = ecf->accept_mutex_delay;
 
     } else {
+        // 单进程、未明确指定负载均衡，就不使用负载均衡
         ngx_use_accept_mutex = 0;
     }
 
@@ -757,6 +787,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #endif
 
+    // 初始化两个延后处理的事件队列
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_events);
 
@@ -765,17 +796,26 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // 遍历事件模块，但只执行实际使用的事件模块对应初始化函数
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
+        // 找到use指令使用的事件模型，或者是默认事件模型
         if (ngx_modules[m]->ctx_index != ecf->use) {
             continue;
         }
 
         module = ngx_modules[m]->ctx;
 
+        // 调用事件模块的事件初始化函数
+        //
+        // 调用epoll_create初始化epoll机制
+        // 参数size=cycle->connection_n / 2，但并无实际意义
+        // 设置全局变量，操作系统提供的底层数据收发接口
+        // 初始化全局的事件模块访问接口，指向epoll的函数
+        // 默认使用et模式，边缘触发，高速
         if (module->actions.init(cycle, ngx_timer_resolution) != NGX_OK) {
             /* fatal */
             exit(2);
@@ -784,12 +824,14 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         break;
     }
 
+// unix代码, 发送定时信号，更新时间用
 #if !(NGX_WIN32)
 
     if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
         struct sigaction  sa;
         struct itimerval  itv;
 
+        // 设置信号掩码，sigalarm
         ngx_memzero(&sa, sizeof(struct sigaction));
         sa.sa_handler = ngx_timer_signal_handler;
         sigemptyset(&sa.sa_mask);
@@ -800,6 +842,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
             return NGX_ERROR;
         }
 
+        // 设置信号发送的时间间隔，也就是nginx的时间精度
+        // 收到信号会设置设置ngx_event_timer_alarm变量
+        // 在epoll的ngx_epoll_process_events里检查，更新时间的标志
         itv.it_interval.tv_sec = ngx_timer_resolution / 1000;
         itv.it_interval.tv_usec = (ngx_timer_resolution % 1000) * 1000;
         itv.it_value.tv_sec = ngx_timer_resolution / 1000;
@@ -897,9 +942,11 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
     /* for each listening socket */
 
+    // 为每个监听端口分配一个连接对象
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+        // 获取一个空闲连接
         c = ngx_get_connection(ls[i].fd, cycle->log);
 
         if (c == NULL) {
@@ -914,6 +961,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         rev = c->read;
 
         rev->log = c->log;
+
+        // 设置accept标志，接受连接
         rev->accept = 1;
 
 #if (NGX_HAVE_DEFERRED_ACCEPT)
@@ -978,18 +1027,29 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #else
 
+        // 重要！！
+        // 设置接受连接的回调函数为ngx_event_accept
+        // 监听端口上收到连接请求时的回调函数，即事件handler
+        // 从cycle的连接池里获取连接
+        // 关键操作 ls->handler(c);调用其他模块的业务handler
         rev->handler = ngx_event_accept;
 
+        // 如果使用负载均衡，不向epoll添加事件，只有抢到锁才添加
         if (ngx_use_accept_mutex) {
+
+            // 对一个监听端口的处理结束，只设置了回调函数
             continue;
         }
 
+        // nginx 1.9.x不再使用rtsig
         if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
             if (ngx_add_conn(c) == NGX_ERROR) {
                 return NGX_ERROR;
             }
 
         } else {
+            // 单进程、未明确指定负载均衡，不使用负载均衡
+            // 直接加入epoll事件，开始监听，可以接受请求
             if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
                 return NGX_ERROR;
             }
@@ -997,7 +1057,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #endif
 
-    }
+    } // 为每个监听端口分配一个连接对象循环结束
 
     return NGX_OK;
 }
