@@ -25,8 +25,14 @@
 // 实际上就是初始化一个红黑树结构
 ngx_int_t ngx_event_timer_init(ngx_log_t *log);
 
+// 在红黑树里查找最小值，即最左边的节点，得到超时的时间差值
+// 如果时间已经超过了，那么时间差值就是0
 ngx_msec_t ngx_event_find_timer(void);
+
+// 遍历定时器红黑树，找出所有过期的事件，调用handler处理超时
 void ngx_event_expire_timers(void);
+
+// 取消定时器，调用handler处理
 void ngx_event_cancel_timers(void);
 
 
