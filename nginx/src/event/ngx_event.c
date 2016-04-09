@@ -25,7 +25,12 @@ extern ngx_module_t ngx_rtsig_module;
 extern ngx_module_t ngx_select_module;
 
 
+// 只检查是否创建了配置结构体，无其他操作
+// 因为event模块只有一个events指令
 static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
+
+// 在ngx_init_cycle里调用，fork子进程之前
+// 创建共享内存，存放负载均衡锁和统计用的原子变量
 static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
 
 // 进程初始化时调用，即每个worker里都会执行
@@ -34,13 +39,26 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
 
 static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+// 解析worker_connections指令
+// 取得指令字符串,转换为数字
+// 再设置到cycle里，即连接池数组的大小
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 决定使用哪个事件模型，linux上通常是epoll
 static char *ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
 static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+// 创建event_core模块的配置结构体，成员初始化为unset
 static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
+
+// 所有模块配置解析完毕后，对配置进行初始化
+// 如果有的指令没有写，就要给正确的默认值
+// 模块默认使用epoll
+// 默认不接受多个请求，也就是一次只accept一个连接
+// 默认使用负载均衡锁
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
@@ -64,7 +82,9 @@ static ngx_atomic_t   connection_counter = 1;
 ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
 
+// 负载均衡锁指针，初始为空指针
 ngx_atomic_t         *ngx_accept_mutex_ptr;
+
 ngx_shmtx_t           ngx_accept_mutex;
 ngx_uint_t            ngx_use_accept_mutex;
 ngx_uint_t            ngx_accept_events;
@@ -97,6 +117,7 @@ ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
 
 
 
+// events模块仅支持一个指令，即events块
 static ngx_command_t  ngx_events_commands[] = {
 
     { ngx_string("events"),
@@ -113,6 +134,9 @@ static ngx_command_t  ngx_events_commands[] = {
 static ngx_core_module_t  ngx_events_module_ctx = {
     ngx_string("events"),
     NULL,
+
+    // 只检查是否创建了配置结构体，无其他操作
+    // 因为event模块只有一个events指令
     ngx_event_init_conf
 };
 
@@ -133,11 +157,13 @@ ngx_module_t  ngx_events_module = {
 };
 
 
+// event_core模块的名字："event_core"
 static ngx_str_t  event_core_name = ngx_string("event_core");
 
 
 static ngx_command_t  ngx_event_core_commands[] = {
 
+    // nginx每个worker进程里的连接池数量，决定了nginx的服务能力
     { ngx_string("worker_connections"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_connections,
@@ -145,6 +171,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
+    // 功能同worker_connections，但已经被废弃，不要使用
     { ngx_string("connections"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_connections,
@@ -152,6 +179,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
+    // 决定使用哪个事件模型，linux上通常是epoll
     { ngx_string("use"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_use,
@@ -159,6 +187,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
+    // 默认不接受多个请求，也就是一次只accept一个连接
     { ngx_string("multi_accept"),
       NGX_EVENT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -166,6 +195,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, multi_accept),
       NULL },
 
+    // 默认使用负载均衡锁
     { ngx_string("accept_mutex"),
       NGX_EVENT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -173,6 +203,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, accept_mutex),
       NULL },
 
+    // 默认负载均衡锁的等待时间是500毫秒
     { ngx_string("accept_mutex_delay"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -191,11 +222,23 @@ static ngx_command_t  ngx_event_core_commands[] = {
 };
 
 
+// event_core模块是event模块，不是core模块
+// 但它不实现具体的事件模型，所以actions函数表全是空指针
 ngx_event_module_t  ngx_event_core_module_ctx = {
+    // event_core模块的名字："event_core"
     &event_core_name,
+
+    // 创建event_core模块的配置结构体，成员初始化为unset
     ngx_event_core_create_conf,            /* create configuration */
+
+    // 所有模块配置解析完毕后，对配置进行初始化
+    // 如果有的指令没有写，就要给正确的默认值
+    // 模块默认使用epoll
+    // 默认不接受多个请求，也就是一次只accept一个连接
+    // 默认使用负载均衡锁
     ngx_event_core_init_conf,              /* init configuration */
 
+    // 不实现具体的事件模型，所以actions函数表全是空指针
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -207,9 +250,12 @@ ngx_module_t  ngx_event_core_module = {
     NGX_EVENT_MODULE,                      /* module type */
     NULL,                                  /* init master */
 
+    // 在ngx_init_cycle里调用，fork子进程之前
+    // 创建共享内存，存放负载均衡锁和统计用的原子变量
     ngx_event_module_init,                 /* init module */
 
     // 初始化cycle里的连接和事件数组
+    // 进程初始化时调用，即每个worker里都会执行
     ngx_event_process_init,                /* init process */
 
     NULL,                                  /* init thread */
@@ -297,6 +343,10 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }
 
+    // 不管是否获得了负载均衡锁，都要处理事件和定时器
+    // 如果获得了负载均衡锁,事件就会多出一个accept事件
+    // 否则只有普通的读写事件和定时器事件
+
     // 获取当前的时间，毫秒数
     delta = ngx_current_msec;
 
@@ -318,27 +368,34 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // 先处理连接事件，通常只有一个accept的连接
     // in ngx_event_posted.c
+    // 实际上调用的就是ngx_event_accept
+    // 在http模块里是http.c:ngx_http_init_connection
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
 
     // 释放锁，其他进程可以获取，再监听端口
+    // 这里只处理accept事件，工作量小，可以尽快释放锁，供其他进程使用
     if (ngx_accept_mutex_held) {
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
 
     // 如果消耗了一点时间，那么看看是否定时器里有过期的
     if (delta) {
+        // 遍历定时器红黑树，找出所有过期的事件，调用handler处理超时
         ngx_event_expire_timers();
     }
 
-    // 接下来处理延后队列里的事件，即调用事件的handler(ev)
+    // 接下来处理延后队列里的事件，即调用事件的handler(ev)，收发数据
     // in ngx_event_posted.c
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 
 
+// 添加读事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event
 ngx_int_t
 ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 {
+    // 使用et模式，epoll/kqueue
     if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
 
         /* kqueue, epoll */
@@ -404,6 +461,8 @@ ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 }
 
 
+// 添加写事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event,多了个send_lowat操作
 ngx_int_t
 ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 {
@@ -483,6 +542,8 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 }
 
 
+// 只检查是否创建了配置结构体，无其他操作
+// 因为event模块只有一个events指令
 static char *
 ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 {
@@ -496,6 +557,8 @@ ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 }
 
 
+// 在ngx_init_cycle里调用，fork子进程之前
+// 创建共享内存，存放负载均衡锁和统计用的原子变量
 static ngx_int_t
 ngx_event_module_init(ngx_cycle_t *cycle)
 {
@@ -507,7 +570,10 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_core_conf_t     *ccf;
     ngx_event_conf_t    *ecf;
 
+    // events模块的配置结构体
     cf = ngx_get_conf(cycle->conf_ctx, ngx_events_module);
+
+    // event_core模块的配置结构体
     ecf = (*cf)[ngx_event_core_module.ctx_index];
 
     if (!ngx_test_config && ngx_process <= NGX_PROCESS_MASTER) {
@@ -515,10 +581,13 @@ ngx_event_module_init(ngx_cycle_t *cycle)
                       "using the \"%s\" event method", ecf->name);
     }
 
+    // core模块的配置结构体
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 获取核心配置的时间精度，用在epoll里更新缓存时间
     ngx_timer_resolution = ccf->timer_resolution;
 
+    // unix专用代码, core dump相关
 #if !(NGX_WIN32)
     {
     ngx_int_t      limit;
@@ -546,10 +615,12 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 #endif /* !(NGX_WIN32) */
 
 
+    // 如果非master/worker进程，即只启动一个进程，那么就没必要使用负载均衡锁
     if (ccf->master == 0) {
         return NGX_OK;
     }
 
+    // 已经有了负载均衡锁，已经初始化过了，就没必要再做操作
     if (ngx_accept_mutex_ptr) {
         return NGX_OK;
     }
@@ -557,12 +628,15 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     /* cl should be equal to or greater than cache line size */
 
+    // cl是一个基本长度，可以容纳原子变量
     cl = 128;
 
+    // 最基本的三个：负载均衡锁，连接计数器,
     size = cl            /* ngx_accept_mutex */
            + cl          /* ngx_connection_counter */
            + cl;         /* ngx_temp_number */
 
+    // 其他统计用的原子变量
 #if (NGX_STAT_STUB)
 
     size += cl           /* ngx_stat_accepted */
@@ -575,6 +649,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
 #endif
 
+    // 创建共享内存，存放负载均衡锁和统计用的原子变量
     shm.size = size;
     shm.name.len = sizeof("nginx_shared_zone");
     shm.name.data = (u_char *) "nginx_shared_zone";
@@ -584,8 +659,10 @@ ngx_event_module_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // shared是共享内存的地址指针
     shared = shm.addr;
 
+    // 第一个就是负载均衡锁
     ngx_accept_mutex_ptr = (ngx_atomic_t *) shared;
     ngx_accept_mutex.spin = (ngx_uint_t) -1;
 
@@ -596,6 +673,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // 连接计数器
     ngx_connection_counter = (ngx_atomic_t *) (shared + 1 * cl);
 
     (void) ngx_atomic_cmp_set(ngx_connection_counter, 0, 1);
@@ -604,10 +682,12 @@ ngx_event_module_init(ngx_cycle_t *cycle)
                    "counter: %p, %d",
                    ngx_connection_counter, *ngx_connection_counter);
 
+    // 临时文件用
     ngx_temp_number = (ngx_atomic_t *) (shared + 2 * cl);
 
     tp = ngx_timeofday();
 
+    // 随机数
     ngx_random_number = (tp->msec << 16) + ngx_pid;
 
 #if (NGX_STAT_STUB)
@@ -1040,6 +1120,8 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 取得指令字符串,转换为数字
+// 再设置到cycle里，即连接池数组的大小
 static char *
 ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1057,7 +1139,10 @@ ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                            "use the \"worker_connections\" directive instead");
     }
 
+    // 取得指令字符串
     value = cf->args->elts;
+
+    // 转换为数字
     ecf->connections = ngx_atoi(value[1].data, value[1].len);
     if (ecf->connections == (ngx_uint_t) NGX_ERROR) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -1066,12 +1151,14 @@ ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 再设置到cycle里，即连接池数组的大小
     cf->cycle->connection_n = ecf->connections;
 
     return NGX_CONF_OK;
 }
 
 
+// 决定使用哪个事件模型，linux上通常是epoll
 static char *
 ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1086,8 +1173,10 @@ ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "is duplicate";
     }
 
+    // 取得指令字符串
     value = cf->args->elts;
 
+    // 看old_cycle里的event_core配置
     if (cf->cycle->old_cycle->conf_ctx) {
         old_ecf = ngx_event_get_conf(cf->cycle->old_cycle->conf_ctx,
                                      ngx_event_core_module);
@@ -1096,17 +1185,25 @@ ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 
+    // 在模块数组里遍历，找事件模块
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
+        // 取事件模块的函数表，里面有名字
         module = ngx_modules[m]->ctx;
         if (module->name->len == value[1].len) {
+            // 长度和名字都一样，即use这个事件模块
             if (ngx_strcmp(module->name->data, value[1].data) == 0) {
+
+                // 设置event_core配置结构体里的use成员为此模块的ctx_index
                 ecf->use = ngx_modules[m]->ctx_index;
+
+                // 设置event_core配置结构体里的name成员为此模块的name
                 ecf->name = module->name->data;
 
+                // 如果是单进程模式，不允许reload切换事件模型
                 if (ngx_process == NGX_PROCESS_SINGLE
                     && old_ecf
                     && old_ecf->use != ecf->use)
@@ -1239,6 +1336,7 @@ ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 创建event_core模块的配置结构体，成员初始化为unset
 static void *
 ngx_event_core_create_conf(ngx_cycle_t *cycle)
 {
@@ -1270,6 +1368,11 @@ ngx_event_core_create_conf(ngx_cycle_t *cycle)
 }
 
 
+// 所有模块配置解析完毕后，对配置进行初始化
+// 如果有的指令没有写，就要给正确的默认值
+// 模块默认使用epoll
+// 默认不接受多个请求，也就是一次只accept一个连接
+// 默认使用负载均衡锁
 static char *
 ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 {
@@ -1278,6 +1381,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 #if (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
     int                  fd;
 #endif
+    // rtsig在nginx 1.9.x已经删除
 #if (NGX_HAVE_RTSIG)
     ngx_uint_t           rtsig;
     ngx_core_conf_t     *ccf;
@@ -1288,20 +1392,25 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
     module = NULL;
 
+// 测试epoll是否可用
 #if (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
 
     fd = epoll_create(100);
 
+    // epoll调用可用，那么模块默认使用epoll
     if (fd != -1) {
         (void) close(fd);
+        // epoll调用可用，那么模块默认使用epoll
         module = &ngx_epoll_module;
 
     } else if (ngx_errno != NGX_ENOSYS) {
+        // epoll调用可用，那么模块默认使用epoll
         module = &ngx_epoll_module;
     }
 
 #endif
 
+    // rtsig在nginx 1.9.x已经删除
 #if (NGX_HAVE_RTSIG)
 
     if (module == NULL) {
@@ -1326,6 +1435,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #endif
 
+    // 如果epoll不可用，那么默认使用select
 #if (NGX_HAVE_SELECT)
 
     if (module == NULL) {
@@ -1334,7 +1444,9 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #endif
 
+    // 还没有决定默认的事件模型
     if (module == NULL) {
+        // 遍历所有的事件模块
         for (i = 0; ngx_modules[i]; i++) {
 
             if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
@@ -1343,31 +1455,44 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
             event_module = ngx_modules[i]->ctx;
 
+            // 跳过event_core模块
             if (ngx_strcmp(event_module->name->data, event_core_name.data) == 0)
             {
                 continue;
             }
 
+            // 使用数组里的第一个事件模块
             module = ngx_modules[i];
             break;
         }
     }
 
+    // 最后还没有决定默认的事件模型，出错
     if (module == NULL) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "no events module found");
         return NGX_CONF_ERROR;
     }
 
+    // nginx每个进程可使用的连接数量，即cycle里的连接池大小
     ngx_conf_init_uint_value(ecf->connections, DEFAULT_CONNECTIONS);
+
+    // 如果没有使用worker_connections指令，在这里设置
     cycle->connection_n = ecf->connections;
 
+    // 决定使用的事件模型,之前的module只作为默认值，如果已经使用了use则无效
     ngx_conf_init_uint_value(ecf->use, module->ctx_index);
 
+    // 初始化使用的事件模块的名字
     event_module = module->ctx;
     ngx_conf_init_ptr_value(ecf->name, event_module->name->data);
 
+    // 默认不接受多个请求，也就是一次只accept一个连接
     ngx_conf_init_value(ecf->multi_accept, 0);
+
+    // 默认使用负载均衡锁
     ngx_conf_init_value(ecf->accept_mutex, 1);
+
+    // 默认负载均衡锁的等待时间是500毫秒
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
 
 

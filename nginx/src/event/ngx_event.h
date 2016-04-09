@@ -489,15 +489,18 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define ngx_process_events   ngx_event_actions.process_events
 #define ngx_done_events      ngx_event_actions.done
 
+// 向epoll添加删除事件
 #define ngx_add_event        ngx_event_actions.add
 #define ngx_del_event        ngx_event_actions.del
+
+// 向epoll添加删除连接，即同时添加读写事件
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
 
 // 事件通知
 #define ngx_notify           ngx_event_actions.notify
 
-// 向定时器红黑树里添加事件, ngx_event_timer.h
+// 向定时器红黑树里添加事件，设置超时，ngx_event_timer.h
 #define ngx_add_timer        ngx_event_add_timer
 
 // 从定时器红黑树里删除事件, ngx_event_timer.h
@@ -537,7 +540,7 @@ typedef struct {
     // nginx每个进程可使用的连接数量，即cycle里的连接池大小
     ngx_uint_t    connections;
 
-    // 使用的是哪个event模块
+    // 使用的是哪个event模块，值是具体事件模块的ctx_index
     ngx_uint_t    use;
 
     // 是否尽可能多接受客户端请求，会影响进程间负载均衡
@@ -634,7 +637,12 @@ u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 // 然后处理在延后队列里的所有事件
 void ngx_process_events_and_timers(ngx_cycle_t *cycle);
 
+// 添加读事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event
 ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
+
+// 添加写事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event,多了个send_lowat操作
 ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
 

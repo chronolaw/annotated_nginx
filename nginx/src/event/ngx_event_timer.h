@@ -41,6 +41,7 @@ extern ngx_rbtree_t  ngx_event_timer_rbtree;
 
 
 // 从定时器红黑树里删除事件
+// #define ngx_del_timer        ngx_event_del_timer
 static ngx_inline void
 ngx_event_del_timer(ngx_event_t *ev)
 {
@@ -63,6 +64,7 @@ ngx_event_del_timer(ngx_event_t *ev)
 
 
 // 向定时器红黑树里添加事件
+// #define ngx_add_timer        ngx_event_add_timer
 static ngx_inline void
 ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
 {
