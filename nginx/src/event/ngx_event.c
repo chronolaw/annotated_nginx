@@ -1076,6 +1076,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 // 设置发送数据时epoll的响应阈值
 // 当系统空闲缓冲超过lowat时触发epoll可写事件
+// ngx_handle_write_event()里调用
 ngx_int_t
 ngx_send_lowat(ngx_connection_t *c, size_t lowat)
 {

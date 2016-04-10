@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -11,6 +12,8 @@
 #include <ngx_event_connect.h>
 
 
+// 使用ngx_peer_connection_t连接远端服务器
+// 可对比ngx_event_accept建立被动连接
 ngx_int_t
 ngx_event_connect_peer(ngx_peer_connection_t *pc)
 {
@@ -22,15 +25,18 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
 
+    // 调用ngx_event_get_peer_pt获取一个主动连接
     rc = pc->get(pc, pc->data);
     if (rc != NGX_OK) {
         return rc;
     }
 
+    // 使用远端服务器地址创建socket
     s = ngx_socket(pc->sockaddr->sa_family, SOCK_STREAM, 0);
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, 0, "socket %d", s);
 
+    // 如果连接失败则返回错误
     if (s == (ngx_socket_t) -1) {
         ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
                       ngx_socket_n " failed");
@@ -38,8 +44,10 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
 
+    // 从cycle的连接池获取一个空闲连接
     c = ngx_get_connection(s, pc->log);
 
+    // 如果没有空闲连接则失败
     if (c == NULL) {
         if (ngx_close_socket(s) == -1) {
             ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
@@ -49,6 +57,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         return NGX_ERROR;
     }
 
+    // 如果设置了接收缓冲区参数，那么设置socket
     if (pc->rcvbuf) {
         if (setsockopt(s, SOL_SOCKET, SO_RCVBUF,
                        (const void *) &pc->rcvbuf, sizeof(int)) == -1)
@@ -59,6 +68,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         }
     }
 
+    // 设置为非阻塞
     if (ngx_nonblocking(s) == -1) {
         ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
                       ngx_nonblocking_n " failed");
@@ -75,6 +85,10 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         }
     }
 
+    // 设置连接的数据收发接口函数
+    // #define ngx_recv             ngx_io.recv
+    // #define ngx_recv_chain       ngx_io.recv_chain
+    // ngx_posix_init.c里初始化为linux的底层接口
     c->recv = ngx_recv;
     c->send = ngx_send;
     c->recv_chain = ngx_recv_chain;
@@ -94,16 +108,21 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
 #endif
     }
 
+    // 连接的读写事件
     rev = c->read;
     wev = c->write;
 
     rev->log = pc->log;
     wev->log = pc->log;
 
+    // 设置主动连接的连接对象，即连接远端服务器的连接
     pc->connection = c;
 
+    // 连接计数器
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
+    // 向epoll添加连接，即同时添加读写事件
+    // 当与远端服务器有任何数据收发时都会触发epoll
     if (ngx_add_conn) {
         if (ngx_add_conn(c) == NGX_ERROR) {
             goto failed;
@@ -113,8 +132,12 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, pc->log, 0,
                    "connect to %V, fd:%d #%uA", pc->name, s, c->number);
 
+    // socket api调用连接远端服务器
     rc = connect(s, pc->sockaddr, pc->socklen);
 
+    // 如果连接失败返回NGX_DECLINED
+    // 如果errno是NGX_EINPROGRESS则可能并不是连接真的失败
+    // 参考man connect
     if (rc == -1) {
         err = ngx_socket_errno;
 
@@ -157,6 +180,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
     if (ngx_add_conn) {
+        // 如果errno是NGX_EINPROGRESS则可能并不是连接真的失败
         if (rc == -1) {
 
             /* NGX_EINPROGRESS */
@@ -164,8 +188,10 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
             return NGX_AGAIN;
         }
 
+        // 这里是rc == 0 ，也就是连接成功
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
 
+        // 连接成功，socket是可写的
         wev->ready = 1;
 
         return NGX_OK;

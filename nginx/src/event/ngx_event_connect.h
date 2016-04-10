@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -19,10 +20,14 @@
 #define NGX_PEER_FAILED              4
 
 
+// nginx作为客户端发起的主动连接
 typedef struct ngx_peer_connection_s  ngx_peer_connection_t;
 
+// 从连接池里获取一个主动连接
 typedef ngx_int_t (*ngx_event_get_peer_pt)(ngx_peer_connection_t *pc,
     void *data);
+
+// 释放主动连接，归还连接池
 typedef void (*ngx_event_free_peer_pt)(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state);
 #if (NGX_SSL)
@@ -34,18 +39,29 @@ typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
 #endif
 
 
+// nginx作为客户端发起的主动连接
 struct ngx_peer_connection_s {
+    // cycle里的连接对象，实际上使用了装饰模式
     ngx_connection_t                *connection;
 
+    // 远端服务器的sockaddr
     struct sockaddr                 *sockaddr;
     socklen_t                        socklen;
     ngx_str_t                       *name;
 
+    // 最大重试次数
     ngx_uint_t                       tries;
+
+    // 连接开始的时间
     ngx_msec_t                       start_time;
 
+    // 从连接池里获取一个主动连接
     ngx_event_get_peer_pt            get;
+
+    // 释放主动连接，归还连接池
     ngx_event_free_peer_pt           free;
+
+    // get/free函数所需的参数
     void                            *data;
 
 #if (NGX_SSL)
@@ -53,12 +69,16 @@ struct ngx_peer_connection_s {
     ngx_event_save_peer_session_pt   save_session;
 #endif
 
+    // 本地地址
     ngx_addr_t                      *local;
 
+    // 接收缓冲区大小
     int                              rcvbuf;
 
+    // 日志对象
     ngx_log_t                       *log;
 
+    // 连接是否已经缓存
     unsigned                         cached:1;
 
                                      /* ngx_connection_log_error_e */
