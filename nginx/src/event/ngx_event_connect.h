@@ -20,7 +20,7 @@
 #define NGX_PEER_FAILED              4
 
 
-// nginx作为客户端发起的主动连接
+// nginx作为客户端发起的主动连接，连接上游服务器
 typedef struct ngx_peer_connection_s  ngx_peer_connection_t;
 
 // 从连接池里获取一个主动连接
@@ -39,12 +39,12 @@ typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
 #endif
 
 
-// nginx作为客户端发起的主动连接
+// nginx作为客户端发起的主动连接，连接上游服务器
 struct ngx_peer_connection_s {
     // cycle里的连接对象，实际上使用了装饰模式
     ngx_connection_t                *connection;
 
-    // 远端服务器的sockaddr
+    // 上游服务器的sockaddr
     struct sockaddr                 *sockaddr;
     socklen_t                        socklen;
     ngx_str_t                       *name;
@@ -86,7 +86,7 @@ struct ngx_peer_connection_s {
 };
 
 
-// 使用ngx_peer_connection_t连接远端服务器
+// 使用ngx_peer_connection_t连接上游服务器
 // 可对比ngx_event_accept建立被动连接
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc);
 

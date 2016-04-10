@@ -618,6 +618,7 @@ extern ngx_module_t           ngx_event_core_module;
 
 
 
+// ngx_event_process_init里设置接受连接的回调函数为ngx_event_accept，可以接受连接
 // 监听端口上收到连接请求时的回调函数，即事件handler
 // 从cycle的连接池里获取连接
 // 关键操作 ls->handler(c);调用其他模块的业务handler

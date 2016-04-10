@@ -12,7 +12,7 @@
 #include <ngx_event_connect.h>
 
 
-// 使用ngx_peer_connection_t连接远端服务器
+// 使用ngx_peer_connection_t连接上游服务器
 // 可对比ngx_event_accept建立被动连接
 ngx_int_t
 ngx_event_connect_peer(ngx_peer_connection_t *pc)
@@ -31,7 +31,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         return rc;
     }
 
-    // 使用远端服务器地址创建socket
+    // 使用上游服务器地址创建socket
     s = ngx_socket(pc->sockaddr->sa_family, SOCK_STREAM, 0);
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, 0, "socket %d", s);
@@ -115,14 +115,14 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     rev->log = pc->log;
     wev->log = pc->log;
 
-    // 设置主动连接的连接对象，即连接远端服务器的连接
+    // 设置主动连接的连接对象，即连接上游服务器的连接
     pc->connection = c;
 
     // 连接计数器
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
     // 向epoll添加连接，即同时添加读写事件
-    // 当与远端服务器有任何数据收发时都会触发epoll
+    // 当与上游服务器有任何数据收发时都会触发epoll
     if (ngx_add_conn) {
         if (ngx_add_conn(c) == NGX_ERROR) {
             goto failed;
@@ -132,7 +132,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, pc->log, 0,
                    "connect to %V, fd:%d #%uA", pc->name, s, c->number);
 
-    // socket api调用连接远端服务器
+    // socket api调用连接上游服务器
     rc = connect(s, pc->sockaddr, pc->socklen);
 
     // 如果连接失败返回NGX_DECLINED
@@ -188,7 +188,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
             return NGX_AGAIN;
         }
 
-        // 这里是rc == 0 ，也就是连接成功
+        // 这里是rc == 0 ，也就是连接上游服务器成功
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
 
         // 连接成功，socket是可写的
