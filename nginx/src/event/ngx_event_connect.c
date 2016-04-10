@@ -266,6 +266,7 @@ failed:
 }
 
 
+// 空函数，无任何操作
 ngx_int_t
 ngx_event_get_peer(ngx_peer_connection_t *pc, void *data)
 {

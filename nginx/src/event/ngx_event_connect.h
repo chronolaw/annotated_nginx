@@ -86,7 +86,11 @@ struct ngx_peer_connection_s {
 };
 
 
+// 使用ngx_peer_connection_t连接远端服务器
+// 可对比ngx_event_accept建立被动连接
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc);
+
+// 空函数，无任何操作
 ngx_int_t ngx_event_get_peer(ngx_peer_connection_t *pc, void *data);
 
 
