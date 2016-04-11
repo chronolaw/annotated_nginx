@@ -13,6 +13,7 @@
 
 
 // 使用ngx_peer_connection_t连接上游服务器
+// 从cycle的连接池获取一个空闲连接
 // 可对比ngx_event_accept建立被动连接
 ngx_int_t
 ngx_event_connect_peer(ngx_peer_connection_t *pc)
@@ -123,6 +124,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
 
     // 向epoll添加连接，即同时添加读写事件
     // 当与上游服务器有任何数据收发时都会触发epoll
+    // 在upstream机制里就是回调ngx_http_upstream_handle
     if (ngx_add_conn) {
         if (ngx_add_conn(c) == NGX_ERROR) {
             goto failed;

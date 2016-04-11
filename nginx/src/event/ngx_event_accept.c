@@ -92,6 +92,7 @@ ngx_event_accept(ngx_event_t *ev)
         if (s == (ngx_socket_t) -1) {
             err = ngx_socket_errno;
 
+            // EAGAIN，此时已经没有新的连接，用于multi_accept
             if (err == NGX_EAGAIN) {
                 ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ev->log, err,
                                "accept() not ready");
@@ -407,7 +408,7 @@ ngx_event_accept(ngx_event_t *ev)
         }
 
     // 如果ev->available = ecf->multi_accept;
-    // epoll尽可能接受多个请求
+    // epoll尽可能接受多个请求，直至accept出错EAGAIN，即无新连接请求
     // 否则epoll只接受一个请求后即退出循环
     } while (ev->available);
 }
@@ -415,17 +416,21 @@ ngx_event_accept(ngx_event_t *ev)
 
 // 尝试获取负载均衡锁，监听端口
 // 如未获取则不监听端口
+// 锁标志ngx_accept_mutex_held
 // 内部调用ngx_enable_accept_events/ngx_disable_accept_events
 ngx_int_t
 ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 {
     // 尝试锁定共享内存锁
+    // 非阻塞，会立即返回
     if (ngx_shmtx_trylock(&ngx_accept_mutex)) {
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "accept mutex locked");
 
         // 锁成功
+
+        // 之前已经持有了锁，那么就直接返回，继续监听端口
         // ngx_accept_events在epoll里不使用
         if (ngx_accept_mutex_held
             && ngx_accept_events == 0
@@ -435,12 +440,17 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
             return NGX_OK;
         }
 
+        // 之前没有持有锁，需要注册epoll事件监听端口
+
         // 遍历监听端口列表，加入epoll连接事件，开始接受请求
         if (ngx_enable_accept_events(cycle) == NGX_ERROR) {
-            // 立即解锁，函数结束
+
+            // 如果监听失败就需要立即解锁，函数结束
             ngx_shmtx_unlock(&ngx_accept_mutex);
             return NGX_ERROR;
         }
+
+        // 已经成功将监听事件加入epoll
 
         // 设置已经获得锁的标志
         ngx_accept_events = 0;

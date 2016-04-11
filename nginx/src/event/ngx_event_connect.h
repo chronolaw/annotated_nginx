@@ -40,8 +40,11 @@ typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
 
 
 // nginx作为客户端发起的主动连接，连接上游服务器
+// 用于实现upstream机制
+// 对于要连接上游服务器才能处理的请求，需要使用两个连接对象
 struct ngx_peer_connection_s {
     // cycle里的连接对象，实际上使用了装饰模式
+    // 在ngx_event_connect_peer()里获取空闲连接并设置
     ngx_connection_t                *connection;
 
     // 上游服务器的sockaddr
@@ -52,7 +55,7 @@ struct ngx_peer_connection_s {
     // 最大重试次数
     ngx_uint_t                       tries;
 
-    // 连接开始的时间
+    // 连接开始的时间，即发起主动连接的时刻
     ngx_msec_t                       start_time;
 
     // 从连接池里获取一个主动连接
