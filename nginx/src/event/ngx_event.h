@@ -40,37 +40,51 @@ struct ngx_event_s {
     // 写事件，也就是说tcp连接是写状态，可以发送数据
     unsigned         write:1;
 
-    // 监听状态标志位
+    // 监听状态标志位，只有listening相关的事件才置此标志位
     unsigned         accept:1;
 
     /* used to detect the stale events in kqueue, rtsig, and epoll */
     // 检测事件是否失效
     // 存储在epoll数据结构体里的指针低位
+    // 在ngx_get_connection里获取空闲连接时，这个标志位会取反
+    // 这样如果连接失效，那么instance就会不同
+    // 判断逻辑在ngx_epoll_module.c:ngx_epoll_process_events
     unsigned         instance:1;
 
     /*
      * the event was passed or would be passed to a kernel;
      * in aio mode - operation was posted.
      */
+    // 事件是否是活跃的，也就是说已经添加进了epoll关注
     unsigned         active:1;
 
+    // epoll无意义
     unsigned         disabled:1;
 
     /* the ready event; in aio mode 0 means that no operation can be posted */
+    // 事件已经就绪，也就是说有数据可读或者可以发送数据
+    // 在读写操作完成后会置ready=0
     unsigned         ready:1;
 
+    // epoll无意义
     unsigned         oneshot:1;
 
     /* aio operation is complete */
     unsigned         complete:1;
 
+    // 当前的字节流已经结束即eof，不会再有数据可读
     unsigned         eof:1;
+
+    // 发生了错误
     unsigned         error:1;
 
     // 事件是否已经超时
+    // 由ngx_event_expire_timers遍历定时器红黑树，找出所有过期的事件设置此标志位
     unsigned         timedout:1;
 
     // 事件是否在定时器里
+    // ngx_add_timer加入定时器时设置
+    // 处理完定时器事件后清除标记
     unsigned         timer_set:1;
 
     unsigned         delayed:1;
@@ -82,6 +96,7 @@ struct ngx_event_s {
 
     // 事件是否已经加入延后处理队列中
     // 操作函数宏ngx_post_event/ngx_delete_posted_event
+    // ngx_posted_accept_events/ngx_posted_events
     unsigned         posted:1;
 
 #if (NGX_WIN32)
@@ -113,9 +128,11 @@ struct ngx_event_s {
 #if (NGX_HAVE_KQUEUE) || (NGX_HAVE_IOCP)
     int              available;
 #else
+    // 是否尽可能多地接受请求建立连接，即multi_accept
     unsigned         available:1;
 #endif
 
+    // 重要！！
     // 事件发生时调用的函数
     // ngx_core.h:typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
     ngx_event_handler_pt  handler;
@@ -141,6 +158,7 @@ struct ngx_event_s {
 
     /* the posted queue */
     // 队列成员，加入延后处理的队列
+    // ngx_posted_accept_events/ngx_posted_events
     ngx_queue_t      queue;
 
     unsigned         closed:1;
@@ -269,6 +287,7 @@ extern ngx_event_actions_t   ngx_event_actions;
  * The event filter requires to read/write the whole data:
  * select, poll, /dev/poll, kqueue, epoll.
  */
+// lt模式
 #define NGX_USE_LEVEL_EVENT      0x00000001
 
 /*
@@ -602,6 +621,7 @@ extern ngx_atomic_t  *ngx_stat_waiting;
 #endif
 
 
+// NGX_UPDATE_TIME要求epoll主动更新时间
 #define NGX_UPDATE_TIME         1
 #define NGX_POST_EVENTS         2
 
