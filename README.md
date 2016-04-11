@@ -13,10 +13,10 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 # 已注解
 
 ###源码目录快捷入口
-* [core](/nginx/src/core) - 20%
-* [event](/nginx/src/event) - 50%，只注解核心模块和epoll，kqueue等不关注
+* [core](/nginx/src/core) - 50%，MD5/sha1/crc等较简单的功能不关注
+* [event](/nginx/src/event) - 80%，只注解核心模块和epoll/kqueue/ssl等不关注
 * [http](/nginx/src/http) - todo
-* [os/unix](/nginx/src/os/unix) - 20%
+* [os/unix](/nginx/src/os/unix) - 20%，bsd/solaris等系统不关注
 
 ####部分关键源码（目录分类）
 
