@@ -75,8 +75,12 @@ static ngx_uint_t     ngx_timer_resolution;
 // 在epoll的ngx_epoll_process_events里检查，更新时间的标志
 sig_atomic_t          ngx_event_timer_alarm;
 
+// 事件模块计数器
 static ngx_uint_t     ngx_event_max_module;
 
+// 事件模型的基本标志位
+// 在ngx_epoll_init里设置为et模式，边缘触发
+// NGX_USE_CLEAR_EVENT|NGX_USE_GREEDY_EVENT|NGX_USE_EPOLL_EVENT
 ngx_uint_t            ngx_event_flags;
 
 // 全局的事件模块访问接口，是一个函数表
@@ -85,7 +89,7 @@ ngx_uint_t            ngx_event_flags;
 ngx_event_actions_t   ngx_event_actions;
 
 
-// 连接计数器
+// 连接计数器，使用共享内存，所有worker公用
 static ngx_atomic_t   connection_counter = 1;
 ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
@@ -158,6 +162,7 @@ static ngx_core_module_t  ngx_events_module_ctx = {
 };
 
 
+// ngx_events_module只是组织各具体的事件模块，本身无功能
 ngx_module_t  ngx_events_module = {
     NGX_MODULE_V1,
     &ngx_events_module_ctx,                /* module context */
@@ -213,6 +218,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       NULL },
 
     // 默认使用负载均衡锁
+    // accept_mutex off也是可以的，这样连接快但可能负载不均衡
     { ngx_string("accept_mutex"),
       NGX_EVENT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -291,7 +297,7 @@ ngx_module_t  ngx_event_core_module = {
 // 在ngx_process_cycle.c:ngx_single_process_cycle/ngx_worker_process_cycle里调用
 // 处理socket读写事件和定时器事件
 // 获取负载均衡锁，监听端口接受连接
-// 调用epoll模块的ngx_epoll_process_events
+// 调用epoll模块的ngx_epoll_process_events获取发生的事件
 // 然后处理超时事件和在延后队列里的所有事件
 void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
@@ -323,7 +329,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
-    // 负载均衡锁标志量
+    // 负载均衡锁标志量， accept_mutex on
     if (ngx_use_accept_mutex) {
         // ngx_accept_disabled = ngx_cycle->connection_n / 8
         //                      - ngx_cycle->free_connection_n;
@@ -348,7 +354,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
                 // 加上NGX_POST_EVENTS标志
                 // epoll获得的所有事件都会加入到ngx_posted_events
-                // 待释放锁后再逐个处理
+                // 待释放锁后再逐个处理，尽量避免过长时间持有锁
                 flags |= NGX_POST_EVENTS;
 
             } else {
@@ -398,6 +404,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 释放锁，其他进程可以获取，再监听端口
     // 这里只处理accept事件，工作量小，可以尽快释放锁，供其他进程使用
     if (ngx_accept_mutex_held) {
+        // 释放负载均衡锁
+        // 其他进程等待ngx_accept_mutex_delay毫秒后
+        // 再走ngx_trylock_accept_mutex决定端口的监听权
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
 

@@ -595,6 +595,7 @@ typedef struct {
 } ngx_event_module_t;
 
 
+// 连接计数器，使用共享内存，所有worker公用
 extern ngx_atomic_t          *ngx_connection_counter;
 
 // 用共享内存实现的原子变量，负载均衡锁
@@ -623,11 +624,19 @@ extern ngx_atomic_t  *ngx_stat_waiting;
 
 // NGX_UPDATE_TIME要求epoll主动更新时间
 #define NGX_UPDATE_TIME         1
+
+// 要求事件延后处理，加入post队列，避免处理事件过多地占用负载均衡锁
 #define NGX_POST_EVENTS         2
 
 
+// 在epoll的ngx_epoll_process_events里检查，更新时间的标志
 extern sig_atomic_t           ngx_event_timer_alarm;
+
+// 事件模型的基本标志位
+// 在ngx_epoll_init里设置为et模式，边缘触发
+// NGX_USE_CLEAR_EVENT|NGX_USE_GREEDY_EVENT|NGX_USE_EPOLL_EVENT
 extern ngx_uint_t             ngx_event_flags;
+
 extern ngx_module_t           ngx_events_module;
 extern ngx_module_t           ngx_event_core_module;
 
@@ -655,7 +664,7 @@ u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 // 在ngx_single_process_cycle/ngx_worker_process_cycle里调用
 // 处理socket读写事件和定时器事件
 // 获取负载均衡锁，监听端口接受连接
-// 调用epoll模块的ngx_epoll_process_events
+// 调用epoll模块的ngx_epoll_process_events获取发生的事件
 // 然后处理超时事件和在延后队列里的所有事件
 void ngx_process_events_and_timers(ngx_cycle_t *cycle);
 
