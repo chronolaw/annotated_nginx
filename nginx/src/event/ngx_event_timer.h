@@ -36,7 +36,9 @@ void ngx_event_expire_timers(void);
 void ngx_event_cancel_timers(void);
 
 
-// 定时器红黑树
+// 定时器红黑树，键值是超时事件（毫秒时间戳）
+// 里面使用ngx_event_t.timer成员组织为红黑树
+// timedout表示已经超时，timer_set表示已经加入定时器红黑树
 extern ngx_rbtree_t  ngx_event_timer_rbtree;
 
 
@@ -63,7 +65,7 @@ ngx_event_del_timer(ngx_event_t *ev)
 }
 
 
-// 向定时器红黑树里添加事件
+// 向定时器红黑树里添加事件，ngx_event_expire_timers()超时后会调用ev->handler
 // #define ngx_add_timer        ngx_event_add_timer
 static ngx_inline void
 ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)

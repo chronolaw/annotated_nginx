@@ -11,7 +11,9 @@
 #include <ngx_event.h>
 
 
-// 定时器红黑树
+// 定时器红黑树，键值是超时事件（毫秒时间戳）
+// 里面使用ngx_event_t.timer成员组织为红黑树
+// timedout表示已经超时，timer_set表示已经加入定时器红黑树
 ngx_rbtree_t              ngx_event_timer_rbtree;
 
 // 定时器红黑树的哨兵节点
