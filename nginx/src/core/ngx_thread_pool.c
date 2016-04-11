@@ -12,6 +12,7 @@
 #include <ngx_thread_pool.h>
 
 
+// 线程池模块的配置，里面是个数组，元素为ngx_thread_pool_t
 typedef struct {
     ngx_array_t               pools;
 } ngx_thread_pool_conf_t;
@@ -27,6 +28,7 @@ typedef struct {
     (q)->last = &(q)->first
 
 
+// 描述一个线程池
 struct ngx_thread_pool_s {
     ngx_thread_mutex_t        mtx;
     ngx_thread_pool_queue_t   queue;
@@ -35,8 +37,12 @@ struct ngx_thread_pool_s {
 
     ngx_log_t                *log;
 
+    // 线程池的名字
     ngx_str_t                 name;
+
+    // 线程的数量
     ngx_uint_t                threads;
+
     ngx_int_t                 max_queue;
 
     u_char                   *file;
@@ -52,15 +58,23 @@ static void ngx_thread_pool_exit_handler(void *data, ngx_log_t *log);
 static void *ngx_thread_pool_cycle(void *data);
 static void ngx_thread_pool_handler(ngx_event_t *ev);
 
+// 解析thread_pool指令，设置线程数和队列数（默认65535）
 static char *ngx_thread_pool(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+// 创建线程池模块的配置，里面是个数组，元素为ngx_thread_pool_t
 static void *ngx_thread_pool_create_conf(ngx_cycle_t *cycle);
+
+// 检查配置的线程池，必须设置线程数量
 static char *ngx_thread_pool_init_conf(ngx_cycle_t *cycle, void *conf);
 
+// ngx_single_process_cycle/ngx_worker_process_cycle里调用
+// 进程开始时初始化，创建线程池
 static ngx_int_t ngx_thread_pool_init_worker(ngx_cycle_t *cycle);
 static void ngx_thread_pool_exit_worker(ngx_cycle_t *cycle);
 
 
+// 线程池模块属于core模块，只有一个指令，配置有名的线程池
+// 解析thread_pool指令，设置线程数和队列数（默认65535）
 static ngx_command_t  ngx_thread_pool_commands[] = {
 
     { ngx_string("thread_pool"),
@@ -74,9 +88,14 @@ static ngx_command_t  ngx_thread_pool_commands[] = {
 };
 
 
+// 线程池模块属于core模块，只有一个指令，配置有名的线程池
 static ngx_core_module_t  ngx_thread_pool_module_ctx = {
     ngx_string("thread_pool"),
+
+    // 创建线程池模块的配置，里面是个数组，元素为ngx_thread_pool_t
     ngx_thread_pool_create_conf,
+
+    // 检查配置的线程池，必须设置线程数量
     ngx_thread_pool_init_conf
 };
 
@@ -97,6 +116,7 @@ ngx_module_t  ngx_thread_pool_module = {
 };
 
 
+// 默认线程池，有32个线程
 static ngx_str_t  ngx_thread_pool_default = ngx_string("default");
 
 // 全局计数器,生成task的id
@@ -386,6 +406,7 @@ ngx_thread_pool_handler(ngx_event_t *ev)
 }
 
 
+// 创建线程池模块的配置，里面是个数组，元素为ngx_thread_pool_t
 static void *
 ngx_thread_pool_create_conf(ngx_cycle_t *cycle)
 {
@@ -407,22 +428,27 @@ ngx_thread_pool_create_conf(ngx_cycle_t *cycle)
 }
 
 
+// 检查配置的线程池，必须设置线程数量
 static char *
 ngx_thread_pool_init_conf(ngx_cycle_t *cycle, void *conf)
 {
+    // 线程池模块的配置结构体
     ngx_thread_pool_conf_t *tcf = conf;
 
     ngx_uint_t           i;
     ngx_thread_pool_t  **tpp;
 
+    // 直接访问数组，元素是ngx_thread_pool_t
     tpp = tcf->pools.elts;
 
     for (i = 0; i < tcf->pools.nelts; i++) {
 
+        // 要求必须设置线程数量
         if (tpp[i]->threads) {
             continue;
         }
 
+        // 默认线程池，有32个线程
         if (tpp[i]->name.len == ngx_thread_pool_default.len
             && ngx_strncmp(tpp[i]->name.data, ngx_thread_pool_default.data,
                            ngx_thread_pool_default.len)
@@ -444,6 +470,7 @@ ngx_thread_pool_init_conf(ngx_cycle_t *cycle, void *conf)
 }
 
 
+// 解析thread_pool指令，设置线程数和队列数（默认65535）
 static char *
 ngx_thread_pool(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
