@@ -15,21 +15,32 @@
 #include <ngx_event.h>
 
 // 编译时需使用选项--with-threads
-// thread_pool指令需要在main域配置
+// thread_pool指令需要在main域配置，定义一个线程池供使用
 
 // 线程执行的任务结构体，handler是真正被线程执行的函数
 struct ngx_thread_task_s {
+    // 链表指针，多个task形成一个链表
     ngx_thread_task_t   *next;
+
+    // task的id，由全局计数器ngx_thread_pool_task_id生成
+    // task->id = ngx_thread_pool_task_id++;
     ngx_uint_t           id;
+
+    // 用户使用的数据
     void                *ctx;
+
+    // 由线程里的线程执行的函数，真正的工作
     void               (*handler)(void *data, ngx_log_t *log);
+
     ngx_event_t          event;
 };
 
 
+// 线程池结构体
 typedef struct ngx_thread_pool_s  ngx_thread_pool_t;
 
 
+// 根据配置创建一个线程池
 ngx_thread_pool_t *ngx_thread_pool_add(ngx_conf_t *cf, ngx_str_t *name);
 
 // 根据名字获取线程池

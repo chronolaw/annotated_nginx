@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Nginx, Inc.
@@ -98,7 +99,9 @@ ngx_module_t  ngx_thread_pool_module = {
 
 static ngx_str_t  ngx_thread_pool_default = ngx_string("default");
 
+// 全局计数器,生成task的id
 static ngx_uint_t               ngx_thread_pool_task_id;
+
 static ngx_atomic_t             ngx_thread_pool_done_lock;
 static ngx_thread_pool_queue_t  ngx_thread_pool_done;
 
