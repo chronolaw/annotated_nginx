@@ -27,6 +27,9 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_connection.h](/nginx/src/core/ngx_connection.h)
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 
+* [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
+* [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
+
 ######event目录
 * [ngx_event.h](/nginx/src/event/ngx_event.h)
 * [ngx_event.c](/nginx/src/event/ngx_event.c)
@@ -58,6 +61,10 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_epoll_module.c](/nginx/src/event/modules/ngx_epoll_module.c)
 
 ######多线程机制
+* [ngx_event.h](/nginx/src/event/ngx_event.h)
+* [ngx_event.c](/nginx/src/event/ngx_event.c)
+* [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
+* [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
 
 ######http处理
 
