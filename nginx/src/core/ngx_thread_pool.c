@@ -25,6 +25,7 @@ typedef struct {
 
 
 // 线程池使用的任务队列
+// 与ngx_queue不同，不是侵入式节点，而是首尾指针
 typedef struct {
     ngx_thread_task_t        *first;
     ngx_thread_task_t       **last;
@@ -39,6 +40,7 @@ typedef struct {
 
 // 描述一个线程池，与thread_pool指令对应
 // 存储在ngx_thread_pool_conf_t里的数组里
+// 核心成员是queue，存储待处理任务
 struct ngx_thread_pool_s {
     // 互斥量
     // 锁定互斥量，防止多线程操作的竞态
@@ -53,7 +55,7 @@ struct ngx_thread_pool_s {
     // 等待的任务数
     ngx_int_t                 waiting;
 
-    // 条件变量
+    // 条件变量,用于等待任务队列queue
     ngx_thread_cond_t         cond;
 
     ngx_log_t                *log;
@@ -90,7 +92,14 @@ static void ngx_thread_pool_destroy(ngx_thread_pool_t *tp);
 // 要求线程结束的任务，调用pthread_exit
 static void ngx_thread_pool_exit_handler(void *data, ngx_log_t *log);
 
+// 线程池里每个线程执行的函数，无限循环
+// 参数是线程池结构体
+// 从待处理任务队列里获取任务，然后执行task->handler(task->ctx)
+// 处理完的任务加入完成队列
 static void *ngx_thread_pool_cycle(void *data);
+
+// 分发处理线程完成的任务，在主线程里执行
+// 调用event->handler，即异步事件完成后的回调函数
 static void ngx_thread_pool_handler(ngx_event_t *ev);
 
 // 解析thread_pool指令，设置线程数和队列数（默认65535）
@@ -395,8 +404,9 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
 
 
 // 线程池里每个线程执行的函数，无限循环
-// 从待处理任务队列里获取任务，然后执行task->handler(task->ctx)
 // 参数是线程池结构体
+// 从待处理任务队列里获取任务，然后执行task->handler(task->ctx)
+// 处理完的任务加入完成队列
 static void *
 ngx_thread_pool_cycle(void *data)
 {
@@ -484,7 +494,7 @@ ngx_thread_pool_cycle(void *data)
 
         task->next = NULL;
 
-        // 自旋锁
+        // 自旋锁保护完成队列
         ngx_spinlock(&ngx_thread_pool_done_lock, 1, 2048);
 
         // 处理完的任务加入完成队列
@@ -495,11 +505,17 @@ ngx_thread_pool_cycle(void *data)
         ngx_unlock(&ngx_thread_pool_done_lock);
 
         // 重要，使用event模块的通知函数
+        // 让主线程（nginx）的epoll触发事件，调用ngx_thread_pool_handler
+        // 分发处理线程完成的任务
+        //
+        // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
         (void) ngx_notify(ngx_thread_pool_handler);
     }
 }
 
 
+// 分发处理线程完成的任务，在主线程里执行
+// 调用event->handler，即异步事件完成后的回调函数
 static void
 ngx_thread_pool_handler(ngx_event_t *ev)
 {
@@ -508,24 +524,37 @@ ngx_thread_pool_handler(ngx_event_t *ev)
 
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "thread pool handler");
 
+    // 自旋锁保护完成队列
     ngx_spinlock(&ngx_thread_pool_done_lock, 1, 2048);
 
+    // 取出队列里的task，task->next里有很多已经完成的任务
     task = ngx_thread_pool_done.first;
+
+    // 把队列直接置空
+    // 即ngx_thread_pool_queue_init
     ngx_thread_pool_done.first = NULL;
     ngx_thread_pool_done.last = &ngx_thread_pool_done.first;
 
     ngx_unlock(&ngx_thread_pool_done_lock);
 
+    // 遍历所有已经完成的任务
     while (task) {
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
                        "run completion handler for task #%ui", task->id);
 
+        // 取task里的事件对象
         event = &task->event;
+
+        // task指针移动到下一个节点
         task = task->next;
 
+        // 线程异步事件已经完成
         event->complete = 1;
+
+        // 事件已经处理完
         event->active = 0;
 
+        // 调用handler，即异步事件完成后的回调函数
         event->handler(event);
     }
 }
