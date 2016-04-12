@@ -1,4 +1,5 @@
 // annotated by chrono since 2016
+// ngx_event_s/ngx_event_actions_t
 
 /*
  * Copyright (C) Igor Sysoev

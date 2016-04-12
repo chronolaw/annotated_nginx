@@ -13,26 +13,37 @@
 
 
 // 线程池模块的配置，里面是个数组，元素为ngx_thread_pool_t
+// 由ngx_thread_pool_add在解析指令的ngx_thread_pool里添加
 typedef struct {
     ngx_array_t               pools;
 } ngx_thread_pool_conf_t;
 
 
+// 线程池使用的任务队列
 typedef struct {
     ngx_thread_task_t        *first;
     ngx_thread_task_t       **last;
 } ngx_thread_pool_queue_t;
 
+// 初始化线程池任务队列，first/last都是空
+// 与ngx_queue_init不同
 #define ngx_thread_pool_queue_init(q)                                         \
     (q)->first = NULL;                                                        \
     (q)->last = &(q)->first
 
 
-// 描述一个线程池
+// 描述一个线程池，与thread_pool指令对应
+// 存储在ngx_thread_pool_conf_t里的数组里
 struct ngx_thread_pool_s {
+    // 互斥量
     ngx_thread_mutex_t        mtx;
+
     ngx_thread_pool_queue_t   queue;
+
+    // 等待的任务数
     ngx_int_t                 waiting;
+
+    // 条件变量
     ngx_thread_cond_t         cond;
 
     ngx_log_t                *log;
@@ -40,18 +51,27 @@ struct ngx_thread_pool_s {
     // 线程池的名字
     ngx_str_t                 name;
 
-    // 线程的数量
+    // 线程的数量，默认为32个线程
     ngx_uint_t                threads;
 
+    // 任务等待队列，默认是65535
     ngx_int_t                 max_queue;
 
+    // 定义线程池的配置文件
     u_char                   *file;
+
+    // 定义线程池指令的行号
     ngx_uint_t                line;
 };
 
 
+// 使用ngx_thread_pool_t结构体初始化线程池
+// 在init_worker时被调用
+// 创建互斥量、条件变量，根据配置的线程数量，创建线程
+// 线程的执行函数是ngx_thread_pool_cycle，参数是线程池结构体
 static ngx_int_t ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log,
     ngx_pool_t *pool);
+
 static void ngx_thread_pool_destroy(ngx_thread_pool_t *tp);
 static void ngx_thread_pool_exit_handler(void *data, ngx_log_t *log);
 
@@ -126,6 +146,10 @@ static ngx_atomic_t             ngx_thread_pool_done_lock;
 static ngx_thread_pool_queue_t  ngx_thread_pool_done;
 
 
+// 使用ngx_thread_pool_t结构体初始化线程池
+// 在init_worker时被调用
+// 创建互斥量、条件变量，根据配置的线程数量，创建线程
+// 线程的执行函数是ngx_thread_pool_cycle，参数是线程池结构体
 static ngx_int_t
 ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
 {
@@ -134,25 +158,33 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
     ngx_uint_t      n;
     pthread_attr_t  attr;
 
+    // 要求必须有事件通知函数ngx_notify
+    // 否则多线程无法工作
+    // 调用系统函数eventfd，创建一个可以用于通知的描述符
     if (ngx_notify == NULL) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
                "the configured event method cannot be used with thread pools");
         return NGX_ERROR;
     }
 
+    // 初始化线程池任务队列，first/last都是空
     ngx_thread_pool_queue_init(&tp->queue);
 
+    // 系统调用创建互斥量
     if (ngx_thread_mutex_create(&tp->mtx, log) != NGX_OK) {
         return NGX_ERROR;
     }
 
+    // 系统调用创建条件变量
     if (ngx_thread_cond_create(&tp->cond, log) != NGX_OK) {
         (void) ngx_thread_mutex_destroy(&tp->mtx, log);
         return NGX_ERROR;
     }
 
+    // 线程池使用的log由外部传入
     tp->log = log;
 
+    // 系统调用，初始化一个线程对象的属性
     err = pthread_attr_init(&attr);
     if (err) {
         ngx_log_error(NGX_LOG_ALERT, log, err,
@@ -169,7 +201,10 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
     }
 #endif
 
+    // 根据配置的线程数量，创建线程
     for (n = 0; n < tp->threads; n++) {
+
+        // 线程的执行函数是ngx_thread_pool_cycle，参数是线程池结构体
         err = pthread_create(&tid, &attr, ngx_thread_pool_cycle, tp);
         if (err) {
             ngx_log_error(NGX_LOG_ALERT, log, err,
@@ -178,6 +213,7 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
         }
     }
 
+    // 销毁线程属性对象
     (void) pthread_attr_destroy(&attr);
 
     return NGX_OK;
@@ -480,6 +516,7 @@ ngx_thread_pool(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
+    // 根据配置创建线程池结构体对象,添加进线程池模块配置结构体里的数组
     tp = ngx_thread_pool_add(cf, &value[1]);
 
     if (tp == NULL) {
@@ -534,34 +571,45 @@ ngx_thread_pool(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 根据配置创建线程池结构体对象,添加进线程池模块配置结构体里的数组
 ngx_thread_pool_t *
 ngx_thread_pool_add(ngx_conf_t *cf, ngx_str_t *name)
 {
     ngx_thread_pool_t       *tp, **tpp;
     ngx_thread_pool_conf_t  *tcf;
 
+    // 如果不指定线程池名字，默认使用default
     if (name == NULL) {
         name = &ngx_thread_pool_default;
     }
 
+    // 检查是否已经定义了线程池
     tp = ngx_thread_pool_get(cf->cycle, name);
 
     if (tp) {
         return tp;
     }
 
+    // 创建线程池结构体对象
     tp = ngx_pcalloc(cf->pool, sizeof(ngx_thread_pool_t));
     if (tp == NULL) {
         return NULL;
     }
 
+    // 线程池名字
     tp->name = *name;
+
+    // 定义线程池的配置文件
     tp->file = cf->conf_file->file.name.data;
+
+    // 定义线程池指令的行号
     tp->line = cf->conf_file->line;
 
+    // 获得线程池模块的配置结构体，里面只有一个数组
     tcf = (ngx_thread_pool_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                                   ngx_thread_pool_module);
 
+    // 把线程池结构体添加进数组
     tpp = ngx_array_push(&tcf->pools);
     if (tpp == NULL) {
         return NULL;
@@ -618,11 +666,16 @@ ngx_thread_pool_init_worker(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
+    // 初始化线程池任务队列，first/last都是空
     ngx_thread_pool_queue_init(&ngx_thread_pool_done);
 
     tpp = tcf->pools.elts;
 
     for (i = 0; i < tcf->pools.nelts; i++) {
+        // 使用ngx_thread_pool_t结构体初始化线程池
+        // 在init_worker时被调用
+        // 创建互斥量、条件变量，根据配置的线程数量，创建线程
+        // 线程的执行函数是ngx_thread_pool_cycle，参数是线程池结构体
         if (ngx_thread_pool_init(tpp[i], cycle->log, cycle->pool) != NGX_OK) {
             return NGX_ERROR;
         }

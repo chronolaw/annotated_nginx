@@ -26,7 +26,7 @@ struct ngx_thread_task_s {
     // task->id = ngx_thread_pool_task_id++;
     ngx_uint_t           id;
 
-    // 用户使用的数据
+    // 用户使用的数据，也就是handl的data参数
     void                *ctx;
 
     // 由线程里的线程执行的函数，真正的工作
@@ -40,7 +40,7 @@ struct ngx_thread_task_s {
 typedef struct ngx_thread_pool_s  ngx_thread_pool_t;
 
 
-// 根据配置创建一个线程池
+// 根据配置创建线程池结构体对象,添加进线程池模块配置结构体里的数组
 ngx_thread_pool_t *ngx_thread_pool_add(ngx_conf_t *cf, ngx_str_t *name);
 
 // 根据名字获取线程池
