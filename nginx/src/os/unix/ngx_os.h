@@ -29,10 +29,10 @@ typedef ngx_chain_t *(*ngx_send_chain_pt)(ngx_connection_t *c, ngx_chain_t *in,
 // 在ngx_posix_init.c:ngx_os_init里初始化
 typedef struct {
     ngx_recv_pt        recv;            // ngx_unix_recv
-    ngx_recv_chain_pt  recv_chain;
-    ngx_recv_pt        udp_recv;
+    ngx_recv_chain_pt  recv_chain;      // ngx_readv_chain
+    ngx_recv_pt        udp_recv;        // ngx_udp_unix_recv
     ngx_send_pt        send;            // ngx_unix_send
-    ngx_send_chain_pt  send_chain;
+    ngx_send_chain_pt  send_chain;      // ngx_writev_chain
     ngx_uint_t         flags;
 } ngx_os_io_t;
 
