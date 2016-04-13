@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * ngx_thread_task_s
+// * ngx_thread_task_alloc
+// * ngx_thread_task_post
 
 /*
  * Copyright (C) Nginx, Inc.
