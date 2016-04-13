@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -19,6 +20,8 @@ ngx_uint_t  ngx_tcp_nodelay_and_tcp_nopush;
 struct rlimit  rlmt;
 
 
+// unix基本的数据收发接口
+// 屏蔽linux/bsd/darwin等的差异
 ngx_os_io_t ngx_os_io = {
     ngx_unix_recv,
     ngx_readv_chain,
@@ -41,6 +44,7 @@ ngx_os_init(ngx_log_t *log)
     ngx_uint_t  n;
 
 #if (NGX_HAVE_OS_SPECIFIC_INIT)
+    // in ngx_linux_init.c
     if (ngx_os_specific_init(log) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -50,7 +54,10 @@ ngx_os_init(ngx_log_t *log)
         return NGX_ERROR;
     }
 
+    // 基本的页大小,ngx_pagesize = getpagesize()
     ngx_pagesize = getpagesize();
+
+    // 宏定义为64
     ngx_cacheline_size = NGX_CPU_CACHE_LINE;
 
     for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
@@ -87,6 +94,7 @@ ngx_os_init(ngx_log_t *log)
 }
 
 
+// 仅打印notice日志，暂无意义
 void
 ngx_os_status(ngx_log_t *log)
 {
@@ -97,6 +105,7 @@ ngx_os_status(ngx_log_t *log)
 #endif
 
 #if (NGX_HAVE_OS_SPECIFIC_INIT)
+    // 仅打印notice日志，暂无意义
     ngx_os_specific_status(log);
 #endif
 

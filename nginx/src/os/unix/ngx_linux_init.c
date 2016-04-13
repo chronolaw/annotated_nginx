@@ -31,6 +31,8 @@ static ngx_os_io_t ngx_linux_io = {
 };
 
 
+// 初始化ngx_os_io结构体，设置为linux的收发函数
+// 在ngx_posix_init.c:ngx_os_init里调用
 ngx_int_t
 ngx_os_specific_init(ngx_log_t *log)
 {
@@ -81,6 +83,7 @@ ngx_os_specific_init(ngx_log_t *log)
 }
 
 
+// 仅打印notice日志，暂无意义
 void
 ngx_os_specific_status(ngx_log_t *log)
 {

@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,6 +14,7 @@
 #include <ngx_core.h>
 
 
+// 封装C库函数malloc，可以记录错误日志
 void *ngx_alloc(size_t size, ngx_log_t *log);
 void *ngx_calloc(size_t size, ngx_log_t *log);
 
@@ -37,7 +39,9 @@ void *ngx_memalign(size_t alignment, size_t size, ngx_log_t *log);
 #endif
 
 
+// 基本的页大小,ngx_pagesize = getpagesize()
 extern ngx_uint_t  ngx_pagesize;
+
 extern ngx_uint_t  ngx_pagesize_shift;
 extern ngx_uint_t  ngx_cacheline_size;
 

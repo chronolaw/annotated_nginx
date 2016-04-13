@@ -24,6 +24,9 @@ typedef ssize_t (*ngx_send_pt)(ngx_connection_t *c, u_char *buf, size_t size);
 typedef ngx_chain_t *(*ngx_send_chain_pt)(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
 
+// unix基本的数据收发接口
+// 屏蔽linux/bsd/darwin等的差异
+// 在ngx_posix_init.c:ngx_os_init里初始化
 typedef struct {
     ngx_recv_pt        recv;
     ngx_recv_chain_pt  recv_chain;
@@ -34,11 +37,32 @@ typedef struct {
 } ngx_os_io_t;
 
 
+// 在nginx.c的main()调用
+// 初始化ngx_os_io结构体，设置基本的收发函数
+// 基本的页大小,ngx_pagesize = getpagesize()
+// 初始化随机数
+// 实际工作在ngx_linux_init.c的ngx_os_specific_init()完成
+// 关键操作ngx_os_io = ngx_linux_io;设置为linux的接口函数
 ngx_int_t ngx_os_init(ngx_log_t *log);
+
+// 仅打印notice日志，暂无意义
 void ngx_os_status(ngx_log_t *log);
+
+// 初始化ngx_os_io结构体，设置为linux的收发函数
+// 在ngx_posix_init.c:ngx_os_init里调用
 ngx_int_t ngx_os_specific_init(ngx_log_t *log);
+
+// 仅打印notice日志，暂无意义
 void ngx_os_specific_status(ngx_log_t *log);
+
+// main()里调用，守护进程化
+// 调用fork()，返回0是子进程，非0是父进程
+// in ngx_daemon.c
 ngx_int_t ngx_daemon(ngx_log_t *log);
+
+// 被ngx_cycle.c里的ngx_signal_process()调用
+// 发送reload/stop等信号
+// in ngx_process.c
 ngx_int_t ngx_os_signal_process(ngx_cycle_t *cycle, char *sig, ngx_int_t pid);
 
 
@@ -79,7 +103,9 @@ ngx_chain_t *ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in,
 ssize_t ngx_writev(ngx_connection_t *c, ngx_iovec_t *vec);
 
 
+// nginx在linux里实际使用的操作系统接口调用
 extern ngx_os_io_t  ngx_os_io;
+
 extern ngx_int_t    ngx_ncpu;
 extern ngx_int_t    ngx_max_sockets;
 extern ngx_uint_t   ngx_inherited_nonblocking;
