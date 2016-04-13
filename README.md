@@ -40,8 +40,9 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 ######http目录
 
 ######os/unix目录
-* [ngx_process.c](nginx/src/os/unix/ngx_process.c)
-* [ngx_process_cycle.c](nginx/src/os/unix/ngx_process_cycle.c)
+* [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
+* [ngx_process.c](/nginx/src/os/unix/ngx_process.c)
+* [ngx_process_cycle.c](/nginx/src/os/unix/ngx_process_cycle.c)
 
 ######stream目录
 
