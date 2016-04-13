@@ -13,8 +13,9 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 # 已注解
 
 ###源码目录快捷入口
-* [core](/nginx/src/core) - 50%，md5/sha1/crc等较简单的功能不关注
-* [event](/nginx/src/event) - 80%，只注解核心模块，epoll/kqueue/ssl等不关注
+* [src](/nginx/src/)
+* [core](/nginx/src/core) - 60%，md5/sha1/crc等较简单的功能不关注
+* [event](/nginx/src/event) - 90%，只注解核心模块，epoll/kqueue/ssl等不关注
 * [http](/nginx/src/http) - todo
 * [os/unix](/nginx/src/os/unix) - 20%，bsd/darwin/solaris等系统不关注
 * [stream](/nginx/src/stream) - todo
@@ -26,7 +27,6 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_conf_file.h](nginx/src/core/ngx_conf_file.h)
 * [ngx_connection.h](/nginx/src/core/ngx_connection.h)
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
-
 * [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
 * [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
 
@@ -42,6 +42,8 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 ######os/unix目录
 * [ngx_process.c](nginx/src/os/unix/ngx_process.c)
 * [ngx_process_cycle.c](nginx/src/os/unix/ngx_process_cycle.c)
+
+######stream目录
 
 ####部分关键源码（功能分类）
 
@@ -65,6 +67,8 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_event.c](/nginx/src/event/ngx_event.c)
 * [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
 * [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
+
+######tcp(stream)处理
 
 ######http处理
 
