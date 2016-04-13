@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -17,20 +18,31 @@
 #endif
 
 
+// 类似ngx_http_request_t，表示tcp通信的会话
+// 存储有tcp处理里需要的数据，例如connection、ctx等
 typedef struct ngx_stream_session_s  ngx_stream_session_t;
 
 
+// 连接上游服务器（后端）的功能
 #include <ngx_stream_upstream.h>
 #include <ngx_stream_upstream_round_robin.h>
 
 
+// tcp流处理的配置结构体
+// 与http不同的是没有location，只有两级
 typedef struct {
+    // 保存stream{}块里的配置，是个数组，存储void*指针
     void                  **main_conf;
+
+    // 保存server{}块里的配置，是个数组，存储void*指针
     void                  **srv_conf;
 } ngx_stream_conf_ctx_t;
 
 
+// tcp流处理的监听端口结构体
 typedef struct {
+
+    // socket地址，使用union适应各种情形
     union {
         struct sockaddr     sockaddr;
         struct sockaddr_in  sockaddr_in;
@@ -43,6 +55,7 @@ typedef struct {
         u_char              sockaddr_data[NGX_SOCKADDRLEN];
     } u;
 
+    // socket地址长度
     socklen_t               socklen;
 
     /* server ctx */
@@ -93,6 +106,7 @@ typedef struct {
 #endif
 
 
+// 端口
 typedef struct {
     /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
     void                   *addrs;
@@ -115,6 +129,7 @@ typedef struct {
 typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 
 
+// 流模块的main配置
 typedef struct {
     ngx_array_t             servers;     /* ngx_stream_core_srv_conf_t */
     ngx_array_t             listen;      /* ngx_stream_listen_t */
@@ -126,6 +141,7 @@ typedef struct {
 typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 
 
+// 流模块的srv配置
 typedef struct {
     ngx_stream_handler_pt   handler;
     ngx_stream_conf_ctx_t  *ctx;
@@ -136,30 +152,48 @@ typedef struct {
 } ngx_stream_core_srv_conf_t;
 
 
+// 类似ngx_http_request_t，表示tcp通信的会话
+// 存储有tcp处理里需要的数据，例如connection、ctx等
 struct ngx_stream_session_s {
+    // 结构体的标志，可以用来识别对象
     uint32_t                signature;         /* "STRM" */
 
+    // 与客户端的连接对象
     ngx_connection_t       *connection;
 
+    // 收到的字节数
     off_t                   received;
 
     ngx_log_handler_pt      log_handler;
 
+    // 数组，存储每个流模块的ctx
     void                  **ctx;
+
+    // 数组，存储每个流模块的main配置
     void                  **main_conf;
+
+    // 数组，存储每个流模块的srv配置
     void                  **srv_conf;
 
     ngx_stream_upstream_t  *upstream;
 };
 
 
+// 流模块的函数表，用于解析配置时调用
 typedef struct {
+    // 解析配置完成之后调用
     ngx_int_t             (*postconfiguration)(ngx_conf_t *cf);
 
+    // 创建main配置结构体
     void                 *(*create_main_conf)(ngx_conf_t *cf);
+
+    // 解析完成后初始化main配置结构体
     char                 *(*init_main_conf)(ngx_conf_t *cf, void *conf);
 
+    // 创建srv配置结构体
     void                 *(*create_srv_conf)(ngx_conf_t *cf);
+
+    // 解析完成后合并srv配置结构体
     char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
                                             void *conf);
 } ngx_stream_module_t;

@@ -1,5 +1,9 @@
 // annotated by chrono since 2016
-// ngx_event_s/ngx_event_actions_t
+//
+// * ngx_event_s
+// * ngx_event_actions_t
+// * ngx_event_accept
+// * ngx_process_events_and_timers
 
 /*
  * Copyright (C) Igor Sysoev
