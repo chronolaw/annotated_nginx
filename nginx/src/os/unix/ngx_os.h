@@ -28,10 +28,10 @@ typedef ngx_chain_t *(*ngx_send_chain_pt)(ngx_connection_t *c, ngx_chain_t *in,
 // 屏蔽linux/bsd/darwin等的差异
 // 在ngx_posix_init.c:ngx_os_init里初始化
 typedef struct {
-    ngx_recv_pt        recv;
+    ngx_recv_pt        recv;            // ngx_unix_recv
     ngx_recv_chain_pt  recv_chain;
     ngx_recv_pt        udp_recv;
-    ngx_send_pt        send;
+    ngx_send_pt        send;            // ngx_unix_send
     ngx_send_chain_pt  send_chain;
     ngx_uint_t         flags;
 } ngx_os_io_t;
@@ -66,9 +66,20 @@ ngx_int_t ngx_daemon(ngx_log_t *log);
 ngx_int_t ngx_os_signal_process(ngx_cycle_t *cycle, char *sig, ngx_int_t pid);
 
 
+// nginx实际调用的接收数据函数 in ngx_recv.c
+// 从连接里获取读事件，使用系统调用recv读数据
+// 尽量多读数据
+// 如果数据长度为0，说明流已经结束，ready=0,eof=1
+// 如果recv返回-1，表示出错，再检查是否是NGX_EAGAIN
 ssize_t ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size);
+
 ssize_t ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *entry, off_t limit);
 ssize_t ngx_udp_unix_recv(ngx_connection_t *c, u_char *buf, size_t size);
+
+// ngx_unix_send不区分linux/bsd
+// 从连接里获取写事件，使用系统调用send发送数据
+// 要求的数据没发送完，说明暂时不能发送，缓冲区可能满了
+// 置ready标志，写事件暂时不可用，即不可写
 ssize_t ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size);
 ngx_chain_t *ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);

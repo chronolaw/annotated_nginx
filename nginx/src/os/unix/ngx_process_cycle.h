@@ -36,7 +36,13 @@ typedef struct {
 } ngx_cache_manager_ctx_t;
 
 
+// main()函数里调用，启动worker进程
+// 监听信号
+// 核心操作是sigsuspend，暂时挂起进程，不占用CPU，只有收到信号时才被唤醒
 void ngx_master_process_cycle(ngx_cycle_t *cycle);
+
+// main()函数里调用，仅启动一个进程，没有fork
+// master_process off;
 void ngx_single_process_cycle(ngx_cycle_t *cycle);
 
 
@@ -52,6 +58,8 @@ extern ngx_pid_t       ngx_pid;
 extern ngx_pid_t       ngx_new_binary;
 extern ngx_uint_t      ngx_inherited;
 extern ngx_uint_t      ngx_daemonized;
+
+// 进程正在退出,即quit
 extern ngx_uint_t      ngx_exiting;
 
 // 声明为extern，供其他文件使用

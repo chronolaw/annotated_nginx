@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,8 +14,10 @@
 #include <ngx_core.h>
 
 
+// 重定义unix的错误码类型
 typedef int               ngx_err_t;
 
+// 重定义unix错误码
 #define NGX_EPERM         EPERM
 #define NGX_ENOENT        ENOENT
 #define NGX_ENOPATH       ENOENT
@@ -65,8 +68,11 @@ typedef int               ngx_err_t;
 #endif
 
 
+// 重命名错误码errno，更清楚
 #define ngx_errno                  errno
 #define ngx_socket_errno           errno
+
+// 设置错误码的操作
 #define ngx_set_errno(err)         errno = err
 #define ngx_set_socket_errno(err)  errno = err
 

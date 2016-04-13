@@ -81,6 +81,7 @@ static ngx_uint_t     ngx_event_max_module;
 // 事件模型的基本标志位
 // 在ngx_epoll_init里设置为et模式，边缘触发
 // NGX_USE_CLEAR_EVENT|NGX_USE_GREEDY_EVENT|NGX_USE_EPOLL_EVENT
+// 在ngx_recv.c:ngx_unix_recv里使用，尽量多读数据
 ngx_uint_t            ngx_event_flags;
 
 // 全局的事件模块访问接口，是一个函数表

@@ -184,6 +184,7 @@ struct ngx_connection_s {
     ngx_listening_t    *listening;
 
     // 连接上已经发送的字节数
+    // ngx_send.c里发送数据成功后增加
     off_t               sent;
 
     // 用于记录日志的log
