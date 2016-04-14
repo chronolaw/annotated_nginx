@@ -1,4 +1,5 @@
 // annotated by chrono since 2016
+//
 // * ngx_stream_block
 
 /*
@@ -412,6 +413,7 @@ found:
         return NGX_ERROR;
     }
 
+    // 把listen结构体存储在addrs数组里供以后使用
     addr->opt = *listen;
 
     return NGX_OK;

@@ -192,6 +192,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+    // 默认tcp_nodelay=1
     ngx_conf_merge_value(conf->tcp_nodelay, prev->tcp_nodelay, 1);
 
     return NGX_CONF_OK;
@@ -264,12 +265,20 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* the server configuration context */
 
+    // 以下代码存储了各个server{}的配置，注意！！
+
+    // 获取stream_core模块的srv配置
+    // 注意这里是当前server{}里的配置数组，不是main的
     cscf = ctx->srv_conf[ngx_stream_core_module.ctx_index];
+
+    // 存储关联此server{}块的配置数组！
+    // ctx是刚才刚创建的配置结构体
     cscf->ctx = ctx;
 
+    // 获取stream_core模块的main配置
     cmcf = ctx->main_conf[ngx_stream_core_module.ctx_index];
 
-    // server配置加入main_conf的servers数组
+    // stream_core模块的server配置加入main_conf的servers数组
     cscfp = ngx_array_push(&cmcf->servers);
     if (cscfp == NULL) {
         return NGX_CONF_ERROR;
@@ -284,6 +293,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     pcf = *cf;
 
     // 设置事件模块的新解析上下文
+    // 使用刚才刚创建的配置结构体存储模块的配置信息
     cf->ctx = ctx;
     cf->cmd_type = NGX_STREAM_SRV_CONF;
 

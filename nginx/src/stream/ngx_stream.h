@@ -1,4 +1,5 @@
 // annotated by chrono since 2016
+//
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
@@ -135,13 +136,17 @@ typedef struct {
 
 
 // 限制访问的函数原型
+// 与ngx_stream_handler_pt很像，但返回的是整数错误码
 typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 
 
-// stream模块的main配置
+// stream core模块的main配置
 // 主要存储server和监听端口
+// 在stream{}里只有一个
 typedef struct {
     // 存储stream{}里定义的server
+    // 实际上存储的是每个server{}配置数组里的stream_core模块的srv配置
+    // 里面的ctx指向了实际server的配置数组
     ngx_array_t             servers;     /* ngx_stream_core_srv_conf_t */
 
     // 存储server{}里定义的监听端口
@@ -157,15 +162,21 @@ typedef struct {
 
 
 // 重要！处理tcp的回调函数原型，相当于http里的content handler
+// 与ngx_stream_access_pt很像，但没有返回值
 typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 
 
-// stream模块的srv配置
+// stream core模块的srv配置
+// 每个server{}块都会有一个，表示一个server
+// 成员ctx就是server{}块自己的配置信息存储数组
+// 存储在ngx_stream_core_main_conf_t.servers
 typedef struct {
     // 收到tcp连接后的处理函数
     // 相当于http location里的content handler
     ngx_stream_handler_pt   handler;
 
+    // 保存模块的配置结构体，其中的main指向stream里
+    // 是每个server{}块独立的存储空间
     ngx_stream_conf_ctx_t  *ctx;
 
     // 记录server{}块定义所在的文件和行号
@@ -195,16 +206,20 @@ struct ngx_stream_session_s {
     void                  **ctx;
 
     // 数组，存储每个流模块的main配置
+    // s->main_conf = addr_conf->ctx->main_conf;
     void                  **main_conf;
 
     // 数组，存储每个流模块的srv配置
+    // s->srv_conf = addr_conf->ctx->srv_conf;
     void                  **srv_conf;
 
+    // 连接上游
     ngx_stream_upstream_t  *upstream;
 };
 
 
 // 流模块的函数表，用于解析配置时调用
+// 与http模块相比没有location相关函数
 typedef struct {
     // 解析配置完成之后调用
     ngx_int_t             (*postconfiguration)(ngx_conf_t *cf);
@@ -256,12 +271,15 @@ typedef struct {
     (s)->srv_conf[module.ctx_index]
 
 // 从conf里得到配置结构体
+// cf->ctx实际上是ngx_stream_conf_ctx_t，所以要先转换
 #define ngx_stream_conf_get_module_main_conf(cf, module)                       \
     ((ngx_stream_conf_ctx_t *) cf->ctx)->main_conf[module.ctx_index]
 #define ngx_stream_conf_get_module_srv_conf(cf, module)                        \
     ((ngx_stream_conf_ctx_t *) cf->ctx)->srv_conf[module.ctx_index]
 
 // 从cycle里得到配置结构体
+// 先判断stream模块是否存在
+// 然后用两次指针，找到main conf，因为main conf是唯一的
 #define ngx_stream_cycle_get_module_main_conf(cycle, module)                   \
     (cycle->conf_ctx[ngx_stream_module.index] ?                                \
         ((ngx_stream_conf_ctx_t *) cycle->conf_ctx[ngx_stream_module.index])   \
