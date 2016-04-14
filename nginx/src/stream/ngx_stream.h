@@ -43,6 +43,7 @@ typedef struct {
 typedef struct {
 
     // socket地址，使用union适应各种情形
+    // 主要使用的是u.sockaddr
     union {
         struct sockaddr     sockaddr;
         struct sockaddr_in  sockaddr_in;
@@ -61,7 +62,10 @@ typedef struct {
     /* server ctx */
     ngx_stream_conf_ctx_t  *ctx;
 
+    // 已经绑定
     unsigned                bind:1;
+
+    // 使用通配符标志位
     unsigned                wildcard:1;
 #if (NGX_STREAM_SSL)
     unsigned                ssl:1;
@@ -113,7 +117,7 @@ typedef struct {
     ngx_uint_t              naddrs;
 } ngx_stream_port_t;
 
-
+// 用在ngx_stream_add_ports
 typedef struct {
     int                     family;
     in_port_t               port;
@@ -121,6 +125,7 @@ typedef struct {
 } ngx_stream_conf_port_t;
 
 
+// 存储在ngx_stream_conf_port_t的addrs数组里
 typedef struct {
     ngx_stream_listen_t     opt;
 } ngx_stream_conf_addr_t;

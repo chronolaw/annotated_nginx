@@ -276,7 +276,8 @@ struct ngx_connection_s {
 };
 
 
-// http/ngx_http.c ngx_http_add_listening()里调用
+// http/ngx_http.c:ngx_http_add_listening()里调用
+// ngx_stream.c:ngx_stream_optimize_servers()里调用
 // 添加到cycle的监听端口数组
 ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
     socklen_t socklen);
