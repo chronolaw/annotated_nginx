@@ -170,9 +170,11 @@ typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 // 每个server{}块都会有一个，表示一个server
 // 成员ctx就是server{}块自己的配置信息存储数组
 // 存储在ngx_stream_core_main_conf_t.servers
+// 见ngx_stream_core_server()
 typedef struct {
     // 收到tcp连接后的处理函数
     // 相当于http location里的content handler
+    // 开发自己的stream模块必须设置此handler
     ngx_stream_handler_pt   handler;
 
     // 保存模块的配置结构体，其中的main指向stream里

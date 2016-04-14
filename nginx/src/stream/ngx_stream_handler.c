@@ -165,6 +165,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     c->log->action = "initializing connection";
     c->log_error = NGX_ERROR_INFO;
 
+    // 一个stream{}块只能有一个main conf
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
 
     // 是否有连接限速设置，在ngx_stream_limit_conn_module.c里设置
@@ -246,6 +247,7 @@ ngx_stream_init_session(ngx_connection_t *c)
     c->log->action = "handling client connection";
 
     // 获取ngx_stream_core_module的配置
+    // 只与每个server{}块相关的专门配置
     cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
 
     // 创建ctx数组，用于存储模块的ctx数据
@@ -332,10 +334,13 @@ ngx_stream_close_connection(ngx_connection_t *c)
     (void) ngx_atomic_fetch_add(ngx_stat_active, -1);
 #endif
 
+    // 暂时保留内存池
     pool = c->pool;
 
+    // 关闭连接
     ngx_close_connection(c);
 
+    // 最后再销毁内存池
     ngx_destroy_pool(pool);
 }
 
