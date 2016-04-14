@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,8 +21,11 @@ typedef int  ngx_socket_t;
 #define ngx_socket_n        "socket()"
 
 
+// 默认会定义NGX_HAVE_FIONBIO
 #if (NGX_HAVE_FIONBIO)
 
+// 设置socket为非阻塞模式
+// ioctl(s, FIONBIO, &nb)
 int ngx_nonblocking(ngx_socket_t s);
 int ngx_blocking(ngx_socket_t s);
 

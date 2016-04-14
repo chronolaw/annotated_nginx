@@ -17,6 +17,7 @@
 #define NGX_IO_SENDFILE    1
 
 
+// 收发数据的函数原型，封装了系统调用recv/send
 typedef ssize_t (*ngx_recv_pt)(ngx_connection_t *c, u_char *buf, size_t size);
 typedef ssize_t (*ngx_recv_chain_pt)(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
@@ -81,6 +82,7 @@ ssize_t ngx_udp_unix_recv(ngx_connection_t *c, u_char *buf, size_t size);
 // 要求的数据没发送完，说明暂时不能发送，缓冲区可能满了
 // 置ready标志，写事件暂时不可用，即不可写
 ssize_t ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size);
+
 ngx_chain_t *ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
 
