@@ -91,6 +91,7 @@ struct ngx_command_s {
     ngx_str_t             name;
 
     //指令的类型，是NGX_CONF_XXX的组合，决定指令出现的位置、参数数量、类型等
+    // NGX_HTTP_MAIN_CONF/NGX_HTTP_SRV_CONF/NGX_HTTP_LOC_CONF
     ngx_uint_t            type;
 
     // 指令解析函数，是函数指针
@@ -100,8 +101,9 @@ struct ngx_command_s {
     // conf当前的配置结构体，需转型后才能使用
     char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-    // 专门给http模块使用，决定存储在main/srv/loc的哪个层次
-    // NGX_HTTP_MAIN_CONF/NGX_HTTP_SRV_CONF/NGX_HTTP_LOC_CONF
+    // 专门给http/stream模块使用，决定存储在main/srv/loc的哪个层次
+    // NGX_HTTP_MAIN_CONF_OFFSET/NGX_HTTP_SRV_CONF_OFFSET/NGX_HTTP_LOC_CONF_OFFSET
+    // NGX_STREAM_MAIN_CONF_OFFSET
     // 其他类型的模块不使用，直接为0
     ngx_uint_t            conf;
 

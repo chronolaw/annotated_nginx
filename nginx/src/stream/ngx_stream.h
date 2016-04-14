@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+// * ngx_stream_core_main_conf_t
+// * ngx_stream_core_srv_conf_t
+// * ngx_stream_session_s
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -144,6 +147,10 @@ typedef struct {
     // 存储server{}里定义的监听端口
     ngx_array_t             listen;      /* ngx_stream_listen_t */
 
+    // 这两个回调相当于http模块里的phases数组
+    // 自定义模块可以设置自己的函数
+    // 在ngx_stream_init_connection里会被调用
+    // 目前nginx对stream模块仅提供了这两个hook点
     ngx_stream_access_pt    limit_conn_handler;
     ngx_stream_access_pt    access_handler;
 } ngx_stream_core_main_conf_t;
@@ -156,6 +163,7 @@ typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 // stream模块的srv配置
 typedef struct {
     // 收到tcp连接后的处理函数
+    // 相当于http location里的content handler
     ngx_stream_handler_pt   handler;
 
     ngx_stream_conf_ctx_t  *ctx;
@@ -216,32 +224,44 @@ typedef struct {
 } ngx_stream_module_t;
 
 
+// stream模块的标志
 #define NGX_STREAM_MODULE       0x4d525453     /* "STRM" */
 
+// 用在配置指令里决定可以出现的位置
 #define NGX_STREAM_MAIN_CONF    0x02000000
 #define NGX_STREAM_SRV_CONF     0x04000000
 #define NGX_STREAM_UPS_CONF     0x08000000
 
 
+// 用在配置指令里决定配置结构体存储的位置
+// ngx_command_t.conf成员
 #define NGX_STREAM_MAIN_CONF_OFFSET  offsetof(ngx_stream_conf_ctx_t, main_conf)
 #define NGX_STREAM_SRV_CONF_OFFSET   offsetof(ngx_stream_conf_ctx_t, srv_conf)
 
 
+// 获取模块的ctx数据
 #define ngx_stream_get_module_ctx(s, module)   (s)->ctx[module.ctx_index]
+
+// 设置模块的ctx数据
 #define ngx_stream_set_ctx(s, c, module)       s->ctx[module.ctx_index] = c;
+
+// 删除模块的ctx数据
 #define ngx_stream_delete_ctx(s, module)       s->ctx[module.ctx_index] = NULL;
 
 
+// 从会话对象里得到配置结构体
 #define ngx_stream_get_module_main_conf(s, module)                             \
     (s)->main_conf[module.ctx_index]
 #define ngx_stream_get_module_srv_conf(s, module)                              \
     (s)->srv_conf[module.ctx_index]
 
+// 从conf里得到配置结构体
 #define ngx_stream_conf_get_module_main_conf(cf, module)                       \
     ((ngx_stream_conf_ctx_t *) cf->ctx)->main_conf[module.ctx_index]
 #define ngx_stream_conf_get_module_srv_conf(cf, module)                        \
     ((ngx_stream_conf_ctx_t *) cf->ctx)->srv_conf[module.ctx_index]
 
+// 从cycle里得到配置结构体
 #define ngx_stream_cycle_get_module_main_conf(cycle, module)                   \
     (cycle->conf_ctx[ngx_stream_module.index] ?                                \
         ((ngx_stream_conf_ctx_t *) cycle->conf_ctx[ngx_stream_module.index])   \
@@ -249,12 +269,24 @@ typedef struct {
         NULL)
 
 
+// 在ngx_stream_optimize_servers里设置有连接发生时的回调函数
+// 创建一个处理tcp的会话对象
+// 要先检查限速和访问限制这两个功能模块
+// 最后调用ngx_stream_init_session
+// 创建ctx数组，用于存储模块的ctx数据
+// 调用handler，处理tcp数据，收发等等
 void ngx_stream_init_connection(ngx_connection_t *c);
+
+// 关闭stream连接，销毁线程池
 void ngx_stream_close_connection(ngx_connection_t *c);
 
 
 extern ngx_module_t  ngx_stream_module;
+
+// 计数器，得到所有的stream模块数量
+// 1.9.11后改用cycle里的变量
 extern ngx_uint_t    ngx_stream_max_module;
+
 extern ngx_module_t  ngx_stream_core_module;
 
 
