@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -10,34 +11,58 @@
 #include <ngx_stream.h>
 
 
+// 主要初始化配置结构体里的servers、listen数组
 static void *ngx_stream_core_create_main_conf(ngx_conf_t *cf);
+
+// 创建stream模块的srv配置，记录server{}块定义所在的文件和行号
 static void *ngx_stream_core_create_srv_conf(ngx_conf_t *cf);
+
+// 配置解析完成后的检查合并配置工作
+// 每个server块必须有一个处理handler，否则报错
+// 设置errlog和tcp_nodelay
 static char *ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
+
+// 设置错误日志
 static char *ngx_stream_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 解析server{}指令，定义一个tcp server
 static char *ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 解析stream/server[]里的listen指令，监听tcp端口
+// 遍历已经添加的端口，如果重复则报错
+// 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
+// stream_core模块的指令，主要是server、listen
+// 与http_core类似
 static ngx_command_t  ngx_stream_core_commands[] = {
 
+    // 定义一个tcpserver
     { ngx_string("server"),
       NGX_STREAM_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
+      // 解析server{}指令，定义一个tcp server
       ngx_stream_core_server,
       0,
       0,
       NULL },
 
+    // server监听的端口
     { ngx_string("listen"),
       NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
+      // 解析stream/server[]里的listen指令，监听tcp端口
+      // 遍历已经添加的端口，如果重复则报错
+      // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
       ngx_stream_core_listen,
       NGX_STREAM_SRV_CONF_OFFSET,
       0,
       NULL },
 
+    // 错误日志，可以在stream_main里出现，用于合并配置
     { ngx_string("error_log"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
       ngx_stream_core_error_log,
@@ -45,6 +70,7 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       0,
       NULL },
 
+    // 可以在stream_main里出现，用于合并配置
     { ngx_string("tcp_nodelay"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -59,9 +85,11 @@ static ngx_command_t  ngx_stream_core_commands[] = {
 static ngx_stream_module_t  ngx_stream_core_module_ctx = {
     NULL,                                  /* postconfiguration */
 
+    // 主要初始化配置结构体里的servers、listen数组
     ngx_stream_core_create_main_conf,      /* create main configuration */
     NULL,                                  /* init main configuration */
 
+    // 创建stream模块的srv配置，记录server{}块定义所在的文件和行号
     ngx_stream_core_create_srv_conf,       /* create server configuration */
     ngx_stream_core_merge_srv_conf         /* merge server configuration */
 };
@@ -70,6 +98,8 @@ static ngx_stream_module_t  ngx_stream_core_module_ctx = {
 ngx_module_t  ngx_stream_core_module = {
     NGX_MODULE_V1,
     &ngx_stream_core_module_ctx,           /* module context */
+
+    // stream_core模块的指令，主要是server、listen
     ngx_stream_core_commands,              /* module directives */
     NGX_STREAM_MODULE,                     /* module type */
     NULL,                                  /* init master */
@@ -83,6 +113,7 @@ ngx_module_t  ngx_stream_core_module = {
 };
 
 
+// 主要初始化配置结构体里的servers、listen数组
 static void *
 ngx_stream_core_create_main_conf(ngx_conf_t *cf)
 {
@@ -110,6 +141,7 @@ ngx_stream_core_create_main_conf(ngx_conf_t *cf)
 }
 
 
+// 创建stream模块的srv配置，记录server{}块定义所在的文件和行号
 static void *
 ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
 {
@@ -135,12 +167,16 @@ ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
 }
 
 
+// 配置解析完成后的检查合并配置工作
+// 每个server块必须有一个处理handler，否则报错
+// 设置errlog和tcp_nodelay
 static char *
 ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_stream_core_srv_conf_t *prev = parent;
     ngx_stream_core_srv_conf_t *conf = child;
 
+    // 每个server块必须有一个处理handler，否则报错
     if (conf->handler == NULL) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                       "no handler for server in %s:%ui",
@@ -162,6 +198,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 设置错误日志
 static char *
 ngx_stream_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -171,6 +208,7 @@ ngx_stream_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 解析server{}指令，定义一个tcp server
 static char *
 ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -183,29 +221,37 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_stream_core_srv_conf_t   *cscf, **cscfp;
     ngx_stream_core_main_conf_t  *cmcf;
 
+    // 创建当前server的配置
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_stream_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 保存stream{}的配置上下文
     stream_ctx = cf->ctx;
+
+    // main_conf直接指向stream{}的main_conf
     ctx->main_conf = stream_ctx->main_conf;
 
     /* the server{}'s srv_conf */
 
+    // 分配存储srv_conf的数组，数量是ngx_stream_max_module
     ctx->srv_conf = ngx_pcalloc(cf->pool,
                                 sizeof(void *) * ngx_stream_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 遍历模块数组，调用每个stream模块create_srv_conf，创建配置结构体
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
             continue;
         }
 
+        // module是流模块的函数表，用于解析配置时调用
         module = ngx_modules[m]->ctx;
 
+        // 创建每个模块的srv_conf
         if (module->create_srv_conf) {
             mconf = module->create_srv_conf(cf);
             if (mconf == NULL) {
@@ -223,6 +269,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cmcf = ctx->main_conf[ngx_stream_core_module.ctx_index];
 
+    // server配置加入main_conf的servers数组
     cscfp = ngx_array_push(&cmcf->servers);
     if (cscfp == NULL) {
         return NGX_CONF_ERROR;
@@ -233,18 +280,26 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* parse inside server{} */
 
+    // 暂存当前的解析上下文
     pcf = *cf;
+
+    // 设置事件模块的新解析上下文
     cf->ctx = ctx;
     cf->cmd_type = NGX_STREAM_SRV_CONF;
 
+    // 递归解析事件相关模块
     rv = ngx_conf_parse(cf, NULL);
 
+    // 恢复之前保存的解析上下文
     *cf = pcf;
 
     return rv;
 }
 
 
+// 解析stream/server[]里的listen指令，监听tcp端口
+// 遍历已经添加的端口，如果重复则报错
+// 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *
 ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -278,10 +333,13 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 获取stream core模块的main_conf
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
 
+    // 准备添加监听端口
     ls = cmcf->listen.elts;
 
+    // 遍历已经添加的端口，如果重复则报错
     for (i = 0; i < cmcf->listen.nelts; i++) {
 
         sa = &ls[i].u.sockaddr;
@@ -332,6 +390,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 向数组里添加一个ngx_stream_listen_t结构体
     ls = ngx_array_push(&cmcf->listen);
     if (ls == NULL) {
         return NGX_CONF_ERROR;
@@ -341,6 +400,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memcpy(&ls->u.sockaddr, u.sockaddr, u.socklen);
 
+    // 从ngx_url_t里拷贝信息
     ls->socklen = u.socklen;
     ls->backlog = NGX_LISTEN_BACKLOG;
     ls->wildcard = u.wildcard;
@@ -350,6 +410,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->ipv6only = 1;
 #endif
 
+    // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
     for (i = 2; i < cf->args->nelts; i++) {
 
         if (ngx_strcmp(value[i].data, "bind") == 0) {

@@ -131,27 +131,39 @@ typedef struct {
 } ngx_stream_conf_addr_t;
 
 
+// 限制访问的函数原型
 typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 
 
-// 流模块的main配置
+// stream模块的main配置
+// 主要存储server和监听端口
 typedef struct {
+    // 存储stream{}里定义的server
     ngx_array_t             servers;     /* ngx_stream_core_srv_conf_t */
+
+    // 存储server{}里定义的监听端口
     ngx_array_t             listen;      /* ngx_stream_listen_t */
+
     ngx_stream_access_pt    limit_conn_handler;
     ngx_stream_access_pt    access_handler;
 } ngx_stream_core_main_conf_t;
 
 
+// 重要！处理tcp的回调函数原型，相当于http里的content handler
 typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 
 
-// 流模块的srv配置
+// stream模块的srv配置
 typedef struct {
+    // 收到tcp连接后的处理函数
     ngx_stream_handler_pt   handler;
+
     ngx_stream_conf_ctx_t  *ctx;
+
+    // 记录server{}块定义所在的文件和行号
     u_char                 *file_name;
     ngx_int_t               line;
+
     ngx_log_t              *error_log;
     ngx_flag_t              tcp_nodelay;
 } ngx_stream_core_srv_conf_t;
