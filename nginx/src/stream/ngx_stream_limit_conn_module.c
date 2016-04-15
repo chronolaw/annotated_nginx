@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_stream_limit_conn_init
+// * ngx_stream_limit_conn_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -53,6 +57,9 @@ static char *ngx_stream_limit_conn_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_stream_limit_conn(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 修改stream_core模块的配置，设置access_handler
+// 为stream{}所有server添加连接限制
 static ngx_int_t ngx_stream_limit_conn_init(ngx_conf_t *cf);
 
 
@@ -93,6 +100,8 @@ static ngx_command_t  ngx_stream_limit_conn_commands[] = {
 
 
 static ngx_stream_module_t  ngx_stream_limit_conn_module_ctx = {
+    // 修改stream_core模块的配置，设置access_handler
+    // 为stream{}所有server添加连接限制
     ngx_stream_limit_conn_init,            /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -165,6 +174,7 @@ ngx_stream_limit_conn_handler(ngx_stream_session_t *s)
 
     hash = ngx_crc32_short(key.data, key.len);
 
+    // 获取此server里连接控制模块的配置
     lccf = ngx_stream_get_module_srv_conf(s, ngx_stream_limit_conn_module);
     limits = lccf->limits.elts;
 
@@ -619,6 +629,8 @@ ngx_stream_limit_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 修改stream_core模块的配置，设置access_handler
+// 为stream{}所有server添加连接限制
 static ngx_int_t
 ngx_stream_limit_conn_init(ngx_conf_t *cf)
 {

@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_stream_access_init
+// * ngx_stream_access_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -45,7 +49,10 @@ typedef struct {
 } ngx_stream_access_srv_conf_t;
 
 
+// 获取此server里访问控制模块的配置
+// 规则检查,拒绝访问返回NGX_DECLINED
 static ngx_int_t ngx_stream_access_handler(ngx_stream_session_t *s);
+
 static ngx_int_t ngx_stream_access_inet(ngx_stream_session_t *s,
     ngx_stream_access_srv_conf_t *ascf, in_addr_t addr);
 #if (NGX_HAVE_INET6)
@@ -63,6 +70,9 @@ static char *ngx_stream_access_rule(ngx_conf_t *cf, ngx_command_t *cmd,
 static void *ngx_stream_access_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_stream_access_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
+
+// 修改stream_core模块的配置，设置access_handler
+// 为stream{}所有server添加访问控制
 static ngx_int_t ngx_stream_access_init(ngx_conf_t *cf);
 
 
@@ -88,6 +98,8 @@ static ngx_command_t  ngx_stream_access_commands[] = {
 
 
 static ngx_stream_module_t  ngx_stream_access_module_ctx = {
+    // 修改stream_core模块的配置，设置access_handler
+    // 为stream{}所有server添加访问控制
     ngx_stream_access_init,                /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -114,6 +126,8 @@ ngx_module_t  ngx_stream_access_module = {
 };
 
 
+// 获取此server里访问控制模块的配置
+// 规则检查,拒绝访问返回NGX_DECLINED
 static ngx_int_t
 ngx_stream_access_handler(ngx_stream_session_t *s)
 {
@@ -125,8 +139,10 @@ ngx_stream_access_handler(ngx_stream_session_t *s)
     struct sockaddr_in6           *sin6;
 #endif
 
+    // 获取此server里访问控制模块的配置
     ascf = ngx_stream_get_module_srv_conf(s, ngx_stream_access_module);
 
+    // 规则检查
     switch (s->connection->sockaddr->sa_family) {
 
     case AF_INET:
@@ -439,6 +455,8 @@ ngx_stream_access_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 修改stream_core模块的配置，设置access_handler
+// 为stream{}所有server添加访问控制
 static ngx_int_t
 ngx_stream_access_init(ngx_conf_t *cf)
 {
