@@ -60,6 +60,7 @@ struct ngx_listening_s {
     /* handler of accepted connection */
     // 重要函数，tcp连接成功时的回调函数
     // 对于http模块是ngx_http_request.c:ngx_http_init_connection
+    // stream模块是ngx_stream_init_connection
     ngx_connection_handler_pt   handler;
 
     void               *servers;  /* array of ngx_http_in_addr_t, for example */
@@ -156,6 +157,7 @@ struct ngx_connection_s {
     // data成员有两种用法
     // 未使用（空闲）时作为链表的后继指针，连接在ngx_cycle_t::free_connections里
     // 在http模块里保存ngx_http_request_t对象，标记连接对应的http请求
+    // 在stream模块里保存ngx_stream_session_t对象
     void               *data;
 
     // 连接对应的读事件，存储在ngx_cycle_t::read_events
