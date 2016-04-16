@@ -20,6 +20,9 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
 * [stream(nginx 1.9.9)](/nginx/src/stream) - 50%
 
+####源码目录快捷入口
+[UML图示](/diagrams/readme.md)
+
 ####部分关键源码（目录分类）
 
 ######core目录
