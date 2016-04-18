@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,11 +14,19 @@
 #include <ngx_core.h>
 
 
+// 包含了http请求处理所有信息的重要结构体
+// 里面有内存池、各模块的配置、ctx、请求头等等
 typedef struct ngx_http_request_s     ngx_http_request_t;
+
+// 连接上游web server，转发http请求
 typedef struct ngx_http_upstream_s    ngx_http_upstream_t;
+
 typedef struct ngx_http_cache_s       ngx_http_cache_t;
 typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
+
+// 记录日志相关的信息
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
+
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 
 #if (NGX_HTTP_SPDY)
@@ -52,6 +61,7 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #endif
 
 
+// 记录日志相关的信息
 struct ngx_http_log_ctx_s {
     ngx_connection_t    *connection;
     ngx_http_request_t  *request;
@@ -66,6 +76,7 @@ struct ngx_http_chunked_s {
 };
 
 
+// 记录解析http头的状态
 typedef struct {
     ngx_uint_t           http_version;
     ngx_uint_t           code;
@@ -75,7 +86,10 @@ typedef struct {
 } ngx_http_status_t;
 
 
+// 获取模块存储在ngx_http_request_t里的ctx数据
 #define ngx_http_get_module_ctx(r, module)  (r)->ctx[module.ctx_index]
+
+// 设置模块存储在ngx_http_request_t里的ctx数据
 #define ngx_http_set_ctx(r, c, module)      r->ctx[module.ctx_index] = c;
 
 
@@ -85,14 +99,19 @@ ngx_int_t ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     ngx_http_listen_opt_t *lsopt);
 
 
+// 当epoll检测到连接事件，会调用event_accept，最后会调用此函数，开始处理http请求
 void ngx_http_init_connection(ngx_connection_t *c);
+
+// 关闭http连接
 void ngx_http_close_connection(ngx_connection_t *c);
 
 #if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
 int ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
 #endif
 
+// 解析http请求行，即get xxx http/1.1 \r\n
 ngx_int_t ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b);
+
 ngx_int_t ngx_http_parse_uri(ngx_http_request_t *r);
 ngx_int_t ngx_http_parse_complex_uri(ngx_http_request_t *r,
     ngx_uint_t merge_slashes);
@@ -130,9 +149,11 @@ void ngx_http_empty_handler(ngx_event_t *wev);
 void ngx_http_request_empty_handler(ngx_http_request_t *r);
 
 
+// ngx_http_send_special支持的参数
 #define NGX_HTTP_LAST   1
 #define NGX_HTTP_FLUSH  2
 
+// 发送特殊的http响应数据，即flush和eof
 ngx_int_t ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags);
 
 
@@ -140,7 +161,9 @@ ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
 ngx_int_t ngx_http_read_unbuffered_request_body(ngx_http_request_t *r);
 
+// 发送http头，调用过滤链表
 ngx_int_t ngx_http_send_header(ngx_http_request_t *r);
+
 ngx_int_t ngx_http_special_response_handler(ngx_http_request_t *r,
     ngx_int_t error);
 ngx_int_t ngx_http_filter_finalize_request(ngx_http_request_t *r,
@@ -153,7 +176,9 @@ size_t ngx_http_get_time(char *buf, time_t t);
 
 
 
+// 丢弃http请求体，对于get等请求是必须的
 ngx_int_t ngx_http_discard_request_body(ngx_http_request_t *r);
+
 void ngx_http_discarded_request_body_handler(ngx_http_request_t *r);
 void ngx_http_block_reading(ngx_http_request_t *r);
 void ngx_http_test_reading(ngx_http_request_t *r);
@@ -176,8 +201,13 @@ extern ngx_module_t  ngx_http_module;
 extern ngx_str_t  ngx_http_html_default_types[];
 
 
+// 过滤链表头指针，过滤header
 extern ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
+
+// 过滤链表头指针，过滤body
 extern ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
+
+// 过滤链表头指针，过滤请求body
 extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 
 
