@@ -230,7 +230,7 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cf->module_type = NGX_STREAM_MODULE;
     cf->cmd_type = NGX_STREAM_MAIN_CONF;
 
-    // 递归解析事件相关模块
+    // 递归解析stream模块
     rv = ngx_conf_parse(cf, NULL);
 
     if (rv != NGX_CONF_OK) {

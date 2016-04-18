@@ -71,6 +71,8 @@ static ngx_int_t ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
     ngx_http_conf_addr_t *addr);
 #endif
 
+// 统计http模块的数量
+// 在1.9.x里加入动态模块后有变化
 ngx_uint_t   ngx_http_max_module;
 
 
@@ -146,6 +148,7 @@ ngx_module_t  ngx_http_module = {
 
 
 // 解析http{}配置块，里面有server{}/location{}等
+// 只有出现这个指令才会在conf_ctx里创建http配置，避免内存浪费
 static char *
 ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -167,23 +170,27 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 结构体放入cycle->conf_ctx数组
     *(ngx_http_conf_ctx_t **) conf = ctx;
 
 
     /* count the number of the http modules and set up their indices */
 
+    // 统计http模块的数量
     ngx_http_max_module = 0;
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_HTTP_MODULE) {
             continue;
         }
 
+        // 设置http模块的ctx_index，即http模块自己的序号
         ngx_modules[m]->ctx_index = ngx_http_max_module++;
     }
 
 
     /* the http main_conf context, it is the same in the all http contexts */
 
+    // main配置数组，所有http模块只有一个
     ctx->main_conf = ngx_pcalloc(cf->pool,
                                  sizeof(void *) * ngx_http_max_module);
     if (ctx->main_conf == NULL) {
@@ -196,6 +203,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * the server{}s' srv_conf's
      */
 
+    // srv配置数组，在http main层次存储server基本的配置，用于合并
+    // 本身并无实际意义
     ctx->srv_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_CONF_ERROR;
@@ -207,6 +216,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * the server{}s' loc_conf's
      */
 
+    // location配置数组，在http main层次存储location基本的配置，用于合并
+    // 本身并无实际意义
     ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->loc_conf == NULL) {
         return NGX_CONF_ERROR;
@@ -218,6 +229,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * of the all http modules
      */
 
+    // 调用每个http模块的create_xxx_conf函数，创建配置结构体
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_HTTP_MODULE) {
             continue;
@@ -226,6 +238,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         module = ngx_modules[m]->ctx;
         mi = ngx_modules[m]->ctx_index;
 
+        // 创建每个模块的main_conf
         if (module->create_main_conf) {
             ctx->main_conf[mi] = module->create_main_conf(cf);
             if (ctx->main_conf[mi] == NULL) {
@@ -233,6 +246,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
         }
 
+        // 创建每个模块的srv_conf
         if (module->create_srv_conf) {
             ctx->srv_conf[mi] = module->create_srv_conf(cf);
             if (ctx->srv_conf[mi] == NULL) {
@@ -248,9 +262,16 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    // 初始的解析环境已经准备好，下面开始解析http{}配置
+
+    // 暂存当前的解析上下文
     pcf = *cf;
+
+    // 设置事件模块的新解析上下文
+    // 即ngx_http_conf_ctx_t结构体
     cf->ctx = ctx;
 
+    // 解析之前，调用preconfiguration，可以添加变量定义
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_HTTP_MODULE) {
             continue;
@@ -267,8 +288,11 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* parse inside the http{} block */
 
+    // 设置解析的类型等信息
     cf->module_type = NGX_HTTP_MODULE;
     cf->cmd_type = NGX_HTTP_MAIN_CONF;
+
+    // 递归解析http模块
     rv = ngx_conf_parse(cf, NULL);
 
     if (rv != NGX_CONF_OK) {
@@ -280,6 +304,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * and its location{}s' loc_conf's
      */
 
+    // 解析完毕，检查http{}里定义的server{}块
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
 
