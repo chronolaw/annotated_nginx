@@ -87,6 +87,8 @@ typedef struct {
 
 
 // 获取模块存储在ngx_http_request_t里的ctx数据
+// ctx可以用来存储在处理过程中任意的数据，作为暂存
+// 因为nginx是事件驱动的，处理不可能一次完成，所以ctx就起到了断点的作用
 #define ngx_http_get_module_ctx(r, module)  (r)->ctx[module.ctx_index]
 
 // 设置模块存储在ngx_http_request_t里的ctx数据
@@ -202,12 +204,18 @@ extern ngx_str_t  ngx_http_html_default_types[];
 
 
 // 过滤链表头指针，过滤header
+// 每个过滤模块都需要内部实现一个函数指针，链接为单向链表
+// 在modules数组里位置在前的是链表末尾，后面的是链表前面
+// 链表的最后一个模块是ngx_http_header_filter_module
 extern ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
 
 // 过滤链表头指针，过滤body
+// 每个过滤模块都需要内部实现一个函数指针，链接为单向链表
+// 在modules数组里位置在前的是链表末尾，后面的是链表前面
+// 链表的最后一个模块是ngx_http_write_filter_module
 extern ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
 
-// 过滤链表头指针，过滤请求body
+// 过滤链表头指针，过滤请求body，1.8.x新增
 extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 
 

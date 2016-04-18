@@ -11,7 +11,9 @@
 #include <ngx_http.h>
 
 
+// 解析http{}配置块，里面有server{}/location{}等
 static char *ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
 static ngx_int_t ngx_http_init_phases(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf);
 static ngx_int_t ngx_http_init_headers_in_hash(ngx_conf_t *cf,
@@ -70,17 +72,30 @@ static ngx_int_t ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
 ngx_uint_t   ngx_http_max_module;
 
 
+// 过滤链表头指针，过滤header
+// 每个过滤模块都需要内部实现一个函数指针，链接为单向链表
+// 在modules数组里位置在前的是链表末尾，后面的是链表前面
+// 链表的最后一个模块是ngx_http_header_filter_module
 ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
+
+// 过滤链表头指针，过滤body
+// 每个过滤模块都需要内部实现一个函数指针，链接为单向链表
+// 在modules数组里位置在前的是链表末尾，后面的是链表前面
+// 链表的最后一个模块是ngx_http_write_filter_module
 ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
+
+// 过滤链表头指针，过滤请求body，1.8.x新增
 ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 
 
+// http请求的默认类型，数组最后用空字符串表示结束
 ngx_str_t  ngx_http_html_default_types[] = {
     ngx_string("text/html"),
     ngx_null_string
 };
 
 
+// 与stream模块一样，http模块也只有一个指令，定义http{}配置块
 static ngx_command_t  ngx_http_commands[] = {
 
     { ngx_string("http"),
