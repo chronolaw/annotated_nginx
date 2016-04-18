@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// 可对比stream模块阅读
 
 /*
  * Copyright (C) Igor Sysoev
@@ -99,7 +101,11 @@ ngx_str_t  ngx_http_html_default_types[] = {
 static ngx_command_t  ngx_http_commands[] = {
 
     { ngx_string("http"),
+
+      // 出现在main域，配置块，无参数
       NGX_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
+
+      // 解析http{}配置块，里面有server{}/location{}等
       ngx_http_block,
       0,
       0,
@@ -109,6 +115,7 @@ static ngx_command_t  ngx_http_commands[] = {
 };
 
 
+// 没有create/init函数，只有出现http指令才创建配置结构体
 static ngx_core_module_t  ngx_http_module_ctx = {
     ngx_string("http"),
     NULL,
@@ -116,10 +123,16 @@ static ngx_core_module_t  ngx_http_module_ctx = {
 };
 
 
+// http模块，是核心模块，配置存储在cycle->conf_ctx
 ngx_module_t  ngx_http_module = {
     NGX_MODULE_V1,
+
+    // 没有create/init函数，只有出现http指令才创建配置结构体
     &ngx_http_module_ctx,                  /* module context */
+
+    // 与stream模块一样，http模块也只有一个指令，定义http{}配置块
     ngx_http_commands,                     /* module directives */
+
     NGX_CORE_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
@@ -132,6 +145,7 @@ ngx_module_t  ngx_http_module = {
 };
 
 
+// 解析http{}配置块，里面有server{}/location{}等
 static char *
 ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -146,6 +160,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* the main http context */
 
+    // ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
+    // in ngx_http_config.h
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
