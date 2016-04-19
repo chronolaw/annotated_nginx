@@ -14,12 +14,24 @@
 
 
 // 解析http{}配置块，里面有server{}/location{}等
+// 只有出现这个指令才会在conf_ctx里创建http配置，避免内存浪费
+// 统计http模块的数量,设置http模块的ctx_index，即http模块自己的序号
+// 调用每个http模块的create_xxx_conf函数，创建配置结构体
+// 初始化http处理引擎的阶段数组，调用ngx_array_init
+// 整理所有的http handler模块，填入引擎数组
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static char *ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+// 初始化http处理引擎的阶段数组，调用ngx_array_init
+// 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
 static ngx_int_t ngx_http_init_phases(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf);
+
 static ngx_int_t ngx_http_init_headers_in_hash(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf);
+
+// 整理所有的http handler模块，填入引擎数组
 static ngx_int_t ngx_http_init_phase_handlers(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf);
 
@@ -52,8 +64,12 @@ static ngx_http_location_tree_node_t *
     ngx_http_create_locations_tree(ngx_conf_t *cf, ngx_queue_t *locations,
     size_t prefix);
 
+// 类似stream模块，对已经整理好的监听端口数组排序
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_int_t ngx_http_optimize_servers(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf, ngx_array_t *ports);
+
 static ngx_int_t ngx_http_server_names(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf, ngx_http_conf_addr_t *addr);
 static ngx_int_t ngx_http_cmp_conf_addrs(const void *one, const void *two);
@@ -62,6 +78,9 @@ static int ngx_libc_cdecl ngx_http_cmp_dns_wildcards(const void *one,
 
 static ngx_int_t ngx_http_init_listening(ngx_conf_t *cf,
     ngx_http_conf_port_t *port);
+
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_listening_t *ngx_http_add_listening(ngx_conf_t *cf,
     ngx_http_conf_addr_t *addr);
 static ngx_int_t ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
@@ -149,6 +168,12 @@ ngx_module_t  ngx_http_module = {
 
 // 解析http{}配置块，里面有server{}/location{}等
 // 只有出现这个指令才会在conf_ctx里创建http配置，避免内存浪费
+// 统计http模块的数量,设置http模块的ctx_index，即http模块自己的序号
+// 调用每个http模块的create_xxx_conf函数，创建配置结构体
+// 初始化http处理引擎的阶段数组，调用ngx_array_init
+// 整理所有的http handler模块，填入引擎数组
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static char *
 ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -306,6 +331,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 解析完毕，检查http{}里定义的server{}块
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+
+    // 所有server{}定义的配置都保存在core module main conf的serevrs数组里
     cscfp = cmcf->servers.elts;
 
     for (m = 0; ngx_modules[m]; m++) {
@@ -318,6 +345,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         /* init http{} main_conf's */
 
+        // 初始化main配置
         if (module->init_main_conf) {
             rv = module->init_main_conf(cf, ctx->main_conf[mi]);
             if (rv != NGX_CONF_OK) {
@@ -325,6 +353,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
         }
 
+        // 合并srv配置
         rv = ngx_http_merge_servers(cf, cmcf, module, mi);
         if (rv != NGX_CONF_OK) {
             goto failed;
@@ -334,6 +363,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* create location trees */
 
+    // 遍历server数组，创建location树
     for (s = 0; s < cmcf->servers.nelts; s++) {
 
         clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
@@ -348,6 +378,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 
+    // 初始化http处理引擎的阶段数组，调用ngx_array_init
+    // 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
     if (ngx_http_init_phases(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -371,6 +403,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    // 初始化变量数组
+    // in ngx_http_variables.c
     if (ngx_http_variables_init_vars(cf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -380,9 +414,11 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * and in postconfiguration process
      */
 
+    // 恢复之前保存的解析上下文
     *cf = pcf;
 
 
+    // 整理所有的http handler模块，填入引擎数组
     if (ngx_http_init_phase_handlers(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -390,6 +426,9 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* optimize the lists of ports, addresses and server names */
 
+    // 类似stream模块，对已经整理好的监听端口数组排序
+    // 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+    // 设置有连接发生时的回调函数ngx_http_init_connection
     if (ngx_http_optimize_servers(cf, cmcf, cmcf->ports) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -398,12 +437,15 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 failed:
 
+    // 解析错误，恢复之前保存的解析上下文
     *cf = pcf;
 
     return rv;
 }
 
 
+// 初始化http处理引擎的阶段数组，调用ngx_array_init
+// 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
 static ngx_int_t
 ngx_http_init_phases(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 {
@@ -501,6 +543,7 @@ ngx_http_init_headers_in_hash(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 }
 
 
+// 整理所有的http handler模块，填入引擎数组
 static ngx_int_t
 ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 {
@@ -514,24 +557,34 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     cmcf->phase_engine.server_rewrite_index = (ngx_uint_t) -1;
     cmcf->phase_engine.location_rewrite_index = (ngx_uint_t) -1;
     find_config_index = 0;
+
+    // 看是否有rewrite模块
     use_rewrite = cmcf->phases[NGX_HTTP_REWRITE_PHASE].handlers.nelts ? 1 : 0;
+
+    // 看是否有access模块
     use_access = cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.nelts ? 1 : 0;
 
+    // 基本的四个模块数量
     n = use_rewrite + use_access + cmcf->try_files + 1 /* find config phase */;
 
+    // 统计所有的handler模块数量，但不含log阶段，注意！
     for (i = 0; i < NGX_HTTP_LOG_PHASE; i++) {
         n += cmcf->phases[i].handlers.nelts;
     }
 
+    // 创建数组
     ph = ngx_pcalloc(cf->pool,
                      n * sizeof(ngx_http_phase_handler_t) + sizeof(void *));
     if (ph == NULL) {
         return NGX_ERROR;
     }
 
+    // 加入到http core模块的配置结构体里
     cmcf->phase_engine.handlers = ph;
     n = 0;
 
+    // 除了log阶段，处理所有的handler模块
+    // 从最开始的post read阶段开始，直至content阶段，不包括log阶段
     for (i = 0; i < NGX_HTTP_LOG_PHASE; i++) {
         h = cmcf->phases[i].handlers.elts;
 
@@ -1480,6 +1533,9 @@ ngx_http_add_server(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 }
 
 
+// 类似stream模块，对已经整理好的监听端口数组排序
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_int_t
 ngx_http_optimize_servers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
     ngx_array_t *ports)
@@ -1518,6 +1574,8 @@ ngx_http_optimize_servers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
             }
         }
 
+        // 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+        // 设置有连接发生时的回调函数ngx_http_init_connection
         if (ngx_http_init_listening(cf, &port[p]) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -1729,6 +1787,8 @@ ngx_http_cmp_dns_wildcards(const void *one, const void *two)
 }
 
 
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_int_t
 ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
 {
@@ -1764,6 +1824,8 @@ ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
             continue;
         }
 
+        // 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+        // 设置有连接发生时的回调函数ngx_http_init_connection
         ls = ngx_http_add_listening(cf, &addr[i]);
         if (ls == NULL) {
             return NGX_ERROR;
@@ -1808,6 +1870,8 @@ ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
 }
 
 
+// 调用ngx_create_listening添加到cycle的监听端口数组，只是添加，没有其他动作
+// 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_listening_t *
 ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
 {
@@ -1824,6 +1888,7 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
 
     ls->addr_ntop = 1;
 
+    // 设置有连接发生时的回调函数ngx_http_init_connection
     ls->handler = ngx_http_init_connection;
 
     cscf = addr->default_server;
@@ -1849,6 +1914,7 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
     }
 #endif
 
+    // backlog/rcvbuf/sndbuf等参数
     ls->backlog = addr->opt.backlog;
     ls->rcvbuf = addr->opt.rcvbuf;
     ls->sndbuf = addr->opt.sndbuf;
