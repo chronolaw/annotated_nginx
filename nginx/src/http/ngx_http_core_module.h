@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -53,10 +54,12 @@
 #define NGX_HTTP_KEEPALIVE_DISABLE_SAFARI  0x0008
 
 
+// 存储location的红黑树节点
 typedef struct ngx_http_location_tree_node_s  ngx_http_location_tree_node_t;
 typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
 
 
+// http用的监听端口结构体
 typedef struct {
     union {
         struct sockaddr        sockaddr;
@@ -114,23 +117,40 @@ typedef struct {
 } ngx_http_listen_opt_t;
 
 
+// http处理的11个阶段，非常重要
 typedef enum {
+    // 读取并解析完http头后，即将开始读取body
     NGX_HTTP_POST_READ_PHASE = 0,
 
+    // 在server阶段重写url
     NGX_HTTP_SERVER_REWRITE_PHASE,
 
+    // 此阶段用户不可介入
     NGX_HTTP_FIND_CONFIG_PHASE,
+
+    // 在location阶段重写url，较常用
     NGX_HTTP_REWRITE_PHASE,
+
+    // 此阶段用户不可介入
     NGX_HTTP_POST_REWRITE_PHASE,
 
+    // 检查访问权限之前
     NGX_HTTP_PREACCESS_PHASE,
 
+    // 检查访问权限，较常用
     NGX_HTTP_ACCESS_PHASE,
+
+    // 此阶段用户不可介入
     NGX_HTTP_POST_ACCESS_PHASE,
 
+    // 此阶段用户不可介入
     NGX_HTTP_TRY_FILES_PHASE,
+
+    // 最常用的阶段，产生http内容，响应客户端请求
+    // 在这里发出去的数据会由过滤链表处理最终发出
     NGX_HTTP_CONTENT_PHASE,
 
+    // 记录访问日志，请求已经处理完毕
     NGX_HTTP_LOG_PHASE
 } ngx_http_phases;
 
@@ -139,49 +159,72 @@ typedef struct ngx_http_phase_handler_s  ngx_http_phase_handler_t;
 typedef ngx_int_t (*ngx_http_phase_handler_pt)(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
+// 存储handler/checker，里面用next实现阶段的快速跳转
 struct ngx_http_phase_handler_s {
+
+    // 阶段的checker函数
     ngx_http_phase_handler_pt  checker;
+
+    // 每个模块自己的处理函数
     ngx_http_handler_pt        handler;
+
+    // 指向下一个阶段第一个模块在数组里的位置
     ngx_uint_t                 next;
 };
 
 
+// 所有的http请求都要使用这个引擎处理
 typedef struct {
+    // 存储所有handler/checker的数组，里面用next实现阶段的快速跳转
     ngx_http_phase_handler_t  *handlers;
+
+    // server重写的跳转位置
     ngx_uint_t                 server_rewrite_index;
+
+    // location重写的跳转位置
     ngx_uint_t                 location_rewrite_index;
 } ngx_http_phase_engine_t;
 
 
+// 存储在ngx_http_core_main_conf_t里
+// 需要操作任何http请求的模块添加进这个数组
 typedef struct {
     ngx_array_t                handlers;
 } ngx_http_phase_t;
 
 
+// 重要结构体，存储server、监听端口、变量等信息
 typedef struct {
+    // 存储http{}里定义的所有server，元素是ngx_http_core_srv_conf_t
     ngx_array_t                servers;         /* ngx_http_core_srv_conf_t */
 
+    // 所有的http请求都要使用这个引擎处理
     ngx_http_phase_engine_t    phase_engine;
 
     ngx_hash_t                 headers_in_hash;
 
     ngx_hash_t                 variables_hash;
 
+    // 存储http里定义的所有变量
     ngx_array_t                variables;       /* ngx_http_variable_t */
     ngx_uint_t                 ncaptures;
 
+    // server散列表设置
     ngx_uint_t                 server_names_hash_max_size;
     ngx_uint_t                 server_names_hash_bucket_size;
 
+    // 变量散列表设置
     ngx_uint_t                 variables_hash_max_size;
     ngx_uint_t                 variables_hash_bucket_size;
 
     ngx_hash_keys_arrays_t    *variables_keys;
 
+    // http{}里定义的所有监听端口
     ngx_array_t               *ports;
 
     ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
 
+    // 所有的http请求都要使用这个引擎数组处理
     ngx_http_phase_t           phases[NGX_HTTP_LOG_PHASE + 1];
 } ngx_http_core_main_conf_t;
 
