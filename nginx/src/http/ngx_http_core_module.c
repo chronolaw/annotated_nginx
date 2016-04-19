@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -52,7 +53,16 @@ static char *ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// root/alais都由ngx_http_core_root函数处理
+// alias不能用于named location，也就是@开头的location
+// 不允许使用$document_root变量
+// 不允许使用$realpath_root变量
+// 检查路径是否以根目录开始（第一个字符是“/”）
+// 否则不使用conf_prefix，以prefix（"/usr/local/nginx/"）拼出完整路径
+// 保存进clcf->root
 static char *ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
 static char *ngx_http_core_limit_except(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_set_aio(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -333,6 +343,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, default_type),
       NULL },
 
+    // root/alais都由ngx_http_core_root函数处理
+    // alias不能用于named location，也就是@开头的location
+    // 不允许使用$document_root变量
+    // 不允许使用$realpath_root变量
+    // 检查路径是否以根目录开始（第一个字符是“/”）
+    // 否则不使用conf_prefix，以prefix（"/usr/local/nginx/"）拼出完整路径
+    // 保存进clcf->root
     { ngx_string("root"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
                         |NGX_CONF_TAKE1,
@@ -4437,6 +4454,13 @@ ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// root/alais都由ngx_http_core_root函数处理
+// alias不能用于named location，也就是@开头的location
+// 不允许使用$document_root变量
+// 不允许使用$realpath_root变量
+// 检查路径是否以根目录开始（第一个字符是“/”）
+// 否则不使用conf_prefix，以prefix（"/usr/local/nginx/"）拼出完整路径
+// 保存进clcf->root
 static char *
 ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -4447,15 +4471,23 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                  n;
     ngx_http_script_compile_t   sc;
 
+    // 指令是否是alias
     alias = (cmd->name.len == sizeof("alias") - 1) ? 1 : 0;
 
+    // 如果已经使用了root/alias指令
     if (clcf->root.data) {
 
+        // 已经设置了别名，clcf->alias != 0
+        // 没有别名，clcf->alias == 0
+        // 又使用了root/alias指令，报错
         if ((clcf->alias != 0) == alias) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "\"%V\" directive is duplicate",
                                &cmd->name);
         } else {
+            // 这里是root/alias先后出现
+            // cmd->name是当前的指令名
+            // clcf->alias是之前的指令名
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "\"%V\" directive is duplicate, "
                                "\"%s\" directive was specified earlier",
@@ -4465,6 +4497,7 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // alias不能用于named location，也就是@开头的location
     if (clcf->named && alias) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the \"alias\" directive cannot be used "
@@ -4473,8 +4506,10 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 指令的参数数组
     value = cf->args->elts;
 
+    // 不允许使用$document_root变量
     if (ngx_strstr(value[1].data, "$document_root")
         || ngx_strstr(value[1].data, "${document_root}"))
     {
@@ -4486,6 +4521,7 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 不允许使用$realpath_root变量
     if (ngx_strstr(value[1].data, "$realpath_root")
         || ngx_strstr(value[1].data, "${realpath_root}"))
     {
@@ -4497,19 +4533,28 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 如果是alias别名功能，存储location的名字长度
     clcf->alias = alias ? clcf->name.len : 0;
+
+    // 存储路径字符串
     clcf->root = value[1];
 
+    // root指令去掉最后的斜杠
     if (!alias && clcf->root.data[clcf->root.len - 1] == '/') {
         clcf->root.len--;
     }
 
+    // 不使用变量，直接使用原始路径
     if (clcf->root.data[0] != '$') {
+        // 检查路径是否以根目录开始（第一个字符是“/”）
+        // 否则不使用conf_prefix，以prefix（"/usr/local/nginx/"）拼出完整路径
+        // 保存进clcf->root
         if (ngx_conf_full_name(cf->cycle, &clcf->root, 0) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
     }
 
+    // 使用了变量配置路径，需要使用脚本引擎计算
     n = ngx_http_script_variables_count(&clcf->root);
 
     ngx_memzero(&sc, sizeof(ngx_http_script_compile_t));

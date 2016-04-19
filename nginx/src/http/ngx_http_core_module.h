@@ -226,6 +226,7 @@ typedef struct {
     ngx_uint_t                 server_names_hash_bucket_size;
 
     // 变量散列表设置
+    // 由指令variables_hash_max_size/variables_hash_bucket_size设置
     ngx_uint_t                 variables_hash_max_size;
     ngx_uint_t                 variables_hash_bucket_size;
 
@@ -236,8 +237,9 @@ typedef struct {
 
     ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
 
-    // 所有的http请求都要使用这个引擎数组处理
-    // 需要在配置解析后的postconfiguration里向cmcf->phases数组注册
+    // http handler模块需要向这个数组添加元素
+    // 在配置解析后的postconfiguration里向cmcf->phases数组注册
+    // 在处理请求时不使用此数组，而是用的phase_engine
     ngx_http_phase_t           phases[NGX_HTTP_LOG_PHASE + 1];
 } ngx_http_core_main_conf_t;
 
@@ -247,6 +249,7 @@ typedef struct {
     ngx_array_t                 server_names;
 
     /* server ctx */
+    // 本server使用的配置结构体数组，避免多个server的冲突
     ngx_http_conf_ctx_t        *ctx;
 
     ngx_str_t                   server_name;
@@ -386,6 +389,8 @@ struct ngx_http_core_loc_conf_s {
 
     unsigned      noname:1;   /* "if () {}" block or limit_except */
     unsigned      lmt_excpt:1;
+
+    // named location，也就是@开头的location
     unsigned      named:1;
 
     unsigned      exact_match:1;
@@ -414,8 +419,13 @@ struct ngx_http_core_loc_conf_s {
     ngx_http_handler_pt  handler;
 
     /* location name length for inclusive location with inherited alias */
+
+    // 如果是alias别名功能，存储location的名字长度，即name.len
     size_t        alias;
+
+    // 存储root/alias指定的路径
     ngx_str_t     root;                    /* root, alias */
+
     ngx_str_t     post_action;
 
     ngx_array_t  *root_lengths;

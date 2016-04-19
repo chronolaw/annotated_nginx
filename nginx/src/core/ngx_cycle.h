@@ -113,8 +113,16 @@ struct ngx_cycle_s {
     // 启动nginx时的环境参数，配置文件，工作路径等
     ngx_str_t                 conf_file;
     ngx_str_t                 conf_param;
+
+    // 如果使用了-p，那么conf_prefix==prefix
+    // 否则两者是不同的，见ngx_process_options
+
+    // #define NGX_CONF_PREFIX  "conf/"
     ngx_str_t                 conf_prefix;
+
+    // #define NGX_PREFIX  "/usr/local/nginx/"
     ngx_str_t                 prefix;
+
     ngx_str_t                 lock_file;
     ngx_str_t                 hostname;
 };
