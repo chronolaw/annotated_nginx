@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_phases
+// * ngx_http_core_main_conf_t
+// * ngx_http_core_srv_conf_t
+// * ngx_http_core_loc_conf_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -56,6 +61,9 @@
 
 // 存储location的红黑树节点
 typedef struct ngx_http_location_tree_node_s  ngx_http_location_tree_node_t;
+
+// 前置声明，location的配置结构体
+// 重要的成员是handler，定义此location特有的内容处理函数
 typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
 
 
@@ -118,6 +126,9 @@ typedef struct {
 
 
 // http处理的11个阶段，非常重要
+// 需要在配置解析后的postconfiguration里向cmcf->phases数组注册
+// content阶段较特殊，在loc_conf里可以为每个location设置单独的handler
+// 这样可以避免数组过大
 typedef enum {
     // 读取并解析完http头后，即将开始读取body
     NGX_HTTP_POST_READ_PHASE = 0,
@@ -148,6 +159,7 @@ typedef enum {
 
     // 最常用的阶段，产生http内容，响应客户端请求
     // 在这里发出去的数据会由过滤链表处理最终发出
+    // content阶段较特殊，在loc_conf里可以为每个location设置单独的handler
     NGX_HTTP_CONTENT_PHASE,
 
     // 记录访问日志，请求已经处理完毕
@@ -225,6 +237,7 @@ typedef struct {
     ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
 
     // 所有的http请求都要使用这个引擎数组处理
+    // 需要在配置解析后的postconfiguration里向cmcf->phases数组注册
     ngx_http_phase_t           phases[NGX_HTTP_LOG_PHASE + 1];
 } ngx_http_core_main_conf_t;
 
@@ -361,7 +374,10 @@ typedef struct {
 } ngx_http_try_file_t;
 
 
+// location的配置结构体
+// 重要的成员是handler，定义此location特有的内容处理函数
 struct ngx_http_core_loc_conf_s {
+    // location的名字
     ngx_str_t     name;          /* location name */
 
 #if (NGX_PCRE)
@@ -394,6 +410,7 @@ struct ngx_http_core_loc_conf_s {
     uint32_t      limit_except;
     void        **limit_except_loc_conf;
 
+    // 重要的成员，定义此location特有的内容处理函数
     ngx_http_handler_pt  handler;
 
     /* location name length for inclusive location with inherited alias */
@@ -408,18 +425,24 @@ struct ngx_http_core_loc_conf_s {
     ngx_hash_t    types_hash;
     ngx_str_t     default_type;
 
+    // 允许post的最大body长度
     off_t         client_max_body_size;    /* client_max_body_size */
+
     off_t         directio;                /* directio */
     off_t         directio_alignment;      /* directio_alignment */
 
     size_t        client_body_buffer_size; /* client_body_buffer_size */
     size_t        send_lowat;              /* send_lowat */
     size_t        postpone_output;         /* postpone_output */
+
+    // 限制速率
     size_t        limit_rate;              /* limit_rate */
+
     size_t        limit_rate_after;        /* limit_rate_after */
     size_t        sendfile_max_chunk;      /* sendfile_max_chunk */
     size_t        read_ahead;              /* read_ahead */
 
+    // 超时相关的参数
     ngx_msec_t    client_body_timeout;     /* client_body_timeout */
     ngx_msec_t    send_timeout;            /* send_timeout */
     ngx_msec_t    keepalive_timeout;       /* keepalive_timeout */
@@ -441,7 +464,12 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_flag_t    client_body_in_single_buffer;
                                            /* client_body_in_singe_buffer */
+
+    // 注意，下面的这些标志量没有使用bit field特性，而是直接用ngx_flag_t
+
+    // location只能被子请求调用，不能被外部访问
     ngx_flag_t    internal;                /* internal */
+
     ngx_flag_t    sendfile;                /* sendfile */
     ngx_flag_t    aio;                     /* aio */
     ngx_flag_t    tcp_nopush;              /* tcp_nopush */
@@ -452,7 +480,10 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    msie_padding;            /* msie_padding */
     ngx_flag_t    msie_refresh;            /* msie_refresh */
     ngx_flag_t    log_not_found;           /* log_not_found */
+
+    // 子请求是否记录日志，默认不记录
     ngx_flag_t    log_subrequest;          /* log_subrequest */
+
     ngx_flag_t    recursive_error_pages;   /* recursive_error_pages */
     ngx_flag_t    server_tokens;           /* server_tokens */
     ngx_flag_t    chunked_transfer_encoding; /* chunked_transfer_encoding */
@@ -495,6 +526,7 @@ struct ngx_http_core_loc_conf_s {
     ngx_uint_t    types_hash_max_size;
     ngx_uint_t    types_hash_bucket_size;
 
+    // 使用queue串联起location
     ngx_queue_t  *locations;
 
 #if 0
@@ -529,6 +561,9 @@ struct ngx_http_location_tree_node_s {
 
 
 void ngx_http_core_run_phases(ngx_http_request_t *r);
+
+// 各个阶段使用的checker
+
 ngx_int_t ngx_http_core_generic_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 ngx_int_t ngx_http_core_rewrite_phase(ngx_http_request_t *r,
@@ -562,25 +597,35 @@ ngx_int_t ngx_http_gzip_ok(ngx_http_request_t *r);
 #endif
 
 
+// 创建子请求对象，复制父请求的大部分字段
 ngx_int_t ngx_http_subrequest(ngx_http_request_t *r,
     ngx_str_t *uri, ngx_str_t *args, ngx_http_request_t **sr,
     ngx_http_post_subrequest_t *psr, ngx_uint_t flags);
+
 ngx_int_t ngx_http_internal_redirect(ngx_http_request_t *r,
     ngx_str_t *uri, ngx_str_t *args);
 ngx_int_t ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name);
 
 
+// 当http请求结束时的清理动作
 ngx_http_cleanup_t *ngx_http_cleanup_add(ngx_http_request_t *r, size_t size);
 
 
+// 响应头过滤函数原型
 typedef ngx_int_t (*ngx_http_output_header_filter_pt)(ngx_http_request_t *r);
+
+// 响应体过滤函数原型
 typedef ngx_int_t (*ngx_http_output_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
+
+// 请求体过滤函数原型
 typedef ngx_int_t (*ngx_http_request_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
 
 
+// 发送响应数据，调用过滤链表，执行数据过滤
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
+
 ngx_int_t ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 ngx_int_t ngx_http_request_body_save_filter(ngx_http_request_t *r,
    ngx_chain_t *chain);
@@ -601,6 +646,7 @@ extern ngx_uint_t ngx_http_max_module;
 extern ngx_str_t  ngx_http_core_get_method;
 
 
+// 简化操作宏，清除响应头里的长度信息
 #define ngx_http_clear_content_length(r)                                      \
                                                                               \
     r->headers_out.content_length_n = -1;                                     \
