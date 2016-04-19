@@ -79,8 +79,13 @@ static char *ngx_http_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 不允许重复，设置location的internal标志
+// 在ngx_http_core_find_config_phase里检查
+// 如果是true那么直接返回404，不允许外部访问
 static char *ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
 static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #if (NGX_HTTP_GZIP)
@@ -358,6 +363,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // root/alais都由ngx_http_core_root函数处理
     { ngx_string("alias"),
       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_core_root,
@@ -543,6 +549,9 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, satisfy),
       &ngx_conf_deprecated_satisfy_any },
 
+    // 不允许重复，设置location的internal标志
+    // 在ngx_http_core_find_config_phase里检查
+    // 如果是true那么直接返回404，不允许外部访问
     { ngx_string("internal"),
       NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
       ngx_http_core_internal,
@@ -613,6 +622,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, log_not_found),
       NULL },
 
+    // 子请求是否记录日志，默认不记录
     { ngx_string("log_subrequest"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -5163,6 +5173,9 @@ ngx_http_core_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 不允许重复，设置location的internal标志
+// 在ngx_http_core_find_config_phase里检查
+// 如果是true那么直接返回404，不允许外部访问
 static char *
 ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
