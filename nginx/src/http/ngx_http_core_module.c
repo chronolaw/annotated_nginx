@@ -26,10 +26,20 @@ static ngx_int_t ngx_http_core_find_location(ngx_http_request_t *r);
 static ngx_int_t ngx_http_core_find_static_location(ngx_http_request_t *r,
     ngx_http_location_tree_node_t *node);
 
+// 解析配置前操作，添加http_host、http_user_agent等核心变量
+// 变量的定义存储在ngx_http_variables.c:ngx_http_core_variables
 static ngx_int_t ngx_http_core_preconfiguration(ngx_conf_t *cf);
+
+// 解析配置完成后调用，设置请求体过滤指针为ngx_http_request_body_save_filter
 static ngx_int_t ngx_http_core_postconfiguration(ngx_conf_t *cf);
+
+// 创建main配置结构体，初始化散列表设置参数
 static void *ngx_http_core_create_main_conf(ngx_conf_t *cf);
+
+// 初始化散列参数
+// 在早期版本变量的散列max size是512,1.8增大了
 static char *ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf);
+
 static void *ngx_http_core_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_core_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
@@ -806,10 +816,18 @@ static ngx_command_t  ngx_http_core_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_core_module_ctx = {
+    // 解析配置前操作，添加http_host、http_user_agent等核心变量
+    // 变量的定义存储在ngx_http_variables.c:ngx_http_core_variables
     ngx_http_core_preconfiguration,        /* preconfiguration */
+
+    // 解析配置完成后调用，设置请求体过滤指针为ngx_http_request_body_save_filter
     ngx_http_core_postconfiguration,       /* postconfiguration */
 
+    // 创建main配置结构体，初始化散列表设置参数
     ngx_http_core_create_main_conf,        /* create main configuration */
+
+    // 初始化散列参数
+    // 在早期版本变量的散列max size是512,1.8增大了
     ngx_http_core_init_main_conf,          /* init main configuration */
 
     ngx_http_core_create_srv_conf,         /* create server configuration */
@@ -3445,6 +3463,8 @@ ngx_http_core_type(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 }
 
 
+// 解析配置前操作，添加http_host、http_user_agent等核心变量
+// 变量的定义存储在ngx_http_variables.c:ngx_http_core_variables
 static ngx_int_t
 ngx_http_core_preconfiguration(ngx_conf_t *cf)
 {
@@ -3452,6 +3472,7 @@ ngx_http_core_preconfiguration(ngx_conf_t *cf)
 }
 
 
+// 解析配置完成后调用，设置请求体过滤指针为ngx_http_request_body_save_filter
 static ngx_int_t
 ngx_http_core_postconfiguration(ngx_conf_t *cf)
 {
@@ -3461,6 +3482,7 @@ ngx_http_core_postconfiguration(ngx_conf_t *cf)
 }
 
 
+// 创建main配置结构体，初始化散列表设置参数
 static void *
 ngx_http_core_create_main_conf(ngx_conf_t *cf)
 {
@@ -3488,6 +3510,8 @@ ngx_http_core_create_main_conf(ngx_conf_t *cf)
 }
 
 
+// 初始化散列参数
+// 在早期版本变量的散列max size是512,1.8增大了
 static char *
 ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf)
 {
