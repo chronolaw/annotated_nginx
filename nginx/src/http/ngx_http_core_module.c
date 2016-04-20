@@ -40,7 +40,9 @@ static void *ngx_http_core_create_main_conf(ngx_conf_t *cf);
 // 在早期版本变量的散列max size是512,1.8增大了
 static char *ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf);
 
+// 创建每个server的配置结构体
 static void *ngx_http_core_create_srv_conf(ngx_conf_t *cf);
+
 static char *ngx_http_core_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
 static void *ngx_http_core_create_loc_conf(ngx_conf_t *cf);
@@ -245,6 +247,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // 每个连接对象的内存池大小，默认4k
     { ngx_string("connection_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -252,6 +255,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, connection_pool_size),
       &ngx_http_core_pool_size_p },
 
+    // 每个请求对象的内存池大小，默认4k
     { ngx_string("request_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -531,6 +535,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // 在一个连接上可以执行的最多请求数，默认值是100
+    // 超过这个数量就会设置r->keep_alive = 0
     { ngx_string("keepalive_requests"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -830,7 +836,9 @@ static ngx_http_module_t  ngx_http_core_module_ctx = {
     // 在早期版本变量的散列max size是512,1.8增大了
     ngx_http_core_init_main_conf,          /* init main configuration */
 
+    // 创建每个server的配置结构体
     ngx_http_core_create_srv_conf,         /* create server configuration */
+
     ngx_http_core_merge_srv_conf,          /* merge server configuration */
 
     ngx_http_core_create_loc_conf,         /* create location configuration */
@@ -3539,6 +3547,7 @@ ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf)
 }
 
 
+// 创建每个server的配置结构体
 static void *
 ngx_http_core_create_srv_conf(ngx_conf_t *cf)
 {
