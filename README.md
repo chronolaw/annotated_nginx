@@ -43,6 +43,8 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 ######http目录
 * [ngx_http.h](/nginx/src/http/ngx_http.h)
 * [ngx_http.c](/nginx/src/http/ngx_http.c)
+* [ngx_http_core_module.h](/nginx/src/http/ngx_http_core_module.h)
+* [ngx_http_core_module.c](/nginx/src/http/ngx_http_core_module.c)
 
 ######os/unix目录
 * [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
@@ -91,6 +93,8 @@ Nginx1.9.11的变动较大，增加了动态模块，完善了多线程，值得
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 * [ngx_http.h](/nginx/src/http/ngx_http.h)
 * [ngx_http.c](/nginx/src/http/ngx_http.c)
+* [ngx_http_core_module.h](/nginx/src/http/ngx_http_core_module.h)
+* [ngx_http_core_module.c](/nginx/src/http/ngx_http_core_module.c)
 
 # 不注解
 
