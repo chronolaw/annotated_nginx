@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,11 +11,16 @@
 
 #define NGX_CONF_BUFFER  4096
 
+// 在所有模块里查找匹配的指令，进行解析
 static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last);
+
+// 从配置文件里读取token,保存在cf->args数组里
 static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf);
+
 static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 
 
+// conf模块唯一的指令，包含其他配置文件
 static ngx_command_t  ngx_conf_commands[] = {
 
     { ngx_string("include"),
@@ -28,6 +34,7 @@ static ngx_command_t  ngx_conf_commands[] = {
 };
 
 
+// conf模块没有其他的函数，功能较简单
 ngx_module_t  ngx_conf_module = {
     NGX_MODULE_V1,
     NULL,                                  /* module context */
@@ -46,6 +53,10 @@ ngx_module_t  ngx_conf_module = {
 
 /* The eight fixed arguments */
 
+// 参数数量转换为NGX_CONF_TAKE宏
+// 相当于map
+// 0 => NGX_CONF_NOARGS
+// 1 => NGX_CONF_TAKE1
 static ngx_uint_t argument_number[] = {
     NGX_CONF_NOARGS,
     NGX_CONF_TAKE1,
@@ -58,6 +69,7 @@ static ngx_uint_t argument_number[] = {
 };
 
 
+// 解析-g传递的命令行参数
 char *
 ngx_conf_param(ngx_conf_t *cf)
 {
@@ -66,6 +78,7 @@ ngx_conf_param(ngx_conf_t *cf)
     ngx_buf_t         b;
     ngx_conf_file_t   conf_file;
 
+    // 获取-g传递的命令行参数
     param = &cf->cycle->conf_param;
 
     if (param->len == 0) {
@@ -76,27 +89,33 @@ ngx_conf_param(ngx_conf_t *cf)
 
     ngx_memzero(&b, sizeof(ngx_buf_t));
 
+    // buffer内容是命令行参数
     b.start = param->data;
     b.pos = param->data;
     b.last = param->data + param->len;
     b.end = b.last;
     b.temporary = 1;
 
+    // 没有配置文件
     conf_file.file.fd = NGX_INVALID_FILE;
     conf_file.file.name.data = NULL;
     conf_file.line = 0;
 
+    // 设置解析的环境
     cf->conf_file = &conf_file;
     cf->conf_file->buffer = &b;
 
+    // 进行解析，type = parse_param
     rv = ngx_conf_parse(cf, NULL);
 
+    // 解析完成，恢复原状
     cf->conf_file = NULL;
 
     return rv;
 }
 
 
+// 解析配置，参数filename可以是空
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 {
@@ -116,6 +135,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
     prev = NULL;
 #endif
 
+    // 有文件名，解析文件
     if (filename) {
 
         /* open configuration file */
@@ -128,8 +148,10 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
             return NGX_CONF_ERROR;
         }
 
+        // 保存之前的conf file
         prev = cf->conf_file;
 
+        // 设置当前解析的conf file
         cf->conf_file = &conf_file;
 
         if (ngx_fd_info(fd, &cf->conf_file->file.info) == NGX_FILE_ERROR) {
@@ -139,6 +161,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
         cf->conf_file->buffer = &buf;
 
+        // 分配读取文件的缓冲区，不会全部读取进内存
         buf.start = ngx_alloc(NGX_CONF_BUFFER, cf->log);
         if (buf.start == NULL) {
             goto failed;
@@ -156,18 +179,22 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
         cf->conf_file->file.log = cf->log;
         cf->conf_file->line = 1;
 
+        // 标记当前是解析文件
         type = parse_file;
 
     } else if (cf->conf_file->file.fd != NGX_INVALID_FILE) {
 
+        // 标记当前是解析配置块
         type = parse_block;
 
     } else {
+        // 解析-g传递的命令行参数
         type = parse_param;
     }
 
 
     for ( ;; ) {
+        // 从配置文件里读取token,保存在cf->args数组里
         rc = ngx_conf_read_token(cf);
 
         /*
@@ -217,6 +244,8 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
         /* rc == NGX_OK || rc == NGX_CONF_BLOCK_START */
 
+        // 特殊的解析处理函数，可以自己定义{}的解析处理，比较自由
+        // 例如 types {}、content_by_lua_block {}
         if (cf->handler) {
 
             /*
@@ -244,6 +273,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
         }
 
 
+        // 在所有模块里查找匹配的指令，进行解析
         rc = ngx_conf_handler(cf, rc);
 
         if (rc == NGX_ERROR) {
@@ -269,6 +299,7 @@ done:
             rc = NGX_ERROR;
         }
 
+        // 恢复之前解析的文件，例如include指令
         cf->conf_file = prev;
     }
 
@@ -280,6 +311,7 @@ done:
 }
 
 
+// 在所有模块里查找匹配的指令，进行解析
 static ngx_int_t
 ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 {
@@ -289,29 +321,43 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
     ngx_str_t      *name;
     ngx_command_t  *cmd;
 
+    // 配置参数的首元素，即指令名字
     name = cf->args->elts;
 
+    // 是否找到指令的标志
     found = 0;
 
+    // 遍历所有模块
     for (i = 0; ngx_modules[i]; i++) {
 
+        // 取模块的指令数组
         cmd = ngx_modules[i]->commands;
+
+        // 节约时间，如果未定义指令数组则跳过
         if (cmd == NULL) {
             continue;
         }
 
         for ( /* void */ ; cmd->name.len; cmd++) {
 
+            // 先判断指令名的长度，速度快
             if (name->len != cmd->name.len) {
                 continue;
             }
 
+            // 再看字符串是否相同
             if (ngx_strcmp(name->data, cmd->name.data) != 0) {
                 continue;
             }
 
+            // 找到了一个匹配的指令
+            // 但因为会有重名，如http/server, upstream/server
+            // 需要根据指令的类型再做判断
             found = 1;
 
+            // NGX_CONF_MODULE类型即conf模块，指令include可以出现在任何地方
+            // 其他的模块类型必须与当前解析的模块一致
+            // 例如：conf.module_type = NGX_CORE_MODULE;
             if (ngx_modules[i]->type != NGX_CONF_MODULE
                 && ngx_modules[i]->type != cf->module_type)
             {
@@ -320,6 +366,9 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             /* is the directive's location right ? */
 
+            // 检查指令的标志位，是否与当前解析环境的一致
+            // 使用的是位运算，检查某个bit
+            // 例如：conf.cmd_type = NGX_MAIN_CONF;
             if (!(cmd->type & cf->cmd_type)) {
                 continue;
             }
@@ -340,30 +389,37 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             /* is the directive's argument count right ? */
 
+            // 检查指令的参数数量
+            // 如果不是NGX_CONF_ANY，那么就要检查
             if (!(cmd->type & NGX_CONF_ANY)) {
 
+                // NGX_CONF_FLAG取值是on/off，加上指令名必须是2个
                 if (cmd->type & NGX_CONF_FLAG) {
 
                     if (cf->args->nelts != 2) {
                         goto invalid;
                     }
 
+                // NGX_CONF_1MORE,加上指令名必须大于1个
                 } else if (cmd->type & NGX_CONF_1MORE) {
 
                     if (cf->args->nelts < 2) {
                         goto invalid;
                     }
 
+                // NGX_CONF_1MORE,加上指令名必须大于2个
                 } else if (cmd->type & NGX_CONF_2MORE) {
 
                     if (cf->args->nelts < 3) {
                         goto invalid;
                     }
 
+                // 如果不是NGX_CONF_ANY，数量不能超过8个
                 } else if (cf->args->nelts > NGX_CONF_MAX_ARGS) {
 
                     goto invalid;
 
+                // 其他情况，使用关联数组检查标志位是否一致
                 } else if (!(cmd->type & argument_number[cf->args->nelts - 1]))
                 {
                     goto invalid;
@@ -372,22 +428,36 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             /* set up the directive's configuration context */
 
+            // 指令的正确行检查完毕，现在要确定结构体的存储位置
+
             conf = NULL;
 
+            // NGX_DIRECT_CONF，直接存储在cf->ctx数组里
+            // 这个通常是core模块
             if (cmd->type & NGX_DIRECT_CONF) {
                 conf = ((void **) cf->ctx)[ngx_modules[i]->index];
 
+            // NGX_MAIN_CONF，里面存储一个void**指针
+            // 例如核心模块http/stream
             } else if (cmd->type & NGX_MAIN_CONF) {
                 conf = &(((void **) cf->ctx)[ngx_modules[i]->index]);
 
+            // 大部分普通模块不会使用NGX_DIRECT_CONF、NGX_MAIN_CONF
             } else if (cf->ctx) {
+
+                // 对于http/stream模块有意义，其他模块无用
+                // cf->ctx是有三个数组的结构体，用cmd->conf偏移量得到数组位置
                 confp = *(void **) ((char *) cf->ctx + cmd->conf);
 
                 if (confp) {
+                    // 得到在main_conf/srv_conf/loc_conf数组里的模块对应配置结构体
+                    // 注意使用的是ctx_index
                     conf = confp[ngx_modules[i]->ctx_index];
                 }
             }
 
+            // 调用指令数组里的函数解析，此时的conf指向正确的存储位置
+            // cf->args里存储的是指令参数，正确性已经验证过了
             rv = cmd->set(cf, cmd, conf);
 
             if (rv == NGX_CONF_OK) {
@@ -403,8 +473,9 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             return NGX_ERROR;
         }
-    }
+    }   // for结束，检查完所有模块
 
+    // 所有模块都没有找到指令，出错
     if (found) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "\"%s\" directive is not allowed here", name->data);
@@ -734,6 +805,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
 }
 
 
+// 解析include指令，包含一个文件
 char *
 ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -742,21 +814,32 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t   *value, file, name;
     ngx_glob_t   gl;
 
+    // 取指令参数数组
     value = cf->args->elts;
+
+    // 第1个元素是包含的文件，可能使用通配符*
     file = value[1];
 
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
 
+    // 决定使用conf_prefix还是prefix得到完整文件名
+    // 如果不是以“\”开始的绝对路径，就加上前缀/usr/local/nginx/conf
     if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
 
+    // 得到了include文件的绝对路径
+
+    // 如果文件不含有*?[等通配符，那么就是普通文件
+    // 调用ngx_conf_parse按普通文件解析
     if (strpbrk((char *) file.data, "*?[") == NULL) {
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
 
         return ngx_conf_parse(cf, &file);
     }
+
+    // 进行通配符查找文件
 
     ngx_memzero(&gl, sizeof(ngx_glob_t));
 
@@ -800,6 +883,8 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 决定使用conf_prefix还是prefix得到完整文件名
+// 如果不是以“\”开始的绝对路径，就加上前缀/usr/local/nginx/conf
 ngx_int_t
 ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 {
@@ -826,6 +911,8 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
     if (name->len) {
         full = *name;
 
+        // 决定使用conf_prefix还是prefix得到完整文件名
+        // 如果不是以“\”开始的绝对路径，就加上前缀/usr/local/nginx/conf
         if (ngx_conf_full_name(cycle, &full, 0) != NGX_OK) {
             return NULL;
         }

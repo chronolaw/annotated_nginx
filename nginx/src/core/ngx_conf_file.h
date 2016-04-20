@@ -251,9 +251,11 @@ struct ngx_conf_s {
 };
 
 
+// 可以在解析完成后再执行一些操作
 typedef char *(*ngx_conf_post_handler_pt) (ngx_conf_t *cf,
     void *data, void *conf);
 
+// 用于解析指令的额外数据，存储函数指针
 typedef struct {
     ngx_conf_post_handler_pt  post_handler;
 } ngx_conf_post_t;
