@@ -110,8 +110,10 @@ struct ngx_cycle_s {
     // 保存之前的cycle，如init_cycle
     ngx_cycle_t              *old_cycle;
 
-    // 启动nginx时的环境参数，配置文件，工作路径等
+    // 启动nginx时的配置文件
     ngx_str_t                 conf_file;
+
+    // 启动nginx时的-g参数
     ngx_str_t                 conf_param;
 
     // 如果使用了-p，那么conf_prefix==prefix

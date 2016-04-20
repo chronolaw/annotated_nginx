@@ -296,12 +296,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 #endif
 
     // 递归执行解析动作，各个模块允许的指令配置参数
+    // 先解析-g传递的命令行参数
     if (ngx_conf_param(&conf) != NGX_CONF_OK) {
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
 
+    // 递归执行解析动作，各个模块允许的指令配置参数
+    // 再解析配置文件
     if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) {
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
