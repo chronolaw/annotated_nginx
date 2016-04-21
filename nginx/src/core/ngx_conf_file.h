@@ -154,7 +154,7 @@ struct ngx_module_s {
 
     ngx_uint_t            version;
 
-    // 模块不同含义不同,通常是函数指针表
+    // 模块不同含义不同,通常是函数指针表，是在配置解析的某个阶段调用的函数
     // core模块的ctx
     //typedef struct {
     //    ngx_str_t             name;
@@ -240,11 +240,21 @@ struct ngx_conf_s {
     ngx_conf_file_t      *conf_file;
     ngx_log_t            *log;
 
-    void                 *ctx;          //重要参数，解析时的上下文
+    // 重要参数，解析时的上下文
+    // 解析开始时是cycle->conf_ctx，即普通数组
+    // 在stream{}里是ngx_stream_conf_ctx_t
+    // 在events{}里是个存储void*的数组，即void**
+    // 在http{}里是ngx_http_conf_ctx_t
+    void                 *ctx;
+
+    // 解析配置文件当前的模块类型，解析时检查
     ngx_uint_t            module_type;
+
+    // 解析配置文件当前的命令类型，解析时检查
     ngx_uint_t            cmd_type;
 
-    // 解析配置的函数指针
+    // 解析配置的函数指针，可以忽略指令，直接处理配置文件内容
+    // types {...}就使用了这个实现
     ngx_conf_handler_pt   handler;
 
     char                 *handler_conf;
