@@ -63,6 +63,9 @@ struct ngx_listening_s {
     // stream模块是ngx_stream_init_connection
     ngx_connection_handler_pt   handler;
 
+    // 用于解决多个server监听相同端口的情况
+    // http模块是ngx_http_in_addr_t,
+    // stream模块是ngx_stream_addr_conf_t
     void               *servers;  /* array of ngx_http_in_addr_t, for example */
 
     ngx_log_t           log;
