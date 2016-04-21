@@ -132,6 +132,9 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // tcp流处理的配置结构体，里面有main_conf/srv_conf两个数组
     // 不允许重复配置
+    //
+    // conf里存储的是ngx_stream_conf_ctx_t *
+    // 注意指针的转型,可以理解为(ngx_stream_conf_ctx_t*)*
     if (*(ngx_stream_conf_ctx_t **) conf) {
         return "is duplicate";
     }
@@ -145,6 +148,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 在cycle里存储这个指针
+    // conf里存储的是ngx_stream_conf_ctx_t *
+    // 注意指针的转型,可以理解为(ngx_stream_conf_ctx_t*)*
     *(ngx_stream_conf_ctx_t **) conf = ctx;
 
     /* count the number of the stream modules and set up their indices */
@@ -225,9 +230,14 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     pcf = *cf;
 
     // 设置事件模块的新解析上下文
+    // 之前的ctx是cycle->conf_ctx
+    // 此时ctx是ngx_stream_conf_ctx_t指针，里面存储了配置数组
     cf->ctx = ctx;
 
+    // 设定之后解析的模块类型必须是stream
     cf->module_type = NGX_STREAM_MODULE;
+
+    // 指令的作用域是stream main
     cf->cmd_type = NGX_STREAM_MAIN_CONF;
 
     // 递归解析stream模块
@@ -249,6 +259,7 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cscfp = cmcf->servers.elts;
 
     // 初始化main_conf，合并srv_conf
+    // 注意cf->ctx会不断变化
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
             continue;
@@ -260,6 +271,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         /* init stream{} main_conf's */
 
+        // 当前的ctx回到stream{}的数组
+        // 这样下面的操作才能获得正确的配置结构体
         cf->ctx = ctx;
 
         if (module->init_main_conf) {
@@ -270,10 +283,13 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
         }
 
+        // 遍历每一个server{}配置块
         for (s = 0; s < cmcf->servers.nelts; s++) {
 
             /* merge the server{}s' srv_conf's */
 
+            // 从server的ctx里得到server的配置数组，修改ctx
+            // 这样才能获得server正确的配置
             cf->ctx = cscfp[s]->ctx;
 
             if (module->merge_srv_conf) {
@@ -294,7 +310,7 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        // module是流模块的函数表，用于解析配置时调用
+        // module是stream模块的函数表，用于解析配置时调用
         module = ngx_modules[m]->ctx;
 
         if (module->postconfiguration) {
@@ -304,7 +320,7 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-    // 恢复之前保存的解析上下文
+    // 最后恢复之前保存的解析上下文
     *cf = pcf;
 
 
