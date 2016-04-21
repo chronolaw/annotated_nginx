@@ -186,6 +186,8 @@ ngx_event_accept(ngx_event_t *ev)
 #endif
 
         // 创建连接使用的内存池
+        // stream模块设置连接的内存池是256bytes，不可配置
+        // http模块可以在ngx_http_core_srv_conf_t里配置
         c->pool = ngx_create_pool(ls->pool_size, ev->log);
         if (c->pool == NULL) {
             ngx_close_accepted_connection(c);
@@ -400,6 +402,7 @@ ngx_event_accept(ngx_event_t *ev)
 
         // 接受连接，收到请求的回调函数
         // 在http模块里是http.c:ngx_http_init_connection
+        // stream模块里是ngx_stream_init_connection
         ls->handler(c);
 
         // epoll不处理
