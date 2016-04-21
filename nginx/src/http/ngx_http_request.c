@@ -396,6 +396,7 @@ ngx_http_init_connection(ngx_connection_t *c)
 
 
 // 接受连接后，读事件加入epoll，当socket有数据可读时就调用
+// 因为是事件触发，可能会被多次调用，即重入
 // 处理读事件，读取请求头
 static void
 ngx_http_wait_request_handler(ngx_event_t *rev)
@@ -438,6 +439,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     b = c->buffer;
 
     // 如果还没有创建缓冲区则创建
+    // 第一次调用是没有，之后再调用就有了
     if (b == NULL) {
         b = ngx_create_temp_buf(c->pool, size);
         if (b == NULL) {
@@ -455,8 +457,10 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
 
+        // 这里pos==last==start，表示一个空的缓冲区
         b->pos = b->start;
         b->last = b->start;
+
         b->end = b->last + size;
     }
 
@@ -465,13 +469,18 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // ngx_posix_init.c里初始化为linux的底层接口
     n = c->recv(c, b->last, size);
 
+    // 如果返回NGX_AGAIN表示还没有数据
+    // 就要再次加定时器防止超时，然后epoll等待下一次的读事件发生
     if (n == NGX_AGAIN) {
 
+        // 没设置超时就再来一次
         if (!rev->timer_set) {
             ngx_add_timer(rev, c->listening->post_accept_timeout);
             ngx_reusable_connection(c, 1);
         }
 
+        // 把读事件加入epoll，当socket有数据可读时就调用ngx_http_wait_request_handler
+        // 因为事件加入了定时器，超时时也会调用ngx_http_wait_request_handler
         if (ngx_handle_read_event(rev, 0) != NGX_OK) {
             ngx_http_close_connection(c);
             return;
@@ -481,18 +490,24 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
          * We are trying to not hold c->buffer's memory for an idle connection.
          */
 
+        // 释放缓冲区，避免空闲连接占用内存
+        // 这样，即使有大量的无数据连接，也不会占用很多的内存
+        // 只有连接对象的内存消耗
         if (ngx_pfree(c->pool, b->start) == NGX_OK) {
             b->start = NULL;
         }
 
+        // 读事件处理完成，因为没读到数据，等待下一次事件发生
         return;
     }
 
+    // 读数据出错了，直接关闭连接
     if (n == NGX_ERROR) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 读到了0自己，还是错误
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client closed connection");
@@ -500,6 +515,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         return;
     }
 
+    // 真正读取了n个字节
     b->last += n;
 
     if (hc->proxy_protocol) {
@@ -527,13 +543,18 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
     ngx_reusable_connection(c, 0);
 
+    // 创建ngx_http_request_t对象，开始真正的处理请求
     c->data = ngx_http_create_request(c);
     if (c->data == NULL) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 读事件的handler改变，变成ngx_http_process_request_line
+    // 之后再有数据来就换成ngx_http_process_request_line
     rev->handler = ngx_http_process_request_line;
+
+    // 马上执行ngx_http_process_request_line
     ngx_http_process_request_line(rev);
 }
 

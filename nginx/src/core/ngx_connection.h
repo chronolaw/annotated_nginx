@@ -217,6 +217,7 @@ struct ngx_connection_s {
 
     // 接收客户端发送数据的缓冲区
     // 与listening中的rcvbuf不同，这个是nginx应用层的
+    // 在ngx_http_wait_request_handler里分配内存
     ngx_buf_t          *buffer;
 
     // 侵入式队列，加入到ngx_cycle_t::reusable_connections_queue
