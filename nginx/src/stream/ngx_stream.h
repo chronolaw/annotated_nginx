@@ -34,6 +34,7 @@ typedef struct ngx_stream_session_s  ngx_stream_session_t;
 
 // tcp流处理的配置结构体
 // 与http不同的是没有location，只有两级
+// 在cycle->conf_ctx里存储的是stream{}级别的配置
 typedef struct {
     // 保存stream{}块里的配置，是个数组，存储void*指针
     void                  **main_conf;
@@ -64,6 +65,7 @@ typedef struct {
     socklen_t               socklen;
 
     /* server ctx */
+    // 监听端口所在的server{}配置数组
     ngx_stream_conf_ctx_t  *ctx;
 
     // 已经绑定
@@ -204,14 +206,14 @@ struct ngx_stream_session_s {
 
     ngx_log_handler_pt      log_handler;
 
-    // 数组，存储每个流模块的ctx
+    // 数组，存储每个stream模块的ctx
     void                  **ctx;
 
-    // 数组，存储每个流模块的main配置
+    // 数组，存储每个stream模块的main配置
     // s->main_conf = addr_conf->ctx->main_conf;
     void                  **main_conf;
 
-    // 数组，存储每个流模块的srv配置
+    // 数组，存储每个stream模块的srv配置
     // s->srv_conf = addr_conf->ctx->srv_conf;
     void                  **srv_conf;
 
