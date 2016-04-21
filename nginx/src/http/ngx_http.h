@@ -102,6 +102,9 @@ ngx_int_t ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 
 
 // 当epoll检测到连接事件，会调用event_accept，最后会调用此函数，开始处理http请求
+// 在ngx_http_optimize_servers->ngx_http_add_listening里设置有连接发生时的回调函数
+// 调用发生在ngx_event_accept.c:ngx_event_accept()
+// 把读事件加入epoll，当socket有数据可读时就调用ngx_http_wait_request_handler
 void ngx_http_init_connection(ngx_connection_t *c);
 
 // 关闭http连接

@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -191,6 +192,10 @@ ngx_http_header_t  ngx_http_headers_in[] = {
 };
 
 
+// 当epoll检测到连接事件，会调用event_accept，最后会调用此函数，开始处理http请求
+// 在ngx_http_optimize_servers->ngx_http_add_listening里设置有连接发生时的回调函数
+// 调用发生在ngx_event_accept.c:ngx_event_accept()
+// 把读事件加入epoll，当socket有数据可读时就调用ngx_http_wait_request_handler
 void
 ngx_http_init_connection(ngx_connection_t *c)
 {
@@ -216,6 +221,7 @@ ngx_http_init_connection(ngx_connection_t *c)
 
     /* find the server configuration for the address:port */
 
+    // 取监听同一端口的server信息
     port = c->listening->servers;
 
     if (port->naddrs > 1) {
@@ -271,7 +277,7 @@ ngx_http_init_connection(ngx_connection_t *c)
         }
 
     } else {
-
+        // 唯一监听端口的server
         switch (c->local_sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -289,8 +295,11 @@ ngx_http_init_connection(ngx_connection_t *c)
     }
 
     /* the default server configuration for the address:port */
+
+    // addr_conf->default_server->ctx就是端口所在的server的配置数组
     hc->conf_ctx = hc->addr_conf->default_server->ctx;
 
+    // http log相关的信息
     ctx = ngx_palloc(c->pool, sizeof(ngx_http_log_ctx_t));
     if (ctx == NULL) {
         ngx_http_close_connection(c);
@@ -308,8 +317,13 @@ ngx_http_init_connection(ngx_connection_t *c)
 
     c->log_error = NGX_ERROR_INFO;
 
+    // 连接的读事件，此时是已经发生连接，即将读数据
     rev = c->read;
+
+    // 处理读事件，读取请求头
     rev->handler = ngx_http_wait_request_handler;
+
+    // 暂时不处理写事件
     c->write->handler = ngx_http_empty_handler;
 
 #if (NGX_HTTP_SPDY)
@@ -348,21 +362,32 @@ ngx_http_init_connection(ngx_connection_t *c)
         c->log->action = "reading PROXY protocol";
     }
 
+    // 通常此时读事件都是ready的
     if (rev->ready) {
         /* the deferred accept(), rtsig, aio, iocp */
 
         if (ngx_use_accept_mutex) {
+            // 如果是负载均衡，那么加入延后处理队列
+            // 尽快释放锁，方便其他进程再接受请求
+            // 会在ngx_event_process_posted里处理
             ngx_post_event(rev, &ngx_posted_events);
             return;
         }
 
+        // 否则直接处理请求,即调用ngx_http_wait_request_handler
         rev->handler(rev);
         return;
     }
 
+    // 暂时没有数据可读，ready=0
+    // 加一个超时事件，等待读事件发生
     ngx_add_timer(rev, c->listening->post_accept_timeout);
+
+    // 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
     ngx_reusable_connection(c, 1);
 
+    // 把读事件加入epoll，当socket有数据可读时就调用ngx_http_wait_request_handler
+    // 因为事件加入了定时器，超时时也会调用ngx_http_wait_request_handler
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         ngx_http_close_connection(c);
         return;
@@ -370,6 +395,8 @@ ngx_http_init_connection(ngx_connection_t *c)
 }
 
 
+// 接受连接后，读事件加入epoll，当socket有数据可读时就调用
+// 处理读事件，读取请求头
 static void
 ngx_http_wait_request_handler(ngx_event_t *rev)
 {
@@ -381,28 +408,36 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     ngx_http_connection_t     *hc;
     ngx_http_core_srv_conf_t  *cscf;
 
+    // 从事件的data获得连接对象
     c = rev->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http wait request handler");
 
+    // 首先检查超时
+    // 是否是由定时器超时引发的，由ngx_event_expire_timers调用
+    // 超时没有发送数据，关闭连接
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         ngx_http_close_connection(c);
         return;
     }
 
+    // 没有超时，检查连接是否被关闭了
     if (c->close) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 连接对象里获取配置数组
     hc = c->data;
     cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
 
+    // 配置的头缓冲区大小
     size = cscf->client_header_buffer_size;
 
     b = c->buffer;
 
+    // 如果还没有创建缓冲区则创建
     if (b == NULL) {
         b = ngx_create_temp_buf(c->pool, size);
         if (b == NULL) {
@@ -425,6 +460,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         b->end = b->last + size;
     }
 
+    // 调用接收函数,b->last是缓冲区的末位置，前面可能有数据
+    // ngx_event_accept.c:ngx_event_accept()里设置为ngx_recv
+    // ngx_posix_init.c里初始化为linux的底层接口
     n = c->recv(c, b->last, size);
 
     if (n == NGX_AGAIN) {
@@ -3298,6 +3336,7 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
 }
 
 
+// 用于忽略读写事件，即不处理
 void
 ngx_http_empty_handler(ngx_event_t *wev)
 {
