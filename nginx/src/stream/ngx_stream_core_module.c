@@ -31,7 +31,7 @@ static char *ngx_stream_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-// 解析stream/server[]里的listen指令，监听tcp端口
+// 解析stream/server{}里的listen指令，监听tcp端口
 // 遍历已经添加的端口，如果重复则报错
 // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -229,6 +229,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 保存stream{}的配置上下文
+    // 也就是stream{}里的ngx_stream_conf_ctx_t
     stream_ctx = cf->ctx;
 
     // main_conf直接指向stream{}的main_conf
@@ -273,12 +274,17 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 存储关联此server{}块的配置数组！
     // ctx是刚才刚创建的配置结构体
+    // 这样在stream_core配置里的ctx就存储了此server的全部配置信息(实际上只是指针)
     cscf->ctx = ctx;
 
     // 获取stream_core模块的main配置
+    // 虽然使用的是当前server的ctx，但实际上是stream{}里的main conf
+    // cmcf只有一个
     cmcf = ctx->main_conf[ngx_stream_core_module.ctx_index];
 
     // stream_core模块的server配置加入main_conf的servers数组
+    // 这样用一个main conf就存储了所有的server信息
+    // 在cmcf->servers里遍历查找即可
     cscfp = ngx_array_push(&cmcf->servers);
     if (cscfp == NULL) {
         return NGX_CONF_ERROR;
@@ -307,7 +313,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-// 解析stream/server[]里的listen指令，监听tcp端口
+// 解析stream/server{}里的listen指令，监听tcp端口
 // 遍历已经添加的端口，如果重复则报错
 // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *
@@ -343,7 +349,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    // 获取stream core模块的main_conf
+    // 获取stream core模块的main_conf，只有一个
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
 
     // 准备添加监听端口
@@ -414,6 +420,8 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->socklen = u.socklen;
     ls->backlog = NGX_LISTEN_BACKLOG;
     ls->wildcard = u.wildcard;
+
+    // 注意这里,存储了cf->ctx，也就是此server的配置数组ngx_stream_conf_ctx_t
     ls->ctx = cf->ctx;
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)

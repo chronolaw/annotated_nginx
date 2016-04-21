@@ -25,6 +25,8 @@ static void ngx_stream_ssl_handshake_handler(ngx_connection_t *c);
 
 
 // 在ngx_stream_optimize_servers里设置有连接发生时的回调函数
+// 调用发生在ngx_event_accept.c:ngx_event_accept()
+//
 // 创建一个处理tcp的会话对象
 // 要先检查限速和访问限制这两个功能模块
 // 最后调用ngx_stream_init_session
@@ -53,6 +55,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
     /* find the server configuration for the address:port */
 
+    // 取监听同一端口的server信息
     port = c->listening->servers;
 
     if (port->naddrs > 1) {
@@ -112,6 +115,8 @@ ngx_stream_init_connection(ngx_connection_t *c)
         }
 
     } else {
+        // 唯一监听端口的server
+        // addr_conf就是端口所在的server的配置数组
         switch (c->local_sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -139,6 +144,8 @@ ngx_stream_init_connection(ngx_connection_t *c)
     s->signature = NGX_STREAM_MODULE;
 
     //设置会话正确的配置结构体
+    // addr_conf就是端口所在的server的配置数组
+    // 之后就可以用宏正确地获取模块的配置信息
     s->main_conf = addr_conf->ctx->main_conf;
     s->srv_conf = addr_conf->ctx->srv_conf;
 
@@ -166,6 +173,8 @@ ngx_stream_init_connection(ngx_connection_t *c)
     c->log_error = NGX_ERROR_INFO;
 
     // 一个stream{}块只能有一个main conf
+    // 所以连接限速、访问限制的处理函数是相同的
+    // 但配置参数每个server可以不同
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
 
     // 是否有连接限速设置，在ngx_stream_limit_conn_module.c里设置
@@ -230,6 +239,8 @@ ngx_stream_init_connection(ngx_connection_t *c)
     }
 #endif
 
+    // 创建ctx数组，用于存储模块的ctx数据
+    // 调用handler，处理tcp数据，收发等等
     ngx_stream_init_session(c);
 }
 
@@ -258,6 +269,7 @@ ngx_stream_init_session(ngx_connection_t *c)
     }
 
     // 调用handler，处理tcp数据，收发等等
+    // 注意没有log模块，不会自动记录访问日志
     cscf->handler(s);
 }
 

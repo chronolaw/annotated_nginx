@@ -332,6 +332,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 得到stream_core里的监听端口
+    // ngx_stream_core_listen添加，可能多个server都监听相同的端口
+    // 故listen数组里可能会有端口相同的元素
     listen = cmcf->listen.elts;
 
     for (i = 0; i < cmcf->listen.nelts; i++) {
@@ -424,6 +426,7 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
 
 found:
 
+    // 监听端口相同也会走到这里
     addr = ngx_array_push(&port->addrs);
     if (addr == NULL) {
         return NGX_ERROR;
@@ -455,11 +458,13 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
     port = ports->elts;
     for (p = 0; p < ports->nelts; p++) {
 
-        // 根据wildcard、bind对port排序
+        // port[p].addrs里存储的是监听相同端口的不同server{}的ngx_stream_listen_t
+        // 根据wildcard、bind对server排序
         ngx_sort(port[p].addrs.elts, (size_t) port[p].addrs.nelts,
                  sizeof(ngx_stream_conf_addr_t), ngx_stream_cmp_conf_addrs);
 
         // addrs.elts里存储的是监听端口结构体ngx_stream_listen_t
+        // addr 数组首地址， last 数组长度
         addr = port[p].addrs.elts;
         last = port[p].addrs.nelts;
 
@@ -486,6 +491,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             }
 
             // 添加到cycle的监听端口数组，只是添加，没有其他动作
+            // 这里的ls是ngx_listening_t
             ls = ngx_create_listening(cf, &addr[i].opt.u.sockaddr,
                                       addr[i].opt.socklen);
             if (ls == NULL) {
@@ -498,8 +504,17 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             // 重要！
             // 设置有连接发生时的回调函数
             ls->handler = ngx_stream_init_connection;
+
+            // 设置连接的内存池是256bytes，不可配置
             ls->pool_size = 256;
 
+            // addr[i].opt就是ngx_stream_listen_t
+            // 在ngx_stream_add_ports里添加
+            // addr->opt.ctx就是server的配置数组ngx_stream_conf_ctx_t
+
+            // 这里没有使用addr[i].opt.ctx
+            // 因为addr的前进与i++并不同步
+            // 获取此server配置数组里的cscf
             cscf = addr->opt.ctx->srv_conf[ngx_stream_core_module.ctx_index];
 
             ls->logp = cscf->error_log;
@@ -525,6 +540,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             ls->reuseport = addr[i].opt.reuseport;
 #endif
 
+            // 存储本server信息
             stport = ngx_palloc(cf->pool, sizeof(ngx_stream_port_t));
             if (stport == NULL) {
                 return NGX_CONF_ERROR;
@@ -554,6 +570,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
                 return NGX_CONF_ERROR;
             }
 
+            // 数组指针前进到下一个元素，即下一个server
             addr++;
             last--;
         }

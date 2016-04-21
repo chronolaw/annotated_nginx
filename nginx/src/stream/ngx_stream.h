@@ -92,8 +92,13 @@ typedef struct {
 } ngx_stream_listen_t;
 
 
+// 用于解决多个server监听相同端口的情况
+// ctx里存储server{}对应的配置数组
+// 存储在ngx_listening_t.servers里
 typedef struct {
+    // ctx里存储server{}对应的配置数组
     ngx_stream_conf_ctx_t  *ctx;
+
     ngx_str_t               addr_text;
 #if (NGX_STREAM_SSL)
     ngx_uint_t              ssl;    /* unsigned   ssl:1; */
