@@ -160,6 +160,7 @@ typedef enum {
     // 刚创建请求对象，正在读取请求数据
     NGX_HTTP_READING_REQUEST_STATE,
 
+    // 请求头解析完毕，准备处理请求
     NGX_HTTP_PROCESS_REQUEST_STATE,
 
     NGX_HTTP_CONNECT_UPSTREAM_STATE,

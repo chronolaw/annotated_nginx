@@ -146,11 +146,38 @@ ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
 
 ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);
+
+// 检查收到的http请求头
+// http1.1不允许没有host头
+// content_length不能是非数字
+// 不支持trace方法
+// 如果是chunked编码那么长度头无意义
+// 设置keep_alive头信息
 ngx_int_t ngx_http_process_request_header(ngx_http_request_t *r);
+
+// 此时已经读取了完整的http请求头，可以开始处理请求了
+// 如果还在定时器红黑树里，那么就删除，不需要检查超时
+// 连接的读写事件handler都设置为ngx_http_request_handler
+// 请求的读事件设置为ngx_http_block_reading
+// 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+// 从phase_handler的位置开始调用模块处理
+// 如果有子请求，那么都要处理
 void ngx_http_process_request(ngx_http_request_t *r);
+
 void ngx_http_update_location_config(ngx_http_request_t *r);
+
+// 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+// 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
+// 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
+// 启动引擎数组处理请求，调用ngx_http_core_run_phases
 void ngx_http_handler(ngx_http_request_t *r);
+
+// 处理主请求里延后处理的请求链表，直至处理完毕
+// r->main->posted_requests
+// 调用请求里的write_event_handler
+// 通常就是ngx_http_core_run_phases引擎数组处理请求
 void ngx_http_run_posted_requests(ngx_connection_t *c);
+
 ngx_int_t ngx_http_post_request(ngx_http_request_t *r,
     ngx_http_posted_request_t *pr);
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);

@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_core_run_phases
 
 /*
  * Copyright (C) Igor Sysoev
@@ -865,6 +867,10 @@ ngx_module_t  ngx_http_core_module = {
 ngx_str_t  ngx_http_core_get_method = { 3, (u_char *) "GET " };
 
 
+// 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+// 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
+// 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
+// 启动引擎数组处理请求，调用ngx_http_core_run_phases
 void
 ngx_http_handler(ngx_http_request_t *r)
 {
@@ -874,6 +880,7 @@ ngx_http_handler(ngx_http_request_t *r)
 
     r->connection->unexpected_eof = 0;
 
+    // 外部请求设置keepalive、lingering_close
     if (!r->internal) {
         switch (r->headers_in.connection_type) {
         case 0:
@@ -889,11 +896,17 @@ ngx_http_handler(ngx_http_request_t *r)
             break;
         }
 
+        // 如果有数据或者是chunked，那么需要lingering_close，等待数据
         r->lingering_close = (r->headers_in.content_length_n > 0
                               || r->headers_in.chunked);
+
+        // 重要!!设置请求的引擎数组起始序号，从头执行引擎数组
+        // 即先从Post read开始
         r->phase_handler = 0;
 
     } else {
+        // 内部请求，即子请求
+        // 跳过post read，直接从server rewrite开始执行，即查找server
         cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
         r->phase_handler = cmcf->phase_engine.server_rewrite_index;
     }
@@ -905,11 +918,16 @@ ngx_http_handler(ngx_http_request_t *r)
     r->gzip_vary = 0;
 #endif
 
+    // 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
     r->write_event_handler = ngx_http_core_run_phases;
+
+    // 启动引擎数组处理请求
     ngx_http_core_run_phases(r);
 }
 
 
+// 启动引擎数组处理请求
+// 从phase_handler的位置开始调用模块处理
 void
 ngx_http_core_run_phases(ngx_http_request_t *r)
 {
@@ -917,10 +935,15 @@ ngx_http_core_run_phases(ngx_http_request_t *r)
     ngx_http_phase_handler_t   *ph;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 得到core main配置
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // 获取引擎里的handler数组
     ph = cmcf->phase_engine.handlers;
 
+    // 从phase_handler的位置开始调用模块处理
+    // 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
+    // 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
     while (ph[r->phase_handler].checker) {
 
         rc = ph[r->phase_handler].checker(r, &ph[r->phase_handler]);

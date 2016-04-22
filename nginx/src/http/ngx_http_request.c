@@ -3,6 +3,9 @@
 // * ngx_http_init_connection
 // * ngx_http_wait_request_handler
 // * ngx_http_process_request_line
+// * ngx_http_process_request_headers
+// * ngx_http_request_handler
+// * ngx_http_run_posted_requests
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,7 +23,19 @@
 // 处理读事件，读取请求头
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
 
+// 调用recv读取数据，解析出请求行信息,存在r->header_in里
+// 如果头太大，或者配置的太小，nginx会再多分配内存
+// 这里用无限循环，保证读取完数据
+// again说明客户端发送的数据不足，会继续读取，error则结束请求
+// 请求行处理完毕设置读事件处理函数为ngx_http_process_request_headers
 static void ngx_http_process_request_line(ngx_event_t *rev);
+
+// 解析请求行之后的请求头数据
+// 处理逻辑与ngx_http_process_request_line类似，也是无限循环，保证读取完数据
+// 如果头太大，或者配置的太小，nginx会再多分配内存
+// 检查收到的http请求头:content_length不能是非数字,不支持trace方法,设置keep_alive头信息
+// 最后调用ngx_http_process_request
+// again说明客户端发送的数据不足，会继续读取，error则结束请求
 static void ngx_http_process_request_headers(ngx_event_t *rev);
 
 // 调用recv读数据，存在r->header_in里
@@ -55,7 +70,11 @@ static ngx_int_t ngx_http_find_virtual_server(ngx_connection_t *c,
     ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
     ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
 
+// http请求处理时的事件handler
+// 当读取完请求头后读写事件的handler都是它
+// 通常就是ngx_http_core_run_phases引擎数组处理请求
 static void ngx_http_request_handler(ngx_event_t *ev);
+
 static void ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc);
 static void ngx_http_terminate_handler(ngx_http_request_t *r);
 static void ngx_http_finalize_connection(ngx_http_request_t *r);
@@ -1041,6 +1060,11 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 #endif
 
 
+// 调用recv读取数据，解析出请求行信息,存在r->header_in里
+// 如果头太大，或者配置的太小，nginx会再多分配内存
+// 这里用无限循环，保证读取完数据
+// again说明客户端发送的数据不足，会继续读取，error则结束请求
+// 请求行处理完毕设置读事件处理函数为ngx_http_process_request_headers
 static void
 ngx_http_process_request_line(ngx_event_t *rev)
 {
@@ -1123,6 +1147,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 return;
             }
 
+            // 解析出host
             if (r->host_start && r->host_end) {
 
                 host.len = r->host_end - r->host_start;
@@ -1346,6 +1371,12 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
 }
 
 
+// 解析请求行之后的请求头数据
+// 处理逻辑与ngx_http_process_request_line类似，也是无限循环，保证读取完数据
+// 如果头太大，或者配置的太小，nginx会再多分配内存
+// 检查收到的http请求头:content_length不能是非数字,不支持trace方法,设置keep_alive头信息
+// 最后调用ngx_http_process_request
+// again说明客户端发送的数据不足，会继续读取，error则结束请求
 static void
 ngx_http_process_request_headers(ngx_event_t *rev)
 {
@@ -1360,12 +1391,15 @@ ngx_http_process_request_headers(ngx_event_t *rev)
     ngx_http_core_srv_conf_t   *cscf;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 获取读事件相关的连接对象和请求对象
     c = rev->data;
     r = c->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
                    "http process request header line");
 
+    // 检查是否超时
+    // 由定时器超时引发的，由ngx_event_expire_timers调用
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         c->timedout = 1;
@@ -1375,14 +1409,20 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // 预设没有数据，需要重试
     rc = NGX_AGAIN;
 
+    // 处理逻辑与ngx_http_process_request_line类似，也是无限循环
     for ( ;; ) {
 
         if (rc == NGX_AGAIN) {
 
+            // 看看是否缓冲区用完了
+            // 如果满了说明数据很多，还在socket里但缓冲区太小放不下
             if (r->header_in->pos == r->header_in->end) {
 
+                // 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+                // 使用了hc->busy/free等成员
                 rv = ngx_http_alloc_large_header_buffer(r, 0);
 
                 if (rv == NGX_ERROR) {
@@ -1417,18 +1457,29 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                                             NGX_HTTP_REQUEST_HEADER_TOO_LARGE);
                     return;
                 }
+
+                // 此时缓冲区已经足够大了
             }
 
+            // 调用recv读数据，存在r->header_in里
+            // 如果暂时无数据就加入定时器等待，加入读事件
+            // 下次读事件发生还会进入这里继续读取
+            // 返回读取的字节数量
             n = ngx_http_read_request_header(r);
 
+            // again会继续读取，error则结束请求
+            // again说明客户端发送的数据不足
             if (n == NGX_AGAIN || n == NGX_ERROR) {
                 return;
             }
         }
 
+        // 此时已经读取了数据，存储在r->header_in里
+
         /* the host header could change the server configuration context */
         cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
 
+        // 解析一行请求头，是否支持下划线由配置确定
         rc = ngx_http_parse_header_line(r, r->header_in,
                                         cscf->underscores_in_headers);
 
@@ -1449,6 +1500,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
             /* a header line has been parsed successfully */
 
+            // 把请求头加入链表
             h = ngx_list_push(&r->headers_in.headers);
             if (h == NULL) {
                 ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1489,9 +1541,11 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                            "http header: \"%V: %V\"",
                            &h->key, &h->value);
 
+            // 成功解析完一行，继续循环，解析下一行
             continue;
         }
 
+        // 全部头解析完毕
         if (rc == NGX_HTTP_PARSE_HEADER_DONE) {
 
             /* a whole header has been parsed successfully */
@@ -1501,8 +1555,15 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
             r->request_length += r->header_in->pos - r->header_name_start;
 
+            // 设置请求的状态，准备处理请求
             r->http_state = NGX_HTTP_PROCESS_REQUEST_STATE;
 
+            // 检查收到的http请求头
+            // http1.1不允许没有host头
+            // content_length不能是非数字
+            // 不支持trace方法
+            // 如果是chunked编码那么长度头无意义
+            // 设置keep_alive头信息
             rc = ngx_http_process_request_header(r);
 
             if (rc != NGX_OK) {
@@ -1514,14 +1575,18 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             return;
         }
 
+        // agian，请求行数据不完整
         if (rc == NGX_AGAIN) {
 
             /* a header line parsing is still not complete */
 
+            // 继续循环，读取数据，保证解析一行成功
             continue;
         }
 
         /* rc == NGX_HTTP_PARSE_INVALID_HEADER: "\r" is not followed by "\n" */
+
+        // 其他情况则是错误
 
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client sent invalid header line: \"%*s\\r...\"",
@@ -1949,6 +2014,12 @@ ngx_http_process_multi_header_lines(ngx_http_request_t *r, ngx_table_elt_t *h,
 }
 
 
+// 检查收到的http请求头
+// http1.1不允许没有host头
+// content_length不能是非数字
+// 不支持trace方法
+// 如果是chunked编码那么长度头无意义
+// 设置keep_alive头信息
 ngx_int_t
 ngx_http_process_request_header(ngx_http_request_t *r)
 {
@@ -2019,11 +2090,19 @@ ngx_http_process_request_header(ngx_http_request_t *r)
 }
 
 
+// 此时已经读取了完整的http请求头，可以开始处理请求了
+// 如果还在定时器红黑树里，那么就删除，不需要检查超时
+// 连接的读写事件handler都设置为ngx_http_request_handler
+// 请求的读事件设置为ngx_http_block_reading
+// 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+// 从phase_handler的位置开始调用模块处理
+// 如果有子请求，那么都要处理
 void
 ngx_http_process_request(ngx_http_request_t *r)
 {
     ngx_connection_t  *c;
 
+    // 获取读事件相关的连接对象
     c = r->connection;
 
 #if (NGX_HTTP_SSL)
@@ -2080,6 +2159,8 @@ ngx_http_process_request(ngx_http_request_t *r)
 
 #endif
 
+    // 此时已经读取了完整的http请求头，可以开始处理请求了
+    // 如果还在定时器红黑树里，那么就删除，不需要检查超时
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
@@ -2091,12 +2172,30 @@ ngx_http_process_request(ngx_http_request_t *r)
     r->stat_writing = 1;
 #endif
 
+    // 头读取完毕
+    // 连接的读写事件handler都设置为ngx_http_request_handler
+    // 内部会转调用r->write_event_handler/r->read_event_handler
     c->read->handler = ngx_http_request_handler;
     c->write->handler = ngx_http_request_handler;
+
+    // 请求的读事件设置为ngx_http_block_reading
+    // 即忽略读事件，有数据也不会处理
     r->read_event_handler = ngx_http_block_reading;
 
+    // in ngx_http_core_module.c
+    // 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+    //
+    // 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
+    // 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
+    // 启动引擎数组处理请求，调用ngx_http_core_run_phases
+    // 从phase_handler的位置开始调用模块处理
     ngx_http_handler(r);
 
+    // 如果有子请求，那么都要处理
+    // 处理主请求里延后处理的请求链表，直至处理完毕
+    // r->main->posted_requests
+    // 调用请求里的write_event_handler
+    // 通常就是ngx_http_core_run_phases引擎数组处理请求
     ngx_http_run_posted_requests(c);
 }
 
@@ -2361,12 +2460,16 @@ ngx_http_find_virtual_server(ngx_connection_t *c,
 }
 
 
+// http请求处理时的事件handler
+// 当读取完请求头后读写事件的handler都是它
+// 通常就是ngx_http_core_run_phases引擎数组处理请求
 static void
 ngx_http_request_handler(ngx_event_t *ev)
 {
     ngx_connection_t    *c;
     ngx_http_request_t  *r;
 
+    // 获取读事件相关的连接对象和请求对象
     c = ev->data;
     r = c->data;
 
@@ -2375,6 +2478,9 @@ ngx_http_request_handler(ngx_event_t *ev)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http run request: \"%V?%V\"", &r->uri, &r->args);
 
+    // 有写事件就调用请求里的write_event_handler
+    // 通常就是ngx_http_core_run_phases引擎数组处理请求
+    // 读事件忽略
     if (ev->write) {
         r->write_event_handler(r);
 
@@ -2382,29 +2488,40 @@ ngx_http_request_handler(ngx_event_t *ev)
         r->read_event_handler(r);
     }
 
+    // 如果有子请求，那么都要处理
     ngx_http_run_posted_requests(c);
 }
 
 
+// 处理主请求里延后处理的请求链表，直至处理完毕
+// r->main->posted_requests
+// 调用请求里的write_event_handler
+// 通常就是ngx_http_core_run_phases引擎数组处理请求
 void
 ngx_http_run_posted_requests(ngx_connection_t *c)
 {
     ngx_http_request_t         *r;
     ngx_http_posted_request_t  *pr;
 
+    // 处理主请求里延后处理的请求链表，直至处理完毕
     for ( ;; ) {
 
+        // 连接对象被销毁则结束
         if (c->destroyed) {
             return;
         }
 
+        // 取连接里的请求对象
         r = c->data;
+
+        // 获取主请求里的延后处理请求链表
         pr = r->main->posted_requests;
 
         if (pr == NULL) {
             return;
         }
 
+        // 取头元素，注意用的是r->main，获得一个请求
         r->main->posted_requests = pr->next;
 
         r = pr->request;
@@ -2414,6 +2531,8 @@ ngx_http_run_posted_requests(ngx_connection_t *c)
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http posted request: \"%V?%V\"", &r->uri, &r->args);
 
+        // 调用请求里的write_event_handler
+        // 通常就是ngx_http_core_run_phases引擎数组处理请求
         r->write_event_handler(r);
     }
 }
