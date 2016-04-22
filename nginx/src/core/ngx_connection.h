@@ -302,7 +302,8 @@ void ngx_configure_listening_sockets(ngx_cycle_t *cycle);
 // 遍历监听端口列表，逐个删除监听事件
 void ngx_close_listening_sockets(ngx_cycle_t *cycle);
 
-// 关闭连接
+// 关闭连接，删除epoll里的读写事件
+// 释放连接，加入空闲链表，可以再次使用
 void ngx_close_connection(ngx_connection_t *c);
 
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,

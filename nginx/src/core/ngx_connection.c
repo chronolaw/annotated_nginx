@@ -951,7 +951,8 @@ ngx_free_connection(ngx_connection_t *c)
 }
 
 
-// 关闭连接
+// 关闭连接，删除epoll里的读写事件
+// 释放连接，加入空闲链表，可以再次使用
 void
 ngx_close_connection(ngx_connection_t *c)
 {
