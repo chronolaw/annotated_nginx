@@ -152,9 +152,14 @@
 #define NGX_HTTP_COPY_BUFFERED             0x04
 
 
+// 标记http请求的处理状态
 typedef enum {
+    // 此状态不使用
     NGX_HTTP_INITING_REQUEST_STATE = 0,
+
+    // 刚创建请求对象，正在读取请求数据
     NGX_HTTP_READING_REQUEST_STATE,
+
     NGX_HTTP_PROCESS_REQUEST_STATE,
 
     NGX_HTTP_CONNECT_UPSTREAM_STATE,
@@ -325,8 +330,12 @@ typedef struct {
 
 typedef struct ngx_http_addr_conf_s  ngx_http_addr_conf_t;
 
+// 建立连接时server{}里相关的信息
+// 重要的是conf_ctx，server的配置数组
 typedef struct {
     ngx_http_addr_conf_t             *addr_conf;
+
+    // server{}里的配置数组
     ngx_http_conf_ctx_t              *conf_ctx;
 
 #if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
@@ -345,6 +354,8 @@ typedef struct {
 #if (NGX_HTTP_SSL)
     unsigned                          ssl:1;
 #endif
+
+    // listen指令是否使用了proxy_protocol参数
     unsigned                          proxy_protocol:1;
 } ngx_http_connection_t;
 

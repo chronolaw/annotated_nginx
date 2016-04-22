@@ -11,6 +11,9 @@
 #include <ngx_http.h>
 
 
+// 接受连接后，读事件加入epoll，当socket有数据可读时就调用
+// 因为是事件触发，可能会被多次调用，即重入
+// 处理读事件，读取请求头
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
 static void ngx_http_process_request_line(ngx_event_t *rev);
 static void ngx_http_process_request_headers(ngx_event_t *rev);
@@ -211,6 +214,9 @@ ngx_http_init_connection(ngx_connection_t *c)
     ngx_http_in6_addr_t    *addr6;
 #endif
 
+    // 建立连接时server{}里相关的信息
+    // 重要的是conf_ctx，server的配置数组
+    // 准备初始化hc
     hc = ngx_pcalloc(c->pool, sizeof(ngx_http_connection_t));
     if (hc == NULL) {
         ngx_http_close_connection(c);
@@ -362,7 +368,9 @@ ngx_http_init_connection(ngx_connection_t *c)
         c->log->action = "reading PROXY protocol";
     }
 
-    // 通常此时读事件都是ready的
+    // 通常此时读事件都是ready=0，只有iocp或者使用了deferred才是ready
+    // ngx_event_accept里设置
+    // 为了提高nginx的性能，减少epoll调用，应该设置deferred
     if (rev->ready) {
         /* the deferred accept(), rtsig, aio, iocp */
 
@@ -379,7 +387,7 @@ ngx_http_init_connection(ngx_connection_t *c)
         return;
     }
 
-    // 暂时没有数据可读，ready=0
+    // 虽然建立了连接，但暂时没有数据可读，ready=0
     // 加一个超时事件，等待读事件发生
     ngx_add_timer(rev, c->listening->post_accept_timeout);
 
@@ -429,13 +437,15 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         return;
     }
 
-    // 连接对象里获取配置数组
+    // 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
+    // 重要的是conf_ctx，server的配置数组
     hc = c->data;
     cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
 
     // 配置的头缓冲区大小
     size = cscf->client_header_buffer_size;
 
+    // 这个缓冲区是给连接对象用的
     b = c->buffer;
 
     // 如果还没有创建缓冲区则创建
@@ -507,7 +517,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         return;
     }
 
-    // 读到了0自己，还是错误
+    // 读到了0字节，还是错误
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client closed connection");
@@ -518,6 +528,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // 真正读取了n个字节
     b->last += n;
 
+    // listen指令是否使用了proxy_protocol参数
     if (hc->proxy_protocol) {
         hc->proxy_protocol = 0;
 
@@ -541,9 +552,11 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
     c->log->action = "reading client request line";
 
+    // 参数reusable表示是否可以复用，即加入队列
+    // 因为此时连接已经在使用，故不能复用
     ngx_reusable_connection(c, 0);
 
-    // 创建ngx_http_request_t对象，开始真正的处理请求
+    // 创建ngx_http_request_t对象，准备开始真正的处理请求
     c->data = ngx_http_create_request(c);
     if (c->data == NULL) {
         ngx_http_close_connection(c);
@@ -554,11 +567,13 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // 之后再有数据来就换成ngx_http_process_request_line
     rev->handler = ngx_http_process_request_line;
 
-    // 马上执行ngx_http_process_request_line
+    // 必须马上执行ngx_http_process_request_line
+    // 否则因为et模式的特性，将无法再获得此事件
     ngx_http_process_request_line(rev);
 }
 
 
+// 创建ngx_http_request_t对象，准备开始真正的处理请求
 ngx_http_request_t *
 ngx_http_create_request(ngx_connection_t *c)
 {
@@ -571,41 +586,60 @@ ngx_http_create_request(ngx_connection_t *c)
     ngx_http_core_loc_conf_t   *clcf;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 处理的请求次数，在ngx_http_create_request里增加
+    // 用来控制长连接里可处理的请求次数，指令keepalive_requests
     c->requests++;
 
+    // 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
+    // 重要的是conf_ctx，server的配置数组
     hc = c->data;
 
+    // 获取server{}的配置
     cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
 
+    // 请求用的内存池
     pool = ngx_create_pool(cscf->request_pool_size, c->log);
     if (pool == NULL) {
         return NULL;
     }
 
+    // 在请求内存池里创建请求对象
+    // 不使用连接的内存池，当请求结束时自动回收
     r = ngx_pcalloc(pool, sizeof(ngx_http_request_t));
     if (r == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
+    // 保存请求的内存池
     r->pool = pool;
 
+    // 请求的连接参数，重要的是conf_ctx，server的配置数组
     r->http_connection = hc;
+
     r->signature = NGX_HTTP_MODULE;
+
+    // 请求关联的连接对象，里面有log
     r->connection = c;
 
+    // 请求对应的配置数组
     r->main_conf = hc->conf_ctx->main_conf;
     r->srv_conf = hc->conf_ctx->srv_conf;
     r->loc_conf = hc->conf_ctx->loc_conf;
 
+    // 设置请求的读处理函数
+    // 注意这个不是读事件的处理函数！！
     r->read_event_handler = ngx_http_block_reading;
 
+    // 取当前location的配置
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     ngx_http_set_connection_log(r->connection, clcf->error_log);
 
+    // 设置读取缓冲区，暂不深究
     r->header_in = hc->nbusy ? hc->busy[0] : c->buffer;
 
+    // 初始化响应头链表
     if (ngx_list_init(&r->headers_out.headers, r->pool, 20,
                       sizeof(ngx_table_elt_t))
         != NGX_OK)
@@ -614,14 +648,17 @@ ngx_http_create_request(ngx_connection_t *c)
         return NULL;
     }
 
+    // 为所有http模块分配存储ctx数据的空间，即一个大数组
     r->ctx = ngx_pcalloc(r->pool, sizeof(void *) * ngx_http_max_module);
     if (r->ctx == NULL) {
         ngx_destroy_pool(r->pool);
         return NULL;
     }
 
+    // 取http core的main配置
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // 为所有变量创建数组
     r->variables = ngx_pcalloc(r->pool, cmcf->variables.nelts
                                         * sizeof(ngx_http_variable_value_t));
     if (r->variables == NULL) {
@@ -635,26 +672,42 @@ ngx_http_create_request(ngx_connection_t *c)
     }
 #endif
 
+    // accept的连接是主请求
     r->main = r;
+
+    // 当前只有一个请求，所有子请求最大不能超过200
     r->count = 1;
 
+    // 得到当前事件
     tp = ngx_timeofday();
+
+    // 设置请求开始的事件，限速用
     r->start_sec = tp->sec;
     r->start_msec = tp->msec;
 
+    // 还没有开始解析请求头，方法未知
     r->method = NGX_HTTP_UNKNOWN;
+
+    // http协议版本号默认是1.0
     r->http_version = NGX_HTTP_VERSION_10;
 
+    // 初始化请求头、响应头的长度都是未知
     r->headers_in.content_length_n = -1;
     r->headers_in.keep_alive_n = -1;
     r->headers_out.content_length_n = -1;
     r->headers_out.last_modified_time = -1;
 
+    // uri改写次数限制，最多10次
     r->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
+
+    // 所有子请求最大不能超过200
+    // 没产生一个子请求，r->subrequests递减
     r->subrequests = NGX_HTTP_MAX_SUBREQUESTS + 1;
 
+    // 当前请求的状态，正在读取请求
     r->http_state = NGX_HTTP_READING_REQUEST_STATE;
 
+    // 日志的ctx
     ctx = c->log->data;
     ctx->request = r;
     ctx->current_request = r;
