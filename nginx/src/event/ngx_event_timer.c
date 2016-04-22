@@ -39,6 +39,7 @@ ngx_event_timer_init(ngx_log_t *log)
 
 // 在红黑树里查找最小值，即最左边的节点，得到超时的时间差值
 // 如果时间已经超过了，那么时间差值就是0
+// 意味着在红黑树里已经有事件超时了，必须立即处理
 ngx_msec_t
 ngx_event_find_timer(void)
 {
@@ -61,6 +62,7 @@ ngx_event_find_timer(void)
     timer = (ngx_msec_int_t) (node->key - ngx_current_msec);
 
     // 如果时间已经超过了，那么时间差值就是0
+    // 意味着在红黑树里已经有事件超时了，必须立即处理
     return (ngx_msec_t) (timer > 0 ? timer : 0);
 }
 

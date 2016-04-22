@@ -314,7 +314,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         flags = 0;
 
     } else {
+        // 没有设置时间精度
         // 在定时器红黑树里找到最小的时间，二叉树查找很快
+        // timer==0意味着在红黑树里已经有事件超时了，必须立即处理
         timer = ngx_event_find_timer();
 
         // NGX_UPDATE_TIME要求epoll等待这个时间，然后主动更新时间
@@ -361,12 +363,13 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
             } else {
                 // 未获取到锁
                 // 要求epoll无限等待，或者等待时间超过配置的ngx_accept_mutex_delay
+                // 也就是说nginx的epoll不会等待超过ngx_accept_mutex_delay的500毫秒
                 if (timer == NGX_TIMER_INFINITE
                     || timer > ngx_accept_mutex_delay)
                 {
                     // epoll的超时时间最大就是ngx_accept_mutex_delay
                     // ngx_accept_mutex_delay = ecf->accept_mutex_delay;
-                    // 如果时间精度设置的太粗，那么就使用这个时间
+                    // 如果时间精度设置的太粗，那么就使用这个时间,500毫秒
                     timer = ngx_accept_mutex_delay;
                 }
             }
@@ -386,6 +389,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // epoll模块核心功能，调用epoll_wait处理发生的事件
     // 使用event_list和nevents获取内核返回的事件
     // timer是无事件发生时最多等待的时间，即超时时间
+    // 如果ngx_event_find_timer返回timer==0，那么epoll不会等待，立即返回
     // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
     (void) ngx_process_events(cycle, timer, flags);
 
