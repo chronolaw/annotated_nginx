@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// 目前stream还缺少变量和log功能，今后也许能够完善
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
@@ -164,6 +165,8 @@ typedef struct {
     // 在ngx_stream_init_connection里会被调用
     // 目前nginx对stream模块仅提供了这两个hook点
     ngx_stream_access_pt    limit_conn_handler;
+
+    // 相当于http里的NGX_HTTP_ACCESS_PHASE
     ngx_stream_access_pt    access_handler;
 } ngx_stream_core_main_conf_t;
 
