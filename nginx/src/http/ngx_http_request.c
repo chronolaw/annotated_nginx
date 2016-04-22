@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_init_connection
+// * ngx_http_wait_request_handler
+// * ngx_http_process_request_line
 
 /*
  * Copyright (C) Igor Sysoev
@@ -15,9 +19,18 @@
 // 因为是事件触发，可能会被多次调用，即重入
 // 处理读事件，读取请求头
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
+
 static void ngx_http_process_request_line(ngx_event_t *rev);
 static void ngx_http_process_request_headers(ngx_event_t *rev);
+
+// 调用recv读数据，存在r->header_in里
+// 如果暂时无数据就加入定时器等待，加入读事件
+// 下次读事件发生还会进入这里继续读取
+// 返回读取的字节数量
 static ssize_t ngx_http_read_request_header(ngx_http_request_t *r);
+
+// 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+// 使用了hc->busy/free等成员
 static ngx_int_t ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
     ngx_uint_t request_line);
 
@@ -423,7 +436,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http wait request handler");
 
     // 首先检查超时
-    // 是否是由定时器超时引发的，由ngx_event_expire_timers调用
+    // 由定时器超时引发的，由ngx_event_expire_timers调用
     // 超时没有发送数据，关闭连接
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
@@ -442,7 +455,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     hc = c->data;
     cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
 
-    // 配置的头缓冲区大小
+    // 配置的头缓冲区大小，默认1k
+    // 如果头太大，或者配置的太小
+    // nginx会再多分配内存，保证读取完数据
     size = cscf->client_header_buffer_size;
 
     // 这个缓冲区是给连接对象用的
@@ -574,6 +589,10 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
 
 // 创建ngx_http_request_t对象，准备开始真正的处理请求
+// 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
+// 创建请求内存池，创建请求对象
+// 为所有http模块分配存储ctx数据的空间，即一个大数组
+// 为所有变量创建数组
 ngx_http_request_t *
 ngx_http_create_request(ngx_connection_t *c)
 {
@@ -678,10 +697,10 @@ ngx_http_create_request(ngx_connection_t *c)
     // 当前只有一个请求，所有子请求最大不能超过200
     r->count = 1;
 
-    // 得到当前事件
+    // 得到当前时间
     tp = ngx_timeofday();
 
-    // 设置请求开始的事件，限速用
+    // 设置请求开始的时间，限速用
     r->start_sec = tp->sec;
     r->start_msec = tp->msec;
 
@@ -701,7 +720,7 @@ ngx_http_create_request(ngx_connection_t *c)
     r->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
 
     // 所有子请求最大不能超过200
-    // 没产生一个子请求，r->subrequests递减
+    // 每产生一个子请求，r->subrequests递减
     r->subrequests = NGX_HTTP_MAX_SUBREQUESTS + 1;
 
     // 当前请求的状态，正在读取请求
@@ -713,6 +732,7 @@ ngx_http_create_request(ngx_connection_t *c)
     ctx->current_request = r;
     r->log_handler = ngx_http_log_error_handler;
 
+    // 在共享内存里增加计数器
 #if (NGX_STAT_STUB)
     (void) ngx_atomic_fetch_add(ngx_stat_reading, 1);
     r->stat_reading = 1;
@@ -1030,12 +1050,15 @@ ngx_http_process_request_line(ngx_event_t *rev)
     ngx_connection_t    *c;
     ngx_http_request_t  *r;
 
+    // 获取读事件相关的连接对象和请求对象
     c = rev->data;
     r = c->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
                    "http process request line");
 
+    // 检查是否超时
+    // 由定时器超时引发的，由ngx_event_expire_timers调用
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         c->timedout = 1;
@@ -1043,31 +1066,52 @@ ngx_http_process_request_line(ngx_event_t *rev)
         return;
     }
 
+    // 预设没有数据，需要重试
     rc = NGX_AGAIN;
 
+    // 配置的头缓冲区大小，默认1k
+    // 如果头太大，或者配置的太小，nginx会再多分配内存
+    // 这里用无限循环，保证读取完数据
     for ( ;; ) {
 
         if (rc == NGX_AGAIN) {
+
+            // 调用recv读数据，存在r->header_in里
+            // 如果暂时无数据就加入定时器等待，加入读事件
+            // 下次读事件发生还会进入这里继续读取
+            // 返回读取的字节数量
             n = ngx_http_read_request_header(r);
 
+            // again会继续读取，error则结束请求
+            // again说明客户端发送的数据不足
             if (n == NGX_AGAIN || n == NGX_ERROR) {
                 return;
             }
         }
 
+        // 此时已经在r->header_in里有一些请求头的数据
+        // 解析请求行, in ngx_http_parse.c
+        // 使用状态机解析，会调整缓冲区里的指针位置
+        // 填充r->method、r->http_version
+        // 如果数据不完整，无法解析则返回NGX_AGAIN，会再次读取
         rc = ngx_http_parse_request_line(r, r->header_in);
 
+        // 成功解析出了http请求行
         if (rc == NGX_OK) {
 
             /* the request line has been parsed successfully */
 
+            // “拷贝”请求行原始字符串
             r->request_line.len = r->request_end - r->request_start;
             r->request_line.data = r->request_start;
+
+            // 获取请求行的长度
             r->request_length = r->header_in->pos - r->request_start;
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http request line: \"%V\"", &r->request_line);
 
+            // “拷贝”方法名
             r->method_name.len = r->method_end - r->request_start + 1;
             r->method_name.data = r->request_line.data;
 
@@ -1119,6 +1163,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
 
 
+            // 初始化请求头链表，准备解析请求头
             if (ngx_list_init(&r->headers_in.headers, r->pool, 20,
                               sizeof(ngx_table_elt_t))
                 != NGX_OK)
@@ -1129,12 +1174,17 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             c->log->action = "reading client request headers";
 
+            // 请求行处理完毕
+            // 设置读事件处理函数为ngx_http_process_request_headers
             rev->handler = ngx_http_process_request_headers;
+
+            // 立即调用ngx_http_process_request_headers，解析请求头
             ngx_http_process_request_headers(rev);
 
             return;
         }
 
+        // 不是again则有错误
         if (rc != NGX_AGAIN) {
 
             /* there was error while a request line parsing */
@@ -1147,8 +1197,13 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
         /* NGX_AGAIN: a request line parsing is still incomplete */
 
+        // agian，请求行数据不完整
+        // 看看是否缓冲区用完了
+        // 如果满了说明数据很多，还在socket里但缓冲区太小放不下
         if (r->header_in->pos == r->header_in->end) {
 
+            // 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+            // 使用了hc->busy/free等成员
             rv = ngx_http_alloc_large_header_buffer(r, 1);
 
             if (rv == NGX_ERROR) {
@@ -1165,7 +1220,11 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 ngx_http_finalize_request(r, NGX_HTTP_REQUEST_URI_TOO_LARGE);
                 return;
             }
+            // 此时缓冲区已经足够大了
         }
+
+        // 缓冲区没有满，那么大小是足够的，那么就再次尝试接收数据
+        // 再次进入for循环，这时recv可能返回again，那么就等待下一次读事件即有数据可读
     }
 }
 
@@ -1474,6 +1533,10 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 }
 
 
+// 调用recv读数据，存在r->header_in里
+// 如果暂时无数据就加入定时器等待，加入读事件
+// 下次读事件发生还会进入这里继续读取
+// 返回读取的字节数量
 static ssize_t
 ngx_http_read_request_header(ngx_http_request_t *r)
 {
@@ -1482,22 +1545,31 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     ngx_connection_t          *c;
     ngx_http_core_srv_conf_t  *cscf;
 
+    // 从请求对象里获取连接对象和读事件
     c = r->connection;
     rev = c->read;
 
+    // 已经读取的数据
     n = r->header_in->last - r->header_in->pos;
 
+    // 如果缓冲区里还有数据，那么就不调用recv直接返回
     if (n > 0) {
         return n;
     }
 
+    // 缓冲区里无数据，需要调用recv收取
     if (rev->ready) {
+        // 注意缓冲区剩余空间的计算
         n = c->recv(c, r->header_in->last,
                     r->header_in->end - r->header_in->last);
     } else {
         n = NGX_AGAIN;
     }
 
+    // 还是没有数据
+    // 那么就加入定时器等待，加入读事件
+    // 读事件的handler不需要重新设置，仍然是ngx_http_process_request_line
+    // 下次读事件发生还会进入这里
     if (n == NGX_AGAIN) {
         if (!rev->timer_set) {
             cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
@@ -1512,6 +1584,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         return NGX_AGAIN;
     }
 
+    // 读取0字节，出错
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client prematurely closed connection");
@@ -1525,12 +1598,15 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
+    // 设置缓冲区指针，读取了n个字节
     r->header_in->last += n;
 
     return n;
 }
 
 
+// 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+// 使用了hc->busy/free等成员
 static ngx_int_t
 ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
     ngx_uint_t request_line)

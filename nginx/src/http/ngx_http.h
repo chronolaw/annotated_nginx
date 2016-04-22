@@ -138,7 +138,13 @@ ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_http_chunked_t *ctx);
 
 
+// 创建ngx_http_request_t对象，准备开始真正的处理请求
+// 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
+// 创建请求内存池，创建请求对象
+// 为所有http模块分配存储ctx数据的空间，即一个大数组
+// 为所有变量创建数组
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
+
 ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);
 ngx_int_t ngx_http_process_request_header(ngx_http_request_t *r);
 void ngx_http_process_request(ngx_http_request_t *r);
