@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_headers_in_t
+// * ngx_http_request_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,10 +24,13 @@
 #define NGX_HTTP_LINGERING_BUFFER_SIZE     4096
 
 
+// HTTP协议版本号标记，nginx1.8还不支持HTTP2
 #define NGX_HTTP_VERSION_9                 9
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
 
+// http请求方法代码，可以使用与或非来检查，存储在r->method
+// r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD)
 #define NGX_HTTP_UNKNOWN                   0x0001
 #define NGX_HTTP_GET                       0x0002
 #define NGX_HTTP_HEAD                      0x0004
@@ -64,6 +71,7 @@
 #define NGX_HTTP_LOG_UNSAFE                8
 
 
+// http状态码，如200、302、404
 #define NGX_HTTP_CONTINUE                  100
 #define NGX_HTTP_SWITCHING_PROTOCOLS       101
 #define NGX_HTTP_PROCESSING                102
@@ -98,6 +106,8 @@
 
 /* Our own HTTP codes */
 
+// 这里是nginx自己定义的特殊状态码
+
 /* The special code to close connection without any response */
 #define NGX_HTTP_CLOSE                     444
 
@@ -122,6 +132,7 @@
  * own code to log such situation when a client has closed the connection
  * before we even try to send the HTTP header to it
  */
+// 客户端主动断连的错误码
 #define NGX_HTTP_CLIENT_CLOSED_REQUEST     499
 
 
@@ -169,9 +180,16 @@ typedef struct {
 } ngx_http_header_out_t;
 
 
+// http请求头数据结构，可以直接用指针获得常用的头
+// 所有头都存储在headers列表里，类型是ngx_table_elt_t
+// 自定义或非常用头需要遍历链表查找
+// content_length_n直接把头里的长度字符串转换为数字
 typedef struct {
+    // 所有头都存储在headers列表里，类型是ngx_table_elt_t
     ngx_list_t                        headers;
 
+    // host、range等常用头，可以直接获取
+    // 如果不存在那么指针就是nullptr
     ngx_table_elt_t                  *host;
     ngx_table_elt_t                  *connection;
     ngx_table_elt_t                  *if_modified_since;
@@ -225,11 +243,17 @@ typedef struct {
     ngx_array_t                       cookies;
 
     ngx_str_t                         server;
+
+    // content_length_n直接把头里的长度字符串转换为数字
     off_t                             content_length_n;
+
+    // keep_alive_n也直接转换为数字
     time_t                            keep_alive_n;
 
     unsigned                          connection_type:2;
     unsigned                          chunked:1;
+
+    // user agent标志位
     unsigned                          msie:1;
     unsigned                          msie6:1;
     unsigned                          opera:1;
@@ -240,12 +264,18 @@ typedef struct {
 } ngx_http_headers_in_t;
 
 
+// 响应头数据结构
+// 响应头需要放进headers列表，也可以直接用指针指定常用头，不必用列表
+// 通常需要指定content_length_n，表示body的长度
+// status是响应码，status_line可以定制响应状态行
 typedef struct {
     ngx_list_t                        headers;
 
+    // status是响应码，status_line可以定制响应状态行
     ngx_uint_t                        status;
     ngx_str_t                         status_line;
 
+    // 常用头
     ngx_table_elt_t                  *server;
     ngx_table_elt_t                  *date;
     ngx_table_elt_t                  *content_length;
@@ -269,14 +299,18 @@ typedef struct {
 
     ngx_array_t                       cache_control;
 
+    // 通常需要指定content_length_n，表示body的长度
     off_t                             content_length_n;
+
     time_t                            date_time;
     time_t                            last_modified_time;
 } ngx_http_headers_out_t;
 
 
+// 请求体的处理函数
 typedef void (*ngx_http_client_body_handler_pt)(ngx_http_request_t *r);
 
+// 请求体的数据结构
 typedef struct {
     ngx_temp_file_t                  *temp_file;
     ngx_chain_t                      *bufs;
@@ -315,13 +349,19 @@ typedef struct {
 } ngx_http_connection_t;
 
 
+// http请求处理完毕时的清理函数，相当于析构
 typedef void (*ngx_http_cleanup_pt)(void *data);
 
 typedef struct ngx_http_cleanup_s  ngx_http_cleanup_t;
 
 struct ngx_http_cleanup_s {
+    // http请求处理完毕时的清理函数，相当于析构
     ngx_http_cleanup_pt               handler;
+
+    // 作为参数传递给handler
     void                             *data;
+
+    // 链表指针，所有的清理结构体连接成一个链表
     ngx_http_cleanup_t               *next;
 };
 
@@ -329,6 +369,7 @@ struct ngx_http_cleanup_s {
 typedef ngx_int_t (*ngx_http_post_subrequest_pt)(ngx_http_request_t *r,
     void *data, ngx_int_t rc);
 
+// 子请求完成后的处理函数，相当于闭包/lambda
 typedef struct {
     ngx_http_post_subrequest_pt       handler;
     void                             *data;
@@ -356,16 +397,23 @@ typedef ngx_int_t (*ngx_http_handler_pt)(ngx_http_request_t *r);
 typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 
 
+// http处理的核心数据结构
+// 保存有所有http模块的配置、ctx数据、请求头、请求体
+// 读写事件的处理函数
 struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
+    // 请求对应的连接对象，里面有log用于记录日志
     ngx_connection_t                 *connection;
 
+    // 保存有所有http模块的配置、ctx数据
     void                            **ctx;
     void                            **main_conf;
     void                            **srv_conf;
     void                            **loc_conf;
 
+    // 读写事件的处理函数
+    // 随着处理的阶段不同会变化
     ngx_http_event_handler_pt         read_event_handler;
     ngx_http_event_handler_pt         write_event_handler;
 
@@ -377,22 +425,36 @@ struct ngx_http_request_s {
     ngx_array_t                      *upstream_states;
                                          /* of ngx_http_upstream_state_t */
 
+    // 请求的内存池，请求结束时会回收
     ngx_pool_t                       *pool;
+
+    // 缓冲区，用于读取请求头
     ngx_buf_t                        *header_in;
 
+    // 请求头结构体
     ngx_http_headers_in_t             headers_in;
+
+    // 响应头结构体
     ngx_http_headers_out_t            headers_out;
 
     ngx_http_request_body_t          *request_body;
 
     time_t                            lingering_time;
+
+    // 请求开始的时间，可用于限速
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
 
+    // 从请求头解析出来的方法
+    // r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD)
     ngx_uint_t                        method;
+
+    // http协议版本号，通常不需要关心
     ngx_uint_t                        http_version;
 
+    // 请求行字符串
     ngx_str_t                         request_line;
+
     ngx_str_t                         uri;
     ngx_str_t                         args;
     ngx_str_t                         exten;
