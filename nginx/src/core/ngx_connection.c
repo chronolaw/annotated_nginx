@@ -1047,6 +1047,7 @@ ngx_close_connection(ngx_connection_t *c)
 
 
 // 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
+// 参数reusable表示是否可以复用，即加入队列
 void
 ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
 {

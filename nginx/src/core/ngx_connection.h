@@ -229,7 +229,8 @@ struct ngx_connection_s {
     // c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
     ngx_atomic_uint_t   number;
 
-    // 处理的请求次数
+    // 处理的请求次数，在ngx_http_create_request里增加
+    // 用来控制长连接里可处理的请求次数，指令keepalive_requests
     ngx_uint_t          requests;
 
     unsigned            buffered:8;
