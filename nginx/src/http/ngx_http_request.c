@@ -72,7 +72,7 @@ static ngx_int_t ngx_http_find_virtual_server(ngx_connection_t *c,
 
 // http请求处理时的事件handler
 // 当读取完请求头后读写事件的handler都是它
-// 通常就是ngx_http_core_run_phases引擎数组处理请求
+// 通常写事件就是ngx_http_core_run_phases引擎数组处理请求
 static void ngx_http_request_handler(ngx_event_t *ev);
 
 static void ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc);
@@ -2462,7 +2462,7 @@ ngx_http_find_virtual_server(ngx_connection_t *c,
 
 // http请求处理时的事件handler
 // 当读取完请求头后读写事件的handler都是它
-// 通常就是ngx_http_core_run_phases引擎数组处理请求
+// 通常写事件就是ngx_http_core_run_phases引擎数组处理请求
 static void
 ngx_http_request_handler(ngx_event_t *ev)
 {
@@ -2479,14 +2479,16 @@ ngx_http_request_handler(ngx_event_t *ev)
                    "http run request: \"%V?%V\"", &r->uri, &r->args);
 
     // 有写事件就调用请求里的write_event_handler
-    // 通常就是ngx_http_core_run_phases引擎数组处理请求
-    // 读事件忽略
     if (ev->write) {
+        // write_event_handler通常就是ngx_http_core_run_phases引擎数组处理请求
         r->write_event_handler(r);
 
     } else {
+        // 否则是读事件，调用read_event_handler
         r->read_event_handler(r);
     }
+
+    // 请求自己的读写事件已经处理完
 
     // 如果有子请求，那么都要处理
     ngx_http_run_posted_requests(c);
