@@ -69,9 +69,14 @@ struct ngx_http_log_ctx_s {
 };
 
 
+// 读取chunk数据的结构体，用于ngx_http_parse_chunked()
 struct ngx_http_chunked_s {
+    // 状态机解析的状态
     ngx_uint_t           state;
+
+    // 当前chunk的大小
     off_t                size;
+
     off_t                length;
 };
 

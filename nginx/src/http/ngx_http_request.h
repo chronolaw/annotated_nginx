@@ -19,8 +19,10 @@
 /* must be 2^n */
 #define NGX_HTTP_LC_HEADER_LEN             32
 
-
+// 在丢弃请求体数据时的缓冲区长度，4k
+// 用在ngx_http_read_discarded_request_body
 #define NGX_HTTP_DISCARD_BUFFER_SIZE       4096
+
 #define NGX_HTTP_LINGERING_BUFFER_SIZE     4096
 
 
@@ -251,6 +253,7 @@ typedef struct {
     ngx_str_t                         server;
 
     // content_length_n直接把头里的长度字符串转换为数字
+    // content_length_n置0，表示无数据，丢弃成功
     off_t                             content_length_n;
 
     // keep_alive_n也直接转换为数字
@@ -316,7 +319,7 @@ typedef struct {
 // 请求体的处理函数
 typedef void (*ngx_http_client_body_handler_pt)(ngx_http_request_t *r);
 
-// 请求体的数据结构
+// 请求体的数据结构，用于读取或丢弃请求体数据
 typedef struct {
     ngx_temp_file_t                  *temp_file;
     ngx_chain_t                      *bufs;
@@ -324,7 +327,10 @@ typedef struct {
     off_t                             rest;
     ngx_chain_t                      *free;
     ngx_chain_t                      *busy;
+
+    // 读取chunk数据的结构体，用于ngx_http_parse_chunked()
     ngx_http_chunked_t               *chunked;
+
     ngx_http_client_body_handler_pt   post_handler;
 } ngx_http_request_body_t;
 
@@ -586,7 +592,10 @@ struct ngx_http_request_s {
     unsigned                          header_only:1;
     unsigned                          keepalive:1;
     unsigned                          lingering_close:1;
+
+    // 丢弃请求体的标志，在ngx_http_discard_request_body里设置
     unsigned                          discard_body:1;
+
     unsigned                          reading_body:1;
     unsigned                          internal:1;
     unsigned                          error_page:1;

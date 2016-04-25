@@ -14,9 +14,19 @@
 static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
+
+// 读取请求体数据并丢弃
+// 使用固定的4k缓冲区接受丢弃的数据
+// 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 需要使用回调ngx_http_discarded_request_body_handler读取数据
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
+
+// 检查请求结构体里的缓冲区数据，丢弃
+// 有content_length_n指定确切长度，那么只接收，不处理，移动缓冲区指针
+// chunked数据需要解析数据
 static ngx_int_t ngx_http_discard_request_body_filter(ngx_http_request_t *r,
     ngx_buf_t *b);
+
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 
 static ngx_int_t ngx_http_request_body_filter(ngx_http_request_t *r,
@@ -299,6 +309,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 获取读事件相关的连接对象和请求对象
     c = r->connection;
     rb = r->request_body;
 
@@ -565,6 +576,16 @@ ngx_http_write_request_body(ngx_http_request_t *r)
 
 
 // 要求nginx丢弃请求体数据
+// 子请求不与客户端直接通信，不会有请求体的读取
+// 已经设置了discard_body标志，表示已经调用了此函数
+// request_body指针不空，表示已经调用了此函数
+// 这三种情况就无需再启动读取handler，故直接返回成功
+// 因为要丢弃数据，所以不需要检查超时，也就是说即使超时也不算是错误
+// 如果头里的长度是0且不是chunked
+// 说明没有请求体数据，那么就无需再读，直接返回成功
+// 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 调用ngx_http_discard_request_body_filter检查收到的数据
+// 使用回调ngx_http_discarded_request_body_handler读取数据
 ngx_int_t
 ngx_http_discard_request_body(ngx_http_request_t *r)
 {
@@ -583,6 +604,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     // 已经设置了discard_body标志，表示已经调用了此函数
     // request_body指针不空，表示已经调用了此函数
     // 这三种情况就无需再启动读取handler，故直接返回成功
+    // discard_body在本函数最末尾设置，防止重入
     if (r != r->main || r->discard_body || r->request_body) {
         return NGX_OK;
     }
@@ -614,18 +636,28 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
 
     // 有数据，或者是chunked数据
     if (size || r->headers_in.chunked) {
+        // 检查请求结构体里的缓冲区数据，丢弃
+        // 有content_length_n指定确切长度，那么只接收，不处理，移动缓冲区指针
+        // chunked数据需要解析数据
         rc = ngx_http_discard_request_body_filter(r, r->header_in);
 
+        // 不是ok表示出错，不能再读取数据
         if (rc != NGX_OK) {
             return rc;
         }
 
+        // content_length_n==0表示数据已经全部读完
+        // 就已经完成了丢弃任务，否则就要加入epoll读事件继续读
         if (r->headers_in.content_length_n == 0) {
             return NGX_OK;
         }
     }
 
+    // 走到这里，表面content_length_n>=0，还有数据要读取
     // 接下来就读取请求体数据并丢弃
+    // 使用固定的4k缓冲区接受丢弃的数据
+    // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+    // 需要使用回调ngx_http_discarded_request_body_handler读取数据
     rc = ngx_http_read_discarded_request_body(r);
 
     if (rc == NGX_OK) {
@@ -633,11 +665,15 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         return NGX_OK;
     }
 
+    // 出错
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         return rc;
     }
 
     /* rc == NGX_AGAIN */
+
+    // 读事件not ready，无数据可读，那么就要在epoll里加入读事件和handler
+    // 注意，不再需要加入定时器
 
     r->read_event_handler = ngx_http_discarded_request_body_handler;
 
@@ -645,7 +681,10 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 引用计数器增加，表示此请求还有关联的操作，不能直接销毁
     r->count++;
+
+    // 设置丢弃标志，防止再次进入本函数
     r->discard_body = 1;
 
     return NGX_OK;
@@ -723,6 +762,10 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 }
 
 
+// 读取请求体数据并丢弃
+// 使用固定的4k缓冲区接受丢弃的数据
+// 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 需要使用回调ngx_http_discarded_request_body_handler读取数据
 static ngx_int_t
 ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 {
@@ -730,55 +773,92 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
     ssize_t    n;
     ngx_int_t  rc;
     ngx_buf_t  b;
+
+    // 使用固定的4k缓冲区接受丢弃的数据
     u_char     buffer[NGX_HTTP_DISCARD_BUFFER_SIZE];
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http read discarded body");
 
+    // 读取用的缓冲区对象
     ngx_memzero(&b, sizeof(ngx_buf_t));
 
+    // 标记为可写
     b.temporary = 1;
 
+    // 一直读数据并解析，检查content_length_n
+    // 如果无数据可读就返回NGX_AGAIN
+    // 需要使用回调ngx_http_discarded_request_body_handler读取数据
     for ( ;; ) {
+
+        // 判断content_length_n，为0就是已经读取完请求体
+        // 就不需要再读了，读事件设置为block，返回成功
         if (r->headers_in.content_length_n == 0) {
             r->read_event_handler = ngx_http_block_reading;
             return NGX_OK;
         }
 
+        // content_length_n大于0，表示还有数据需要读取
+        // 看读事件是否ready，即是否有数据可读
+        // 如果没数据那么就返回again
+        // 需要使用回调ngx_http_discarded_request_body_handler读取数据
         if (!r->connection->read->ready) {
             return NGX_AGAIN;
         }
 
+        // 决定要读取的数据长度，不能超过4k
+        // #define NGX_HTTP_DISCARD_BUFFER_SIZE       4096
         size = (size_t) ngx_min(r->headers_in.content_length_n,
                                 NGX_HTTP_DISCARD_BUFFER_SIZE);
 
+        // 调用底层recv读取数据
+        // 每次都从buffer的0位置放置数据，也就是丢弃之前读取的全部数据
         n = r->connection->recv(r->connection, buffer, size);
 
+        // 出错也允许，因为丢弃数据不需要关心
+        // 但需要置error标记
         if (n == NGX_ERROR) {
             r->connection->error = 1;
             return NGX_OK;
         }
 
+        // again表示无数据可读
+        // 需要使用回调ngx_http_discarded_request_body_handler读取数据
         if (n == NGX_AGAIN) {
             return NGX_AGAIN;
         }
 
+        // 读取完了数据，也是ok
         if (n == 0) {
             return NGX_OK;
         }
 
+        // 读取了n字节的数据，但不使用
+        // 交给ngx_http_discard_request_body_filter来检查
         b.pos = buffer;
         b.last = buffer + n;
 
+        // 检查请求结构体里的缓冲区数据，丢弃
+        // 有content_length_n指定确切长度，那么只接收，不处理，移动缓冲区指针
+        // chunked数据需要解析数据
+        // content_length_n==0表示数据已经全部读完
+        // 就已经完成了丢弃任务，否则就要加入epoll读事件继续读
         rc = ngx_http_discard_request_body_filter(r, &b);
 
         if (rc != NGX_OK) {
             return rc;
         }
+
+        // 如果是ok，那么在for开始的地方检查content_length_n
     }
 }
 
 
+// 检查请求结构体里的缓冲区数据，丢弃
+// 有content_length_n指定确切长度，那么只接收，不处理，移动缓冲区指针
+// chunked数据需要解析数据
+// content_length_n==0表示数据已经全部读完
+// 就已经完成了丢弃任务，否则就要加入epoll读事件继续读
 static ngx_int_t
 ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
 {
@@ -786,10 +866,13 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
     ngx_int_t                 rc;
     ngx_http_request_body_t  *rb;
 
+    // chunked数据长度不确定，需要特殊处理
     if (r->headers_in.chunked) {
 
+        // 获取专门的请求体数据结构
         rb = r->request_body;
 
+        // 如果还没有就创建
         if (rb == NULL) {
 
             rb = ngx_pcalloc(r->pool, sizeof(ngx_http_request_body_t));
@@ -807,26 +890,40 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
 
         for ( ;; ) {
 
+            // in ngx_http_parse.c
+            // 解析chunked数据
             rc = ngx_http_parse_chunked(r, b, rb->chunked);
 
+            // ok表示一个chunk解析完成
             if (rc == NGX_OK) {
 
                 /* a chunk has been parsed successfully */
 
+                // 计算实际数据的长度
                 size = b->last - b->pos;
 
+                // 实际长度大于chunk长度，可能有下一个的数据已经读了
                 if ((off_t) size > rb->chunked->size) {
+
+                    // 移动缓冲区指针，消费读取的chunk数据
                     b->pos += (size_t) rb->chunked->size;
+
+                    // chunk长度归0
                     rb->chunked->size = 0;
 
                 } else {
+                    // chunk数据不完整，没读取完
+                    // 减去已经读取的长度，剩下的就是还要读取的长度
                     rb->chunked->size -= size;
                     b->pos = b->last;
                 }
 
+                // 继续解析读取的数据，直至非ok
                 continue;
             }
 
+            // done所有的chunk数据均读取完毕
+            // content_length_n置0，表示无数据，丢弃成功
             if (rc == NGX_DONE) {
 
                 /* a whole response has been parsed successfully */
@@ -835,6 +932,7 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
                 break;
             }
 
+            // again表示数据不完整，需要继续读取
             if (rc == NGX_AGAIN) {
 
                 /* set amount of data we want to see next time */
@@ -852,14 +950,30 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
         }
 
     } else {
+        // 不是chunked，请求体数据有确定的长度
+
+        // 检查缓冲区里头之后的数据，即收到的请求体数据
         size = b->last - b->pos;
 
+        // 收到的数据大于头里的content_length_n
         if ((off_t) size > r->headers_in.content_length_n) {
+
+            // 缓冲区指针移动，即消费content_length_n的数据
             b->pos += (size_t) r->headers_in.content_length_n;
+
+            // content_length_n置0，表示无数据，丢弃成功
             r->headers_in.content_length_n = 0;
 
         } else {
+
+            // 收到的数据不足，即还没有收完content_length_n字节数
+            // 如果正好收完，也是在这里处理
+
+            // 指针直接移动到最后，即消费所有收到的数据
             b->pos = b->last;
+
+            // 头里的content_length_n减少，即还将要收多少数据
+            // 如果正好收完，那么值就是0，丢弃成功
             r->headers_in.content_length_n -= size;
         }
     }
