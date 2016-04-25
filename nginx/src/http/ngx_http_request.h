@@ -461,6 +461,8 @@ struct ngx_http_request_s {
     // 响应头结构体
     ngx_http_headers_out_t            headers_out;
 
+    // 读取并存储请求体
+    // 指针的形式只有在需要的时候才分配内存
     ngx_http_request_body_t          *request_body;
 
     // 延迟关闭的时间点，用于ngx_http_discarded_request_body_handler
@@ -500,6 +502,7 @@ struct ngx_http_request_s {
     ngx_http_handler_pt               content_handler;
     ngx_uint_t                        access_code;
 
+    // 变量值数组，每个请求都不同
     ngx_http_variable_value_t        *variables;
 
 #if (NGX_PCRE)
@@ -600,22 +603,38 @@ struct ngx_http_request_s {
 #endif
 
     unsigned                          pipeline:1;
+
+    // 两种含义，如果请求头有chunked那么置1，表示请求体长度不确定
+    // 如果响应头无content_length_n，那么表示响应体长度不确定，是chunked
     unsigned                          chunked:1;
+
+    // 只有响应头的标志位
     unsigned                          header_only:1;
+
+    // 是否keep alive
     unsigned                          keepalive:1;
+
+    // 延后关闭标志
     unsigned                          lingering_close:1;
 
     // 丢弃请求体的标志，在ngx_http_discard_request_body里设置
     unsigned                          discard_body:1;
 
+    // 正在读取请求体，在ngx_http_read_client_request_body里设置
     unsigned                          reading_body:1;
+
+    // 是否是内部请求，即子请求
     unsigned                          internal:1;
+
     unsigned                          error_page:1;
     unsigned                          filter_finalize:1;
     unsigned                          post_action:1;
     unsigned                          request_complete:1;
     unsigned                          request_output:1;
+
+    // 是否已经发送了头，如果已经发送则不能再次设置或发送头
     unsigned                          header_sent:1;
+
     unsigned                          expect_tested:1;
     unsigned                          root_tested:1;
     unsigned                          done:1;
@@ -667,6 +686,7 @@ struct ngx_http_request_s {
     u_char                           *port_start;
     u_char                           *port_end;
 
+    // http的主次版本号
     unsigned                          http_minor:16;
     unsigned                          http_major:16;
 };
