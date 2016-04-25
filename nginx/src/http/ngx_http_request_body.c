@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_discard_request_body
+// * ngx_http_discarded_request_body_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -18,6 +21,7 @@ static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
 // 读取请求体数据并丢弃
 // 使用固定的4k缓冲区接受丢弃的数据
 // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 因为使用的是et模式，所以必须把数据读完
 // 需要使用回调ngx_http_discarded_request_body_handler读取数据
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 
@@ -583,7 +587,8 @@ ngx_http_write_request_body(ngx_http_request_t *r)
 // 因为要丢弃数据，所以不需要检查超时，也就是说即使超时也不算是错误
 // 如果头里的长度是0且不是chunked
 // 说明没有请求体数据，那么就无需再读，直接返回成功
-// 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// *一直*读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 因为使用的是et模式，所以必须把数据读完
 // 调用ngx_http_discard_request_body_filter检查收到的数据
 // 使用回调ngx_http_discarded_request_body_handler读取数据
 ngx_int_t
@@ -635,6 +640,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     size = r->header_in->last - r->header_in->pos;
 
     // 有数据，或者是chunked数据
+    // 有可能已经读取了一些请求体数据，所以先检查一下
     if (size || r->headers_in.chunked) {
         // 检查请求结构体里的缓冲区数据，丢弃
         // 有content_length_n指定确切长度，那么只接收，不处理，移动缓冲区指针
@@ -657,6 +663,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     // 接下来就读取请求体数据并丢弃
     // 使用固定的4k缓冲区接受丢弃的数据
     // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+    // 因为使用的是et模式，所以必须把数据读完
     // 需要使用回调ngx_http_discarded_request_body_handler读取数据
     rc = ngx_http_read_discarded_request_body(r);
 
@@ -674,6 +681,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
 
     // 读事件not ready，无数据可读，那么就要在epoll里加入读事件和handler
     // 注意，不再需要加入定时器
+    // 之后再有数据来均由ngx_http_discarded_request_body_handler处理
 
     r->read_event_handler = ngx_http_discarded_request_body_handler;
 
@@ -691,6 +699,11 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
 }
 
 
+// 丢弃请求体读事件处理，在epoll里加入读事件和handler
+// 这时epoll通知socket上有数据可以读取
+// ngx_http_read_discarded_request_body ok表示数据已经读完
+// 传递done给ngx_http_finalize_request，并不是真正结束请求
+// 因为有引用计数器r->count，所以在ngx_http_close_request里只是减1的效果
 void
 ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 {
@@ -700,9 +713,11 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 获取读事件相关的连接对象和请求对象
     c = r->connection;
     rev = c->read;
 
+    // 检查超时，使用的是lingering_timeout
     if (rev->timedout) {
         c->timedout = 1;
         c->error = 1;
@@ -710,6 +725,8 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
         return;
     }
 
+    // 设置延时时间，那么就会设置超时时间timer
+    // 如果是一开始就丢弃请求体，那么就不会走这里， timer=0
     if (r->lingering_time) {
         timer = (ngx_msec_t) r->lingering_time - (ngx_msec_t) ngx_time();
 
@@ -724,8 +741,15 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
         timer = 0;
     }
 
+    // 这时epoll通知socket上有数据可以读取
+    // 读取请求体数据并丢弃
+    // 使用固定的4k缓冲区接受丢弃的数据
+    // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
     rc = ngx_http_read_discarded_request_body(r);
 
+    // ok表示数据已经读完
+    // 传递done给ngx_http_finalize_request，并不是真正结束请求
+    // 因为有引用计数器r->count，所以在ngx_http_close_request里只是减1的效果
     if (rc == NGX_OK) {
         r->discard_body = 0;
         r->lingering_close = 0;
@@ -733,6 +757,7 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
         return;
     }
 
+    // 出错
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         c->error = 1;
         ngx_http_finalize_request(r, NGX_ERROR);
@@ -741,12 +766,15 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 
     /* rc == NGX_AGAIN */
 
+    // again则需要再次加入epoll事件，等有数据来再次进入
+    // rev的handler不变，直接加入
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         c->error = 1;
         ngx_http_finalize_request(r, NGX_ERROR);
         return;
     }
 
+    // 如果是一开始就丢弃请求体，那么就不会走这里， timer=0
     if (timer) {
 
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -765,6 +793,7 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 // 读取请求体数据并丢弃
 // 使用固定的4k缓冲区接受丢弃的数据
 // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 因为使用的是et模式，所以必须把数据读完
 // 需要使用回调ngx_http_discarded_request_body_handler读取数据
 static ngx_int_t
 ngx_http_read_discarded_request_body(ngx_http_request_t *r)

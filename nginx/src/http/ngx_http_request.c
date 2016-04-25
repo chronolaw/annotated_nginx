@@ -3010,6 +3010,7 @@ ngx_http_request_finalizer(ngx_http_request_t *r)
 }
 
 
+// 仅打印日志，不从socket读数据，故客户端发送将阻塞
 void
 ngx_http_block_reading(ngx_http_request_t *r)
 {

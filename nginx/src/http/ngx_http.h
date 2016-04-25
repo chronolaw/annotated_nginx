@@ -220,10 +220,29 @@ size_t ngx_http_get_time(char *buf, time_t t);
 
 
 // 丢弃http请求体，对于get等请求是必须的
+// 子请求不与客户端直接通信，不会有请求体的读取
+// 已经设置了discard_body标志，表示已经调用了此函数
+// request_body指针不空，表示已经调用了此函数
+// 这三种情况就无需再启动读取handler，故直接返回成功
+// 因为要丢弃数据，所以不需要检查超时，也就是说即使超时也不算是错误
+// 如果头里的长度是0且不是chunked
+// 说明没有请求体数据，那么就无需再读，直接返回成功
+// *一直*读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
+// 因为使用的是et模式，所以必须把数据读完
+// 调用ngx_http_discard_request_body_filter检查收到的数据
+// 使用回调ngx_http_discarded_request_body_handler读取数据
 ngx_int_t ngx_http_discard_request_body(ngx_http_request_t *r);
 
+// 丢弃请求体读事件处理，在epoll里加入读事件和handler
+// 这时epoll通知socket上有数据可以读取
+// ngx_http_read_discarded_request_body ok表示数据已经读完
+// 传递done给ngx_http_finalize_request，并不是真正结束请求
+// 因为有引用计数器r->count，所以在ngx_http_close_request里只是减1的效果
 void ngx_http_discarded_request_body_handler(ngx_http_request_t *r);
+
+// 仅打印日志，不从socket读数据，故客户端发送将阻塞
 void ngx_http_block_reading(ngx_http_request_t *r);
+
 void ngx_http_test_reading(ngx_http_request_t *r);
 
 

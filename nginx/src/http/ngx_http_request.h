@@ -460,6 +460,8 @@ struct ngx_http_request_s {
 
     ngx_http_request_body_t          *request_body;
 
+    // 延迟关闭的时间点，用于ngx_http_discarded_request_body_handler
+    // 可以在这之前接收数据
     time_t                            lingering_time;
 
     // 请求开始的时间，可用于限速
