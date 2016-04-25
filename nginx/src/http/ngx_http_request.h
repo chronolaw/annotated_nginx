@@ -608,7 +608,8 @@ struct ngx_http_request_s {
     // 如果响应头无content_length_n，那么表示响应体长度不确定，是chunked
     unsigned                          chunked:1;
 
-    // 只有响应头的标志位
+    // 只有头的标志位
+    // ngx_http_header_filter_module里检查，如果方法是head则置1
     unsigned                          header_only:1;
 
     // 是否keep alive
