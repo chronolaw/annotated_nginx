@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_discard_request_body
+// * ngx_http_read_discarded_request_body
 // * ngx_http_discarded_request_body_handler
 
 /*
@@ -629,7 +630,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         ngx_del_timer(rev);
     }
 
-    // 如果头里的长度是0且不是chunked
+    // 如果头里的长度未设置、或者是0且不是chunked
     // 说明没有请求体数据，那么就无需再读，直接返回成功
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         return NGX_OK;
@@ -659,7 +660,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         }
     }
 
-    // 走到这里，表面content_length_n>=0，还有数据要读取
+    // 走到这里，表明content_length_n>=0，还有数据要读取
     // 接下来就读取请求体数据并丢弃
     // 使用固定的4k缓冲区接受丢弃的数据
     // 一直读数据并解析，检查content_length_n,如果无数据可读就返回NGX_AGAIN
@@ -682,9 +683,12 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     // 读事件not ready，无数据可读，那么就要在epoll里加入读事件和handler
     // 注意，不再需要加入定时器
     // 之后再有数据来均由ngx_http_discarded_request_body_handler处理
+    // 里面还是调用ngx_http_read_discarded_request_body读数据
 
     r->read_event_handler = ngx_http_discarded_request_body_handler;
 
+    // 注意，读事件的handler实际上是ngx_http_request_handler
+    // 但最终会调用r->read_event_handler
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -718,6 +722,7 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
     rev = c->read;
 
     // 检查超时，使用的是lingering_timeout
+    // 普通的丢弃不会进入这里
     if (rev->timedout) {
         c->timedout = 1;
         c->error = 1;
@@ -768,6 +773,8 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 
     // again则需要再次加入epoll事件，等有数据来再次进入
     // rev的handler不变，直接加入
+    // 注意，读事件的handler实际上是ngx_http_request_handler
+    // 但最终会调用r->read_event_handler，即本函数
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         c->error = 1;
         ngx_http_finalize_request(r, NGX_ERROR);

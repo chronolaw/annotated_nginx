@@ -2491,6 +2491,7 @@ ngx_http_request_handler(ngx_event_t *ev)
     // 请求自己的读写事件已经处理完
 
     // 如果有子请求，那么都要处理
+    // 每当有事件发生，子请求都会有机会得到处理
     ngx_http_run_posted_requests(c);
 }
 
