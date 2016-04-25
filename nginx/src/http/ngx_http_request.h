@@ -419,7 +419,10 @@ struct ngx_http_request_s {
     ngx_connection_t                 *connection;
 
     // 保存有所有http模块的配置、ctx数据
+    // 使用ngx_http_get_module_ctx获取ctx
     void                            **ctx;
+
+    // 使用ngx_http_get_module_main_conf访问
     void                            **main_conf;
     void                            **srv_conf;
     void                            **loc_conf;

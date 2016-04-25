@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -563,6 +564,7 @@ ngx_http_write_request_body(ngx_http_request_t *r)
 }
 
 
+// 要求nginx丢弃请求体数据
 ngx_int_t
 ngx_http_discard_request_body(ngx_http_request_t *r)
 {
@@ -577,6 +579,10 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     }
 #endif
 
+    // 子请求不与客户端直接通信，不会有请求体的读取
+    // 已经设置了discard_body标志，表示已经调用了此函数
+    // request_body指针不空，表示已经调用了此函数
+    // 这三种情况就无需再启动读取handler，故直接返回成功
     if (r != r->main || r->discard_body || r->request_body) {
         return NGX_OK;
     }
@@ -585,20 +591,28 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 从请求获取连接对象，再获得读事件
     rev = r->connection->read;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0, "http set discard body");
 
+    // 因为要丢弃数据，所以不需要检查超时，也就是说即使超时也不算是错误
+    // 不检查读事件的超时，有数据就读
     if (rev->timer_set) {
         ngx_del_timer(rev);
     }
 
+    // 如果头里的长度是0且不是chunked
+    // 说明没有请求体数据，那么就无需再读，直接返回成功
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         return NGX_OK;
     }
 
+    // 检查缓冲区里在解析完头后是否还有数据
+    // 也就是说之前可能读取了部分请求体数据
     size = r->header_in->last - r->header_in->pos;
 
+    // 有数据，或者是chunked数据
     if (size || r->headers_in.chunked) {
         rc = ngx_http_discard_request_body_filter(r, r->header_in);
 
@@ -611,6 +625,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         }
     }
 
+    // 接下来就读取请求体数据并丢弃
     rc = ngx_http_read_discarded_request_body(r);
 
     if (rc == NGX_OK) {
