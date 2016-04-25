@@ -331,6 +331,8 @@ typedef struct {
     // 读取chunk数据的结构体，用于ngx_http_parse_chunked()
     ngx_http_chunked_t               *chunked;
 
+    // 当读取完毕后的回调函数
+    // 即ngx_http_read_client_request_body的第二个参数
     ngx_http_client_body_handler_pt   post_handler;
 } ngx_http_request_body_t;
 
@@ -450,6 +452,7 @@ struct ngx_http_request_s {
     ngx_pool_t                       *pool;
 
     // 缓冲区，用于读取请求头
+    // 如果有请求体数据，也会都读到这里
     ngx_buf_t                        *header_in;
 
     // 请求头结构体
@@ -511,6 +514,7 @@ struct ngx_http_request_s {
     /* used to learn the Apache compatible response length without a header */
     size_t                            header_size;
 
+    // 收到的请求数据总长度，即header+body
     off_t                             request_length;
 
     ngx_uint_t                        err_status;
@@ -553,11 +557,17 @@ struct ngx_http_request_s {
     unsigned                          uri_changes:4;
 
     unsigned                          request_body_in_single_buf:1;
+
+    // 是否把请求体数据存入文件，与request_body_no_buffering相反
     unsigned                          request_body_in_file_only:1;
+
     unsigned                          request_body_in_persistent_file:1;
     unsigned                          request_body_in_clean_file:1;
     unsigned                          request_body_file_group_access:1;
     unsigned                          request_body_file_log_level:3;
+
+    // 0-缓存请求体数据
+    // 1-不缓存请求体数据
     unsigned                          request_body_no_buffering:1;
 
     unsigned                          subrequest_in_memory:1;

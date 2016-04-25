@@ -3,6 +3,8 @@
 // * ngx_http_discard_request_body
 // * ngx_http_read_discarded_request_body
 // * ngx_http_discarded_request_body_handler
+//
+// * ngx_http_read_client_request_body
 
 /*
  * Copyright (C) Igor Sysoev
@@ -34,14 +36,19 @@ static ngx_int_t ngx_http_discard_request_body_filter(ngx_http_request_t *r,
 
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 
+// 分为chunked和确定长度两种
+// 简单起见只研究确定长度，即ngx_http_request_body_length_filter
 static ngx_int_t ngx_http_request_body_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
+
 static ngx_int_t ngx_http_request_body_length_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
+
 static ngx_int_t ngx_http_request_body_chunked_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
 
 
+// 要求nginx读取请求体，传入一个post_handler
 ngx_int_t
 ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler)
@@ -54,6 +61,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 引用计数器增加，表示此请求还有关联的操作，不能直接销毁
     r->main->count++;
 
 #if (NGX_HTTP_SPDY)
@@ -64,9 +72,15 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     }
 #endif
 
+    // 子请求不与客户端直接通信，不会有请求体的读取
+    // 已经设置了discard_body标志，表示已经开始丢弃请求体
+    // request_body指针不空，表示已经开始读取请求体
     if (r != r->main || r->request_body || r->discard_body) {
         r->request_body_no_buffering = 0;
+
+        // 不需要再读取数据了，直接回调handler
         post_handler(r);
+
         return NGX_OK;
     }
 
@@ -75,10 +89,13 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         goto done;
     }
 
+    // 如果要求不缓存请求体数据
+    // 那么请求体就不会存在磁盘文件里
     if (r->request_body_no_buffering) {
         r->request_body_in_file_only = 0;
     }
 
+    // 创建请求体数据结构体
     rb = ngx_pcalloc(r->pool, sizeof(ngx_http_request_body_t));
     if (rb == NULL) {
         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -96,18 +113,24 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
      */
 
     rb->rest = -1;
+
+    // 当读取完毕后的回调函数
+    // 即ngx_http_read_client_request_body的第二个参数
     rb->post_handler = post_handler;
 
     r->request_body = rb;
 
+    // 数据长度不对，直接回调handler
     if (r->headers_in.content_length_n < 0 && !r->headers_in.chunked) {
         r->request_body_no_buffering = 0;
         post_handler(r);
         return NGX_OK;
     }
 
+    // 查看已经读取的数据，即缓冲区里头之后的数据
     preread = r->header_in->last - r->header_in->pos;
 
+    // 已经读取了部分body
     if (preread) {
 
         /* there is the pre-read part of the request body */
@@ -208,9 +231,13 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         goto done;
     }
 
+    // 取模块的loc配置
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 查看body的缓冲区大小
     size = clcf->client_body_buffer_size;
+
+    // 增加1/4的长度
     size += size >> 2;
 
     /* TODO: honor r->request_body_in_single_buf */
@@ -1060,6 +1087,8 @@ ngx_http_test_expect(ngx_http_request_t *r)
 }
 
 
+// 分为chunked和确定长度两种
+// 简单起见只研究确定长度，即ngx_http_request_body_length_filter
 static ngx_int_t
 ngx_http_request_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -1072,6 +1101,7 @@ ngx_http_request_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
+// 调用请求体过滤链表
 static ngx_int_t
 ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -1133,6 +1163,7 @@ ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
         ll = &tl->next;
     }
 
+    // 这里调用请求体过滤链表
     rc = ngx_http_top_request_body_filter(r, out);
 
     ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &out,
