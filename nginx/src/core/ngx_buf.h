@@ -188,6 +188,9 @@ void ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free,
 
 off_t ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit);
 
+// 根据已经实际发送的字节数更新链表
+// 已经发送的缓冲区会清空
+// 最后返回处理之后的链表指针
 ngx_chain_t *ngx_chain_update_sent(ngx_chain_t *in, off_t sent);
 
 #endif /* _NGX_BUF_H_INCLUDED_ */

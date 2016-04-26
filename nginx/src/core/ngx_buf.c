@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_chain_update_sent
 
 /*
  * Copyright (C) Igor Sysoev
@@ -44,6 +47,9 @@ ngx_create_temp_buf(ngx_pool_t *pool, size_t size)
 }
 
 
+// 从内存池的空闲链表里取一个对象
+// 如果空闲链表是空才真正创建对象
+// 这是对象池模式，提高运行效率
 ngx_chain_t *
 ngx_alloc_chain_link(ngx_pool_t *pool)
 {
@@ -65,6 +71,7 @@ ngx_alloc_chain_link(ngx_pool_t *pool)
 }
 
 
+// 创建多个链表节点
 ngx_chain_t *
 ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs)
 {
@@ -262,47 +269,69 @@ ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
 }
 
 
+// 根据已经实际发送的字节数更新链表
+// 已经发送的缓冲区会清空
+// 最后返回处理之后的链表指针
 ngx_chain_t *
 ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
 {
     off_t  size;
 
+    // sent字节数处理完结束循环
     for ( /* void */ ; in; in = in->next) {
 
+        // 忽略flush、sync、eof等控制用特殊缓冲区
         if (ngx_buf_special(in->buf)) {
             continue;
         }
 
+        // 优化，0不做任何处理
         if (sent == 0) {
             break;
         }
 
+        // 计算当前链表节点里缓冲区的大小
         size = ngx_buf_size(in->buf);
 
+        // 总发送字节数大于此缓冲区
+        // 也就是说会有多于一个的链表节点
         if (sent >= size) {
+            // sent数减少
             sent -= size;
 
+            // 内存缓冲区，直接清空，指针pos指向last
             if (ngx_buf_in_memory(in->buf)) {
                 in->buf->pos = in->buf->last;
             }
 
+            // 文件缓冲区，直接清空，指针pos指向last
             if (in->buf->in_file) {
                 in->buf->file_pos = in->buf->file_last;
             }
 
+            // 链表指针后移，继续处理下一个节点
             continue;
         }
 
+        // 此缓冲区的大小多于剩余的sent字节
+        // 即此缓冲区只发送了一部分，还有一些没有发送出去
+
+
+        // 调整内存缓冲区的指针，剩下的是未发送的
         if (ngx_buf_in_memory(in->buf)) {
             in->buf->pos += (size_t) sent;
         }
 
+        // 调整文件缓冲区的指针，剩下的是未发送的
         if (in->buf->in_file) {
             in->buf->file_pos += sent;
         }
 
+        // sent字节数已经处理完，结束循环
+        // 其实也可以令sent=0，然后在循环开头结束
         break;
     }
 
+    // 最后返回处理之后的链表指针
     return in;
 }
