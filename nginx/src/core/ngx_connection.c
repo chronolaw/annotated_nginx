@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_create_listening
+// * ngx_configure_listening_sockets
 
 /*
  * Copyright (C) Igor Sysoev
@@ -686,6 +689,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_DEFERRED_ACCEPT)
 
+// 这个是freebsd的设置
 #ifdef SO_ACCEPTFILTER
 
         if (ls[i].delete_deferred) {
@@ -731,8 +735,12 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 
 #endif
 
+// 这个是linux的设置
 #ifdef TCP_DEFER_ACCEPT
 
+        // deferred，只有socket上有数据可读才接受连接
+        // 由内核检查客户端连接的数据发送情况
+        // 减少了epoll的调用次数，可以提高性能
         if (ls[i].add_deferred || ls[i].delete_deferred) {
 
             if (ls[i].add_deferred) {

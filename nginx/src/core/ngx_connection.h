@@ -295,6 +295,7 @@ ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
 // 创建socket, bind/listen
 ngx_int_t ngx_open_listening_sockets(ngx_cycle_t *cycle);
 
+// ngx_init_cycle()里调用，在ngx_open_listening_sockets()之后
 // 配置监听端口的rcvbuf/sndbuf等参数，调用setsockopt()
 void ngx_configure_listening_sockets(ngx_cycle_t *cycle);
 
