@@ -200,8 +200,12 @@ void ngx_http_request_empty_handler(ngx_http_request_t *r);
 ngx_int_t ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags);
 
 
+// 要求nginx读取请求体，传入一个post_handler
+// 引用计数器增加，表示此请求还有关联的操作，不能直接销毁
+// 所以post_handler里需要调用ngx_http_finalize_request来结束请求
 ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
+
 ngx_int_t ngx_http_read_unbuffered_request_body(ngx_http_request_t *r);
 
 // 发送http头，调用过滤链表

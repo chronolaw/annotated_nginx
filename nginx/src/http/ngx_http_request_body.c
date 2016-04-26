@@ -133,6 +133,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
      *     rb->chunked = NULL;
      */
 
+    // -1表示未初始化
     rb->rest = -1;
 
     // 当读取完毕后的回调函数
@@ -229,6 +230,8 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
             // 写事件阻塞
             r->write_event_handler = ngx_http_request_empty_handler;
 
+            // 在rb->buf里读取数据
+            // 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
             rc = ngx_http_do_read_client_request_body(r);
             goto done;
         }
@@ -348,6 +351,8 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     // 写事件阻塞
     r->write_event_handler = ngx_http_request_empty_handler;
 
+    // 在rb->buf里读取数据
+    // 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
     rc = ngx_http_do_read_client_request_body(r);
 
 done:
@@ -367,10 +372,12 @@ done:
         post_handler(r);
     }
 
+    // 出错，减少引用计数
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         r->main->count--;
     }
 
+    // 返回错误码
     return rc;
 }
 
@@ -414,6 +421,7 @@ ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
     // 实际功能在ngx_http_do_read_client_request_body
     rc = ngx_http_do_read_client_request_body(r);
 
+    // 出错直接结束请求
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         ngx_http_finalize_request(r, rc);
     }
@@ -501,7 +509,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             // 计算剩余空间的大小
             size = rb->buf->end - rb->buf->last;
 
-            // 减取缓冲区里已经读取的长度
+            // 减去缓冲区里已经读取的长度
             rest = rb->rest - (rb->buf->last - rb->buf->pos);
 
             // 计算实际应该读取的长度，两者的小值
