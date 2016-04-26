@@ -95,6 +95,7 @@ ngx_chain_t *ngx_aio_write_chain(ngx_connection_t *c, ngx_chain_t *in,
 #endif
 
 
+// nginx分配iovec的最大数量，用在ngx_iovec_t.nalloc
 #if (IOV_MAX > 64)
 #define NGX_IOVS_PREALLOCATE  64
 #else
@@ -102,9 +103,19 @@ ngx_chain_t *ngx_aio_write_chain(ngx_connection_t *c, ngx_chain_t *in,
 #endif
 
 
+// 系统调用writev/readv的结构体
+// 封装了底层的iovec，表示多个内存块
 typedef struct {
+    // struct iovec {
+    //     void  *iov_base;    /* Starting address */
+    //     size_t iov_len;     /* Number of bytes to transfer */
+    // };
+    // 类似ngx_str_t，表示一个内存块
     struct iovec  *iovs;
+
+    // iovs数组的长度，即内存块的个数
     ngx_uint_t     count;
+
     size_t         size;
     ngx_uint_t     nalloc;
 } ngx_iovec_t;

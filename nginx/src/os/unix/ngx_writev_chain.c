@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,8 +21,10 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
     ngx_iovec_t    vec;
     struct iovec   iovs[NGX_IOVS_PREALLOCATE];
 
+    // 从连接获取写事件
     wev = c->write;
 
+    // 如果事件not ready，即暂不可写，那么立即返回，无动作
     if (!wev->ready) {
         return in;
     }
@@ -45,6 +48,7 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
     send = 0;
 
+    // 设置iovs，指向函数内部的数组iovs，长度是NGX_IOVS_PREALLOCATE，通常是64
     vec.iovs = iovs;
     vec.nalloc = NGX_IOVS_PREALLOCATE;
 
@@ -104,6 +108,8 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 }
 
 
+// 缓冲区链表转换为iovec结构体
+// 要求缓冲区必须在内存里，否则报错
 ngx_chain_t *
 ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in, size_t limit,
     ngx_log_t *log)
@@ -120,14 +126,17 @@ ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in, size_t limit,
 
     for ( /* void */ ; in && total < limit; in = in->next) {
 
+        // 忽略flush、sync、eof等控制用特殊缓冲区
         if (ngx_buf_special(in->buf)) {
             continue;
         }
 
+        // 不考虑磁盘文件
         if (in->buf->in_file) {
             break;
         }
 
+        // 要求缓冲区必须在内存里，否则报错
         if (!ngx_buf_in_memory(in->buf)) {
             ngx_log_error(NGX_LOG_ALERT, log, 0,
                           "bad buf in output chain "
@@ -147,6 +156,7 @@ ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in, size_t limit,
             return NGX_CHAIN_ERROR;
         }
 
+        // 获得缓冲区内数据长度
         size = in->buf->last - in->buf->pos;
 
         if (size > limit - total) {
