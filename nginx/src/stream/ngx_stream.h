@@ -203,6 +203,7 @@ typedef struct {
 // 类似ngx_http_request_t，表示tcp通信的会话
 // 存储有tcp处理里需要的数据，例如connection、ctx等
 // 缺点是无法扩展，如果增加一个void*成员就好了
+// 可以在ctx数组里利用模块ctx来扩展存储，但还是不太方便
 struct ngx_stream_session_s {
     // 结构体的标志，可以用来识别对象
     uint32_t                signature;         /* "STRM" */
