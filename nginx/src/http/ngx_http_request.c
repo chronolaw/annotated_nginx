@@ -2180,6 +2180,8 @@ ngx_http_process_request(ngx_http_request_t *r)
 
     // 请求的读事件设置为ngx_http_block_reading
     // 即忽略读事件，有数据也不会处理
+    // 如果之后调用了丢弃或者读取body
+    // 那么会变成ngx_http_discarded_request_body_handler/ngx_http_read_client_request_body_handler
     r->read_event_handler = ngx_http_block_reading;
 
     // in ngx_http_core_module.c

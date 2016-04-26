@@ -5,6 +5,7 @@
 // * ngx_http_discarded_request_body_handler
 //
 // * ngx_http_read_client_request_body
+// * ngx_http_read_client_request_body_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -17,7 +18,10 @@
 #include <ngx_http.h>
 
 
+// 读取请求体的handler
+// 首先检查超时，实际功能在ngx_http_do_read_client_request_body
 static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
+
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
 
@@ -309,17 +313,21 @@ ngx_http_read_unbuffered_request_body(ngx_http_request_t *r)
 }
 
 
+// 读取请求体的handler
+// 首先检查超时，实际功能在ngx_http_do_read_client_request_body
 static void
 ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
 {
     ngx_int_t  rc;
 
+    // 首先检查超时
     if (r->connection->read->timedout) {
         r->connection->timedout = 1;
         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
 
+    // 实际功能在ngx_http_do_read_client_request_body
     rc = ngx_http_do_read_client_request_body(r);
 
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
