@@ -83,6 +83,12 @@ ssize_t ngx_udp_unix_recv(ngx_connection_t *c, u_char *buf, size_t size);
 // 置ready标志，写事件暂时不可用，即不可写
 ssize_t ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size);
 
+// 发送limit长度（字节数）的数据
+// limit有限制，但基本上可以说是无限大了
+// 如果事件not ready，即暂不可写，那么立即返回，无动作
+// 要求缓冲区必须在内存里，否则报错
+// 最后返回消费缓冲区之后的链表指针
+// 发送出错、遇到again、发送完毕，这三种情况函数结束
 ngx_chain_t *ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
 
@@ -116,14 +122,26 @@ typedef struct {
     // iovs数组的长度，即内存块的个数
     ngx_uint_t     count;
 
+    // 所有内存块里的总字节数
     size_t         size;
+
+    // iovs数组的最大长度，count不能超过nalloc
     ngx_uint_t     nalloc;
 } ngx_iovec_t;
 
+// 缓冲区链表转换为iovec结构体
+// 输出参数vec，存储iovec，输入参数in是nginx的缓冲区链表
+// limit，发送数据的限制长度
+// 要求缓冲区必须在内存里，否则报错
+// 最后返回消费缓冲区之后的链表指针
 ngx_chain_t *ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in,
     size_t limit, ngx_log_t *log);
 
 
+// 封装系统调用writev，发送多个内存块
+// again，暂时不可写，需要等待事件可写再重试，返回again
+// 被中断，需要立即重试，可能就成功了
+// 其他的就是错误
 ssize_t ngx_writev(ngx_connection_t *c, ngx_iovec_t *vec);
 
 
