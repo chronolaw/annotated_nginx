@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_headers_in_t
+// * ngx_http_request_body_t
 // * ngx_http_request_s
 
 /*
@@ -322,10 +323,22 @@ typedef void (*ngx_http_client_body_handler_pt)(ngx_http_request_t *r);
 // 请求体的数据结构，用于读取或丢弃请求体数据
 typedef struct {
     ngx_temp_file_t                  *temp_file;
+
+    // 收到的数据都存在这个链表里
+    // 最后一个节点b->last_buf = 1
     ngx_chain_t                      *bufs;
+
+    // 当前使用的缓冲区
     ngx_buf_t                        *buf;
+
+    // 剩余要读取的字节数
+    // 对于确定长度（有content length）的就是r->headers_in.content_length_n
+    // 在读取过程中会不断变化，最终为0
     off_t                             rest;
+
+    // 空闲节点链表，优化用，避免再向内存池要节点
     ngx_chain_t                      *free;
+
     ngx_chain_t                      *busy;
 
     // 读取chunk数据的结构体，用于ngx_http_parse_chunked()

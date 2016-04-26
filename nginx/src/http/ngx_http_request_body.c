@@ -6,6 +6,7 @@
 //
 // * ngx_http_read_client_request_body
 // * ngx_http_read_client_request_body_handler
+// * ngx_http_do_read_client_request_body
 
 /*
  * Copyright (C) Igor Sysoev
@@ -22,7 +23,11 @@
 // 首先检查超时，实际功能在ngx_http_do_read_client_request_body
 static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
 
+// 在rb->buf里读取数据
+// 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
+
+// 请求体写入临时文件，不研究
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
 
 // 读取请求体数据并丢弃
@@ -45,6 +50,15 @@ static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 static ngx_int_t ngx_http_request_body_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
 
+// 处理确定长度的请求体数据，参数in是已经读取的数据链表
+// 先看free里是否有空闲节点，有则直接使用
+// 如果没有，就从内存池的空闲链表里获取
+// 创建新的链表节点，加入到out链表里
+// 这里只是指针操作，没有内存拷贝
+// 调用请求体过滤链表，对数据进行过滤处理
+// 实际上是ngx_http_request_body_save_filter
+// 拷贝in链表里的buf到rb->bufs里，不是直接连接
+// 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
 static ngx_int_t ngx_http_request_body_length_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
 
@@ -53,6 +67,8 @@ static ngx_int_t ngx_http_request_body_chunked_filter(ngx_http_request_t *r,
 
 
 // 要求nginx读取请求体，传入一个post_handler
+// 引用计数器增加，表示此请求还有关联的操作，不能直接销毁
+// 所以post_handler里需要调用ngx_http_finalize_request来结束请求
 ngx_int_t
 ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler)
@@ -83,6 +99,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         r->request_body_no_buffering = 0;
 
         // 不需要再读取数据了，直接回调handler
+        // 相当于触发写事件，继续之前中断的处理流程
         post_handler(r);
 
         return NGX_OK;
@@ -127,6 +144,9 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     // 数据长度不对，直接回调handler
     if (r->headers_in.content_length_n < 0 && !r->headers_in.chunked) {
         r->request_body_no_buffering = 0;
+
+        // 不需要再读取数据了，直接回调handler
+        // 相当于触发写事件，继续之前中断的处理流程
         post_handler(r);
         return NGX_OK;
     }
@@ -142,56 +162,102 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http client request body preread %uz", preread);
 
+        // 链表的第一个节点指向r->header_in
         out.buf = r->header_in;
         out.next = NULL;
 
+        // 分为chunked和确定长度两种
+        // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+        //
+        // 处理确定长度的请求体数据，参数是已经读取的数据链表
+        // 先看free里是否有空闲节点，有则直接使用
+        // 如果没有，就从内存池的空闲链表里获取
+        // 这里只是指针操作，没有内存拷贝
+        // 调用请求体过滤链表，对数据进行过滤处理
+        // 实际上是ngx_http_request_body_save_filter
+        // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+        // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
         rc = ngx_http_request_body_filter(r, &out);
 
         if (rc != NGX_OK) {
             goto done;
         }
 
+        // 增加已经读取的数据长度，但因为
+        // preread = r->header_in->last - r->header_in->pos;
+        // 实际上是没有增加
         r->request_length += preread - (r->header_in->last - r->header_in->pos);
 
+        // 不是chunked，有确定长度
+        // 还有剩余数据要读取
+        // header_in缓冲区里还有空间，足够容纳rest字节的数据
+        // 所以不需要再另外分配内存了,header_in缓冲区可以存下所有请求数据
+        // 特别优化处理
+        // 设置读事件handler为ngx_http_read_client_request_body_handler
+        // 要求继续读取
         if (!r->headers_in.chunked
             && rb->rest > 0
             && rb->rest <= (off_t) (r->header_in->end - r->header_in->last))
         {
             /* the whole request body may be placed in r->header_in */
 
+            // 创建一个缓冲区对象
             b = ngx_calloc_buf(r->pool);
             if (b == NULL) {
                 rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
                 goto done;
             }
 
+            // 指向header_in里的请求头后的所有空间
             b->temporary = 1;
             b->start = r->header_in->pos;
             b->pos = r->header_in->pos;
             b->last = r->header_in->last;
             b->end = r->header_in->end;
 
+            // 请求体使用此缓冲区
             rb->buf = b;
 
+            // 设置读事件handler为ngx_http_read_client_request_body_handler
+            // 注意，读事件的handler实际上是ngx_http_request_handler
+            // 但最终会调用r->read_event_handler
+
+            // 读取请求体的handler
+            // 首先检查超时，实际功能在ngx_http_do_read_client_request_body
             r->read_event_handler = ngx_http_read_client_request_body_handler;
+
+            // 写事件阻塞
             r->write_event_handler = ngx_http_request_empty_handler;
 
             rc = ngx_http_do_read_client_request_body(r);
             goto done;
         }
 
+        // 这里表示rest==0，一次就已经全部读取了header+body
+        // 不需要再关心读事件
+        // 走下面的if (rb->rest == 0)
+
     } else {
         /* set rb->rest */
+        // 没有读取body数据
 
+        // 分为chunked和确定长度两种
+        // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+        // 因为参数是null，所以函数里只会设置rb->rest，即剩余要读取的字节数
         if (ngx_http_request_body_filter(r, NULL) != NGX_OK) {
             rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
             goto done;
         }
+
+        // 走下面的clcf = ngx_http_get_module_loc_conf
     }
 
+    // rb->rest == 0 body已经读取完毕
+    // preread >= content length
     if (rb->rest == 0) {
         /* the whole request body was pre-read */
 
+        // 写文件暂不研究
         if (r->request_body_in_file_only) {
             if (ngx_http_write_request_body(r) != NGX_OK) {
                 rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -220,20 +286,25 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
                 rb->bufs = NULL;
             }
         }
+        // 写文件暂不研究
 
         r->request_body_no_buffering = 0;
 
+        // body已经读取完毕，可以调用post_handler继续处理流程
         post_handler(r);
 
         return NGX_OK;
     }
 
+    // 错误，负数body
     if (rb->rest < 0) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                       "negative request body rest");
         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
         goto done;
     }
+
+    // 没读到body数据，但知道了确定的body长度
 
     // 取模块的loc配置
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -246,9 +317,11 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
     /* TODO: honor r->request_body_in_single_buf */
 
+    // 长度确定，且在size里可以容纳剩余字节数
     if (!r->headers_in.chunked && rb->rest < size) {
         size = (ssize_t) rb->rest;
 
+        // 要求body在一块缓冲区里，长度增加
         if (r->request_body_in_single_buf) {
             size += preread;
         }
@@ -257,13 +330,22 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         size = clcf->client_body_buffer_size;
     }
 
+    // 内存池里分配一个缓冲区，大小为size
     rb->buf = ngx_create_temp_buf(r->pool, size);
     if (rb->buf == NULL) {
         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
         goto done;
     }
 
+    // 设置读事件handler为ngx_http_read_client_request_body_handler
+    // 注意，读事件的handler实际上是ngx_http_request_handler
+    // 但最终会调用r->read_event_handler
+
+    // 读取请求体的handler
+    // 首先检查超时，实际功能在ngx_http_do_read_client_request_body
     r->read_event_handler = ngx_http_read_client_request_body_handler;
+
+    // 写事件阻塞
     r->write_event_handler = ngx_http_request_empty_handler;
 
     rc = ngx_http_do_read_client_request_body(r);
@@ -323,6 +405,8 @@ ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
     // 首先检查超时
     if (r->connection->read->timedout) {
         r->connection->timedout = 1;
+
+        // 读取body超时错误，返回408
         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
@@ -336,6 +420,8 @@ ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
 }
 
 
+// 在rb->buf里读取数据
+// 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
 static ngx_int_t
 ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 {
@@ -357,7 +443,13 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                    "http read client request body");
 
     for ( ;; ) {
+
+        // 在rb->buf里读取数据
+        // 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
         for ( ;; ) {
+
+            // 检查请求体结构里的缓冲区
+            // 是否已经满了
             if (rb->buf->last == rb->buf->end) {
 
                 if (rb->buf->pos != rb->buf->last) {
@@ -402,24 +494,33 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
                 rb->buf->pos = rb->buf->start;
                 rb->buf->last = rb->buf->start;
-            }
+            }   // if (rb->buf->last == rb->buf->end)
 
+            // 缓冲区没有满，还可以存放数据
+
+            // 计算剩余空间的大小
             size = rb->buf->end - rb->buf->last;
+
+            // 减取缓冲区里已经读取的长度
             rest = rb->rest - (rb->buf->last - rb->buf->pos);
 
+            // 计算实际应该读取的长度，两者的小值
             if ((off_t) size > rest) {
                 size = (size_t) rest;
             }
 
+            // 调用recv，读取数据，放入缓冲区
             n = c->recv(c, rb->buf->last, size);
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http client request body recv %z", n);
 
+            // again，暂时无数据，中断内层循环
             if (n == NGX_AGAIN) {
                 break;
             }
 
+            // 读到0字节，出错
             if (n == 0) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client prematurely closed connection");
@@ -430,38 +531,66 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 return NGX_HTTP_BAD_REQUEST;
             }
 
+            // n>0，读取了一些数据
+
+            // 调整buf的last指针，有效数据增加
             rb->buf->last += n;
+
+            // 总请求数据长度增加
             r->request_length += n;
 
+            // 已经读完了所有剩余数据
             if (n == rest) {
                 /* pass buffer to request body filter chain */
 
                 out.buf = rb->buf;
                 out.next = NULL;
 
+                // 分为chunked和确定长度两种
+                // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+                //
+                // 处理确定长度的请求体数据，参数是已经读取的数据链表
+                // 先看free里是否有空闲节点，有则直接使用
+                // 如果没有，就从内存池的空闲链表里获取
+                // 这里只是指针操作，没有内存拷贝
+                // 调用请求体过滤链表，对数据进行过滤处理
+                // 实际上是ngx_http_request_body_save_filter
+                // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+                // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
                 rc = ngx_http_request_body_filter(r, &out);
 
+                // 出错则结束函数
                 if (rc != NGX_OK) {
                     return rc;
                 }
             }
 
+            // ngx_http_request_body_filter里计算了rest剩余字节数
+            // 读取完毕则结束内层循环
             if (rb->rest == 0) {
                 break;
             }
 
+            // 缓冲区没有用完，也结束内层循环
+            // 在后面调用ngx_http_request_body_filter处理读取到的数据
             if (rb->buf->last < rb->buf->end) {
                 break;
             }
-        }
+
+            // 回到内层循环开头，即缓冲区已满
+
+        }   // 内层for
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http client request body rest %O", rb->rest);
 
+        // ngx_http_request_body_filter里计算了rest剩余字节数
+        // 读取完毕则结束外层循环
         if (rb->rest == 0) {
             break;
         }
 
+        // 还有数据要读，且已经无数据可读
         if (!c->read->ready) {
 
             if (r->request_body_no_buffering
@@ -472,6 +601,17 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 out.buf = rb->buf;
                 out.next = NULL;
 
+                // 分为chunked和确定长度两种
+                // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+                //
+                // 处理确定长度的请求体数据，参数是已经读取的数据链表
+                // 先看free里是否有空闲节点，有则直接使用
+                // 如果没有，就从内存池的空闲链表里获取
+                // 这里只是指针操作，没有内存拷贝
+                // 调用请求体过滤链表，对数据进行过滤处理
+                // 实际上是ngx_http_request_body_save_filter
+                // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+                // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
                 rc = ngx_http_request_body_filter(r, &out);
 
                 if (rc != NGX_OK) {
@@ -479,21 +619,27 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 }
             }
 
+            // 读取body的超时时间
             clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
             ngx_add_timer(c->read, clcf->client_body_timeout);
 
+            // 读事件加入epoll，可读会调用ngx_http_read_client_request_body_handler
+            // 即再次进入本函数
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
             return NGX_AGAIN;
         }
-    }
+    }   // 外层for
+
+    // 只有rest==0，即读取完毕才会走到这里
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
 
+    // 请求体要写入文件，暂不研究
     if (rb->temp_file || r->request_body_in_file_only) {
 
         /* save the last part */
@@ -523,9 +669,13 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             rb->bufs = NULL;
         }
     }
+    // 请求体要写入文件，暂不研究
 
+    // 要求缓存请求体
     if (!r->request_body_no_buffering) {
         r->read_event_handler = ngx_http_block_reading;
+
+        // body已经读取完毕，可以调用post_handler继续处理流程
         rb->post_handler(r);
     }
 
@@ -533,6 +683,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 }
 
 
+// 请求体写入临时文件，不研究
 static ngx_int_t
 ngx_http_write_request_body(ngx_http_request_t *r)
 {
@@ -765,11 +916,15 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
         return;
     }
 
-    // 设置延时时间，那么就会设置超时时间timer
+    // 设置延时关闭时间，那么就会设置超时时间timer
     // 如果是一开始就丢弃请求体，那么就不会走这里， timer=0
     if (r->lingering_time) {
+
+        // 计算当前事件，是否要关闭
         timer = (ngx_msec_t) r->lingering_time - (ngx_msec_t) ngx_time();
 
+        // 延时关闭时间已到，不需要再接收数据了
+        // 清除标志，调用ngx_http_finalize_request结束请求
         if ((ngx_msec_int_t) timer <= 0) {
             r->discard_body = 0;
             r->lingering_close = 0;
@@ -1109,7 +1264,15 @@ ngx_http_request_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
-// 调用请求体过滤链表
+// 处理确定长度的请求体数据，参数in是已经读取的数据链表
+// 先看free里是否有空闲节点，有则直接使用
+// 如果没有，就从内存池的空闲链表里获取
+// 创建新的链表节点，加入到out链表里
+// 这里只是指针操作，没有内存拷贝
+// 调用请求体过滤链表，对数据进行过滤处理
+// 实际上是ngx_http_request_body_save_filter
+// 拷贝in链表里的buf到rb->bufs里，不是直接连接
+// 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
 static ngx_int_t
 ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -1119,8 +1282,11 @@ ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_chain_t               *cl, *tl, *out, **ll;
     ngx_http_request_body_t   *rb;
 
+    // 请求体数据的结构体
     rb = r->request_body;
 
+    // -1表示无效，即还没有开始读取
+    // 那么剩余字节数就是content_length_n
     if (rb->rest == -1) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http request body content length filter");
@@ -1131,21 +1297,30 @@ ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
     out = NULL;
     ll = &out;
 
+    // 遍历已经读取的数据链表
+    // 创建新的链表节点，加入到out链表里
+    // 这里只是指针操作，没有内存拷贝
     for (cl = in; cl; cl = cl->next) {
 
+        // 已经读完，无剩余字节，那么就结束循环
         if (rb->rest == 0) {
             break;
         }
 
+        // 先看free里是否有空闲节点，有则直接使用
+        // 如果没有，就从内存池的空闲链表里获取
+        // 最开始rb->free是空的，所以要从内存池里获取
         tl = ngx_chain_get_free_buf(r->pool, &rb->free);
         if (tl == NULL) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
+        // 这个缓冲区对象并不持有实际的内存块
         b = tl->buf;
 
         ngx_memzero(b, sizeof(ngx_buf_t));
 
+        // 调整缓冲区的指针，指向链表节点里的地址
         b->temporary = 1;
         b->tag = (ngx_buf_tag_t) &ngx_http_read_client_request_body;
         b->start = cl->buf->pos;
@@ -1154,26 +1329,56 @@ ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
         b->end = cl->buf->end;
         b->flush = r->request_body_no_buffering;
 
+        // 计算此缓冲区里的数据长度
         size = cl->buf->last - cl->buf->pos;
 
+        // 剩余的数据还很多
+        // 这里处理的是in链表，不是out
+        // 消费的是in链表里的缓冲区
         if ((off_t) size < rb->rest) {
+            // 消费缓冲区里的数据
             cl->buf->pos = cl->buf->last;
+
+            // 剩余字节数减少
             rb->rest -= size;
 
         } else {
+            // 这里rest字节已经读取足够了
+
+            // 消费缓冲区里的数据
             cl->buf->pos += (size_t) rb->rest;
+
+            // 剩余数据全部读取完毕，rest=0
             rb->rest = 0;
+
+            // 如果还有多余的数据也不再考虑，调整last
             b->last = cl->buf->pos;
+
+            // 标记为最后一块数据，重要
             b->last_buf = 1;
         }
 
+        // 加入链表
         *ll = tl;
         ll = &tl->next;
     }
 
-    // 这里调用请求体过滤链表
+    // 这里调用请求体过滤链表，对数据进行过滤处理
+    // 实际上是ngx_http_request_body_save_filter
+
+    // 从内存池里分配节点
+    // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+    // 同样是指针操作，没有内存拷贝
+    // 如果要求写磁盘文件，那么调用ngx_http_write_request_body
     rc = ngx_http_top_request_body_filter(r, out);
 
+    // 用于处理请求体数据，更新free/busy几个链表指针
+    // 先把out链表挂到busy指针上
+    // 遍历busy链表
+    // 缓冲区为空，说明可以复用，应该挂到free链表里
+    // 把缓冲区复位，都指向start，即完全可用
+    // 此节点不应该在busy里，从busy链表摘除
+    // 加入到free链表里，供以后复用
     ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &out,
                             (ngx_buf_tag_t) &ngx_http_read_client_request_body);
 
@@ -1334,6 +1539,11 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
+// 参数in实际上是ngx_http_request_body_length_filter里的out，即读取到的数据
+// 从内存池里分配节点
+// 拷贝in链表里的buf到rb->bufs里，不是直接连接
+// 同样是指针操作，没有内存拷贝
+// 如果要求写磁盘文件，那么调用ngx_http_write_request_body
 ngx_int_t
 ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -1342,6 +1552,7 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 #endif
     ngx_http_request_body_t   *rb;
 
+    // 请求体数据的结构体
     rb = r->request_body;
 
 #if (NGX_DEBUG)
@@ -1372,10 +1583,14 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     /* TODO: coalesce neighbouring buffers */
 
+    // 从内存池里分配节点
+    // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+    // 同样是指针操作，没有内存拷贝
     if (ngx_chain_add_copy(r->pool, &rb->bufs, in) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 如果要求写磁盘文件，那么调用ngx_http_write_request_body
     if (rb->rest > 0
         && rb->buf && rb->buf->last == rb->buf->end
         && !r->request_body_no_buffering)

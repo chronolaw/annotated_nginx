@@ -637,6 +637,12 @@ typedef ngx_int_t (*ngx_http_request_body_filter_pt)
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 
 ngx_int_t ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *chain);
+
+// 参数in实际上是ngx_http_request_body_length_filter里的out，即读取到的数据
+// 从内存池里分配节点
+// 拷贝in链表里的buf到rb->bufs里，不是直接连接
+// 同样是指针操作，没有内存拷贝
+// 如果要求写磁盘文件，那么调用ngx_http_write_request_body
 ngx_int_t ngx_http_request_body_save_filter(ngx_http_request_t *r,
    ngx_chain_t *chain);
 
