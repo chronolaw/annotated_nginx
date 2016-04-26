@@ -424,6 +424,7 @@ struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
     // 请求对应的连接对象，里面有log用于记录日志
+    // 里面还有读写事件read/write
     ngx_connection_t                 *connection;
 
     // 保存有所有http模块的配置、ctx数据
@@ -438,6 +439,10 @@ struct ngx_http_request_s {
     // 读写事件的处理函数
     // 随着处理的阶段不同会变化
     ngx_http_event_handler_pt         read_event_handler;
+
+    // 写最开始是ngx_http_empty_handler
+    // 然后是ngx_http_core_run_phases
+    // 当进入content阶段调用location handler后变成ngx_http_request_empty_handler
     ngx_http_event_handler_pt         write_event_handler;
 
 #if (NGX_HTTP_CACHE)
@@ -456,13 +461,16 @@ struct ngx_http_request_s {
     ngx_buf_t                        *header_in;
 
     // 请求头结构体
+    // 里面用链表存储了所有的头，也可以用指针快速访问常用头
     ngx_http_headers_in_t             headers_in;
 
     // 响应头结构体
+    // 里面有状态码/状态行和响应头链表
     ngx_http_headers_out_t            headers_out;
 
     // 读取并存储请求体
     // 指针的形式只有在需要的时候才分配内存
+    // 相关函数ngx_http_discard_request_body/ngx_http_read_client_request_body
     ngx_http_request_body_t          *request_body;
 
     // 延迟关闭的时间点，用于ngx_http_discarded_request_body_handler
@@ -498,7 +506,9 @@ struct ngx_http_request_s {
     ngx_http_post_subrequest_t       *post_subrequest;
     ngx_http_posted_request_t        *posted_requests;
 
+    // 执行ngx_http_core_run_phases时的重要参数，标记在引擎数组里的位置
     ngx_int_t                         phase_handler;
+
     ngx_http_handler_pt               content_handler;
     ngx_uint_t                        access_code;
 
@@ -511,7 +521,10 @@ struct ngx_http_request_s {
     u_char                           *captures_data;
 #endif
 
+    // 限速用
     size_t                            limit_rate;
+
+    // 多少字节之后开始限速
     size_t                            limit_rate_after;
 
     /* used to learn the Apache compatible response length without a header */
@@ -529,10 +542,19 @@ struct ngx_http_request_s {
 
     ngx_http_log_handler_pt           log_handler;
 
+    // 清理结构体链表，结束时会逐个调用
+    // 与内存池的清理调用时机不同
     ngx_http_cleanup_t               *cleanup;
 
+    // 子请求数量，最多不能超过200个
     unsigned                          subrequests:8;
+
+    // 引用计数，丢弃/读取请求体/发起子请求都会增加
+    // 表示当前请求有其他关联的操作，不能随意关闭
+    // 在http_close里会检查count，如果大于1只减少，不会真正关闭
     unsigned                          count:8;
+
+    // 请求的阻塞数量，用于线程池，当发起一个多线程task时需要增加
     unsigned                          blocked:8;
 
     unsigned                          aio:1;
