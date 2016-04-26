@@ -130,6 +130,9 @@ ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs)
 }
 
 
+// 从内存池里分配节点
+// 拷贝in链表里的buf到chain里，不是直接连接
+// 同样是指针操作，没有内存拷贝
 ngx_int_t
 ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
 {
@@ -137,10 +140,13 @@ ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
 
     ll = chain;
 
+    // 找到chain链表的末尾
     for (cl = *chain; cl; cl = cl->next) {
         ll = &cl->next;
     }
 
+    // 从内存池里分配节点
+    // 拷贝buf到chain里，不是直接连接
     while (in) {
         cl = ngx_alloc_chain_link(pool);
         if (cl == NULL) {
@@ -159,6 +165,8 @@ ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
 }
 
 
+// 先看free里是否有空闲节点，有则直接使用
+// 如果没有，就从内存池的空闲链表里获取
 ngx_chain_t *
 ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free)
 {
@@ -187,16 +195,27 @@ ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free)
 }
 
 
+// 用于处理请求体数据，更新free/busy几个链表指针
+// 先把out链表挂到busy指针上
+// 遍历busy链表
+// 缓冲区为空，说明可以复用，应该挂到free链表里
+// 把缓冲区复位，都指向start，即完全可用
+// 此节点不应该在busy里，从busy链表摘除
+// 加入到free链表里，供以后复用
 void
 ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
     ngx_chain_t **out, ngx_buf_tag_t tag)
 {
     ngx_chain_t  *cl;
 
+    // 把out链表挂到busy指针上
     if (*busy == NULL) {
+
+        // busy是空直接挂
         *busy = *out;
 
     } else {
+        // 否则找到busy的链表末尾再挂上
         for (cl = *busy; cl->next; cl = cl->next) { /* void */ }
 
         cl->next = *out;
@@ -204,23 +223,34 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
 
     *out = NULL;
 
+    // 遍历busy链表
     while (*busy) {
+        // 取当前节点
         cl = *busy;
 
+        // 缓冲区里有数据，停止遍历，结束函数
         if (ngx_buf_size(cl->buf) != 0) {
             break;
         }
 
+        // 缓冲区为空，说明可以复用，应该挂到free链表里
+
+        // 检查tag，如果不是本功能相关的buf就归还给内存池
+        // 跳过此节点，继续检查下一个
         if (cl->buf->tag != tag) {
             *busy = cl->next;
             ngx_free_chain(p, cl);
             continue;
         }
 
+        // 把缓冲区复位，都指向start，即完全可用
         cl->buf->pos = cl->buf->start;
         cl->buf->last = cl->buf->start;
 
+        // 此节点不应该在busy里，从busy链表摘除
         *busy = cl->next;
+
+        // 加入到free链表里，供以后复用
         cl->next = *free;
         *free = cl;
     }
