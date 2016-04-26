@@ -23,12 +23,15 @@ typedef struct {
 
 
 void ngx_time_init(void);
+
 //要求Nginx更新缓存的时间,需要使用锁，成本较高，所以不应该频繁调用
 void ngx_time_update(void);
+
 void ngx_time_sigsafe_update(void);
 
 // time_t转换为日期字符串
 u_char *ngx_http_time(u_char *buf, time_t t);
+
 u_char *ngx_http_cookie_time(u_char *buf, time_t t);
 
 // 把time_t转换为格林威治标准时间（GMT）
@@ -43,6 +46,7 @@ extern volatile ngx_time_t  *ngx_cached_time;
 
 // 当前时间的秒数（时间戳）
 #define ngx_time()           ngx_cached_time->sec
+
 // 当前完整的时间数据结构
 #define ngx_timeofday()      (ngx_time_t *) ngx_cached_time
 
