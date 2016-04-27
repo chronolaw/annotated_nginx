@@ -144,6 +144,9 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         if (send >= limit || in == NULL) {
             return in;
         }
+
+        // limit字节很多，这次没有发送完
+        // 需要再从循环开头取数据发送
     }
 }
 
@@ -220,6 +223,7 @@ ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in, size_t limit,
         // 两个buf，它们实际上指向了一块连续的内存
         // 即buf1的last是buf2的pos
         // 所以nginx进行优化，不需要赋值，直接加上长度
+        // 节约一个iov数组元素
         if (prev == in->buf->pos) {
             iov->iov_len += size;
 
@@ -269,6 +273,8 @@ ngx_writev(ngx_connection_t *c, ngx_iovec_t *vec)
     ssize_t    n;
     ngx_err_t  err;
 
+// 这个goto标签可以改用for+continue来实现
+// 即发生EINTR错误就重试发送数据
 eintr:
 
     // 系统调用writev，发送多个内存块
