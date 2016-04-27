@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,9 +11,12 @@
 #include <ngx_http.h>
 
 
+// 初始化body过滤链表头节点，保证链表末尾不是空指针
+// 此时头节点是ngx_http_write_filter
 static ngx_int_t ngx_http_write_filter_init(ngx_conf_t *cf);
 
 
+// 函数表里只有一个init函数，初始化链表指针
 static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
     NULL,                                  /* preconfiguration */
     ngx_http_write_filter_init,            /* postconfiguration */
@@ -28,6 +32,7 @@ static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
 };
 
 
+// 没有其他配置相关的信息
 ngx_module_t  ngx_http_write_filter_module = {
     NGX_MODULE_V1,
     &ngx_http_write_filter_module_ctx,     /* module context */
@@ -44,6 +49,7 @@ ngx_module_t  ngx_http_write_filter_module = {
 };
 
 
+// 真正的向客户端发送数据，调用recv
 ngx_int_t
 ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -54,8 +60,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 获取连接对象
     c = r->connection;
 
+    // 如果连接有错误就不能发送数据
     if (c->error) {
         return NGX_ERROR;
     }
@@ -64,10 +72,13 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     flush = 0;
     sync = 0;
     last = 0;
+
+    // 请求里存储的待发送的数据链表
     ll = &r->out;
 
     /* find the size, the flush point and the last link of the saved chain */
 
+    // 遍历当前待发送的数据链表，计算长度
     for (cl = r->out; cl; cl = cl->next) {
         ll = &cl->next;
 
@@ -318,6 +329,8 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
+// 初始化body过滤链表头节点，保证链表末尾不是空指针
+// 此时头节点是ngx_http_write_filter
 static ngx_int_t
 ngx_http_write_filter_init(ngx_conf_t *cf)
 {

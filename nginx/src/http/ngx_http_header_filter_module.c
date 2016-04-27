@@ -731,6 +731,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
 
+    // 定义在ngx_http_write_filter_module.c
     return ngx_http_write_filter(r, &out);
 }
 

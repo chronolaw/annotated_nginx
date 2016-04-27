@@ -17,6 +17,7 @@
 // 要求缓冲区必须在内存里，否则报错
 // 最后返回消费缓冲区之后的链表指针
 // 发送出错、遇到again、发送完毕，这三种情况函数结束
+// 返回的是最后发送到的链表节点指针
 ngx_chain_t *
 ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {

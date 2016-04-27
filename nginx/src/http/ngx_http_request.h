@@ -512,7 +512,10 @@ struct ngx_http_request_s {
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
 
+    // 发送的数据链表
+    // 所有的header、body数据都会存在这里
     ngx_chain_t                      *out;
+
     ngx_http_request_t               *main;
     ngx_http_request_t               *parent;
     ngx_http_postponed_request_t     *postponed;
