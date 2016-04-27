@@ -2,7 +2,7 @@
 Annotated Nginx Source（中文）
 
 # 简介
-注解Nginx源码，帮助学习Nginx
+注解/分析/剖析Nginx源码，帮助学习Nginx。
 
 当前使用的是1.8.1稳定版，待注解较完善后升级至1.10。
 
