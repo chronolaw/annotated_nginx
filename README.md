@@ -48,6 +48,8 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 * [ngx_http_request.h](/nginx/src/http/ngx_http_request.h)
 * [ngx_http_request.c](/nginx/src/http/ngx_http_request.c)
 * [ngx_http_request_body.c](/nginx/src/http/ngx_http_request_body.c)
+* [ngx_http_header_filter_module.c](/nginx/src/http/ngx_http_header_filter_module.c)
+* [ngx_http_write_filter_module.c](/nginx/src/http/ngx_http_write_filter_module.c)
 
 ######os/unix目录
 * [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
@@ -105,6 +107,8 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 * [ngx_http_request.h](/nginx/src/http/ngx_http_request.h)
 * [ngx_http_request.c](/nginx/src/http/ngx_http_request.c)
 * [ngx_http_request_body.c](/nginx/src/http/ngx_http_request_body.c)
+* [ngx_http_header_filter_module.c](/nginx/src/http/ngx_http_header_filter_module.c)
+* [ngx_http_write_filter_module.c](/nginx/src/http/ngx_http_write_filter_module.c)
 
 # 不注解
 
