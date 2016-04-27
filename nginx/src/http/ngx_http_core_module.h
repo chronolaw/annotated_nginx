@@ -99,6 +99,7 @@ typedef struct {
     unsigned                   so_keepalive:2;
     unsigned                   proxy_protocol:1;
 
+    // listen指令设置的backlog队列，收发缓冲区
     int                        backlog;
     int                        rcvbuf;
     int                        sndbuf;
@@ -117,6 +118,8 @@ typedef struct {
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
     char                      *accept_filter;
 #endif
+
+    // 延后accept连接特性，由内核处理有数据的连接，提高性能
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
     ngx_uint_t                 deferred_accept;
 #endif
