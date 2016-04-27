@@ -50,6 +50,7 @@ ngx_module_t  ngx_http_write_filter_module = {
 
 
 // 真正的向客户端发送数据，调用send_chain
+// 也由ngx_http_set_write_handler设置epoll的写事件触发
 // 如果数据发送不完，就保存在r->out里，返回again
 // 需要再次发生可写事件才能发送
 // 不是last、flush，且数据量较小（默认1460）
@@ -380,6 +381,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     // 清除缓冲标志位
     c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
 
+    // NGX_LOWLEVEL_BUFFERED目前似乎在nginx里还没有用到
     if ((c->buffered & NGX_LOWLEVEL_BUFFERED) && r->postponed == NULL) {
         return NGX_AGAIN;
     }

@@ -649,6 +649,7 @@ typedef ngx_int_t (*ngx_http_request_body_filter_pt)
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 
 // 真正的向客户端发送数据，调用send_chain
+// 也由ngx_http_set_write_handler设置epoll的写事件触发
 // 如果数据发送不完，就保存在r->out里，返回again
 // 需要再次发生可写事件才能发送
 // 不是last、flush，且数据量较小（默认1460）

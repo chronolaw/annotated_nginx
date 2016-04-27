@@ -78,7 +78,17 @@ static void ngx_http_request_handler(ngx_event_t *ev);
 static void ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc);
 static void ngx_http_terminate_handler(ngx_http_request_t *r);
 static void ngx_http_finalize_connection(ngx_http_request_t *r);
+
+// 设置发送数据的handler，即写事件的回调handler为write_event_handler
+// 不限速，需要加入发送超时，即send_timeout时间内socket不可写则报错
+// 使用send_lowat设置epoll写事件
+// 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+// 当可写时真正的向客户端发送数据，调用send_chain
+// 如果数据发送不完，就保存在r->out里，返回again,需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么就不真正调用write发送，减少系统调用的次数，提高性能
 static ngx_int_t ngx_http_set_write_handler(ngx_http_request_t *r);
+
 static void ngx_http_writer(ngx_http_request_t *r);
 static void ngx_http_request_finalizer(ngx_http_request_t *r);
 
@@ -2646,6 +2656,14 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
         if (r->buffered || r->postponed) {
 
+            // 设置发送数据的handler，即写事件的回调handler为write_event_handler
+            // 不限速，需要加入发送超时，即send_timeout时间内socket不可写则报错
+            // 使用send_lowat设置epoll写事件
+            // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+            // 当可写时真正的向客户端发送数据，调用send_chain
+            // 如果数据发送不完，就保存在r->out里，返回again,需要再次发生可写事件才能发送
+            // 不是last、flush，且数据量较小（默认1460）
+            // 那么就不真正调用write发送，减少系统调用的次数，提高性能
             if (ngx_http_set_write_handler(r) != NGX_OK) {
                 ngx_http_terminate_request(r, 0);
             }
@@ -2712,6 +2730,14 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
     if (r->buffered || c->buffered || r->postponed || r->blocked) {
 
+        // 设置发送数据的handler，即写事件的回调handler为write_event_handler
+        // 不限速，需要加入发送超时，即send_timeout时间内socket不可写则报错
+        // 使用send_lowat设置epoll写事件
+        // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+        // 当可写时真正的向客户端发送数据，调用send_chain
+        // 如果数据发送不完，就保存在r->out里，返回again,需要再次发生可写事件才能发送
+        // 不是last、flush，且数据量较小（默认1460）
+        // 那么就不真正调用write发送，减少系统调用的次数，提高性能
         if (ngx_http_set_write_handler(r) != NGX_OK) {
             ngx_http_terminate_request(r, 0);
         }
@@ -2873,17 +2899,37 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
 }
 
 
+// 设置发送数据的handler，即写事件的回调handler为write_event_handler
+// 不限速，需要加入发送超时，即send_timeout时间内socket不可写则报错
+// 使用send_lowat设置epoll写事件
+// 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+// 当可写时真正的向客户端发送数据，调用send_chain
+// 如果数据发送不完，就保存在r->out里，返回again,需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么就不真正调用write发送，减少系统调用的次数，提高性能
 static ngx_int_t
 ngx_http_set_write_handler(ngx_http_request_t *r)
 {
     ngx_event_t               *wev;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 当前的状态是正在发送数据
     r->http_state = NGX_HTTP_WRITING_REQUEST_STATE;
 
+    // 如果当前是丢弃请求体，那么读handler是ngx_http_discarded_request_body_handler
+    // 否则是ngx_http_test_reading
     r->read_event_handler = r->discard_body ?
                                 ngx_http_discarded_request_body_handler:
                                 ngx_http_test_reading;
+
+    // 写事件handler是ngx_http_writer
+    //
+    // 真正的向客户端发送数据，调用send_chain
+    // 如果数据发送不完，就保存在r->out里，返回again
+    // 需要再次发生可写事件才能发送
+    // 不是last、flush，且数据量较小（默认1460）
+    // 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
+    // 在此函数里处理限速
     r->write_event_handler = ngx_http_writer;
 
 #if (NGX_HTTP_SPDY)
@@ -2892,17 +2938,25 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
     }
 #endif
 
+    // 连接里的写事件
     wev = r->connection->write;
 
+    // 如果此时是可写的，或者需要限速，那么直接返回
+    // 不需要加入epoll事件
     if (wev->ready && wev->delayed) {
         return NGX_OK;
     }
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    // 不限速，需要加入发送超时
+    // 即send_timeout时间内socket不可写则报错
     if (!wev->delayed) {
         ngx_add_timer(wev, clcf->send_timeout);
     }
 
+    // 使用send_lowat设置epoll写事件
+    // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
     if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
         ngx_http_close_request(r, 0);
         return NGX_ERROR;
