@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_header_filter
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,11 +13,22 @@
 #include <ngx_http.h>
 #include <nginx.h>
 
+// ngx_http_header_filter_module是modules数组里第一个header filter模块
+// 因为nginx依据数组顺序设置链表指针
+// 所以它是header过滤链表里的最后一个节点
+// 作用是整理headers_out里的头信息，拼接成响应头字符串
+// 最后交给ngx_http_write_filter输出，即发送到socket
 
+// 初始化header过滤链表头节点，保证链表末尾不是空指针
+// 此时头节点是ngx_http_header_filter
 static ngx_int_t ngx_http_header_filter_init(ngx_conf_t *cf);
+
+// 作用是整理headers_out里的头信息，拼接成响应头字符串
+// 最后交给ngx_http_write_filter输出，即发送到socket
 static ngx_int_t ngx_http_header_filter(ngx_http_request_t *r);
 
 
+// 函数表里只有一个init函数，初始化链表指针
 static ngx_http_module_t  ngx_http_header_filter_module_ctx = {
     NULL,                                  /* preconfiguration */
     ngx_http_header_filter_init,           /* postconfiguration */
@@ -30,6 +44,7 @@ static ngx_http_module_t  ngx_http_header_filter_module_ctx = {
 };
 
 
+// 没有其他配置相关的信息
 ngx_module_t  ngx_http_header_filter_module = {
     NGX_MODULE_V1,
     &ngx_http_header_filter_module_ctx,    /* module context */
@@ -46,10 +61,17 @@ ngx_module_t  ngx_http_header_filter_module = {
 };
 
 
+// 输出响应头里的server信息，短字符串，不含版本号
 static char ngx_http_server_string[] = "Server: nginx" CRLF;
+
+// 输出响应头里的server信息，长字符串，含版本号
 static char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
 
 
+// 状态行字符串的关联数组
+// 采用状态码减取基准的方法实现映射，很巧妙
+// 例如201-200=1, 302-300 + 7
+// 可以在这里加入自己的状态码定义
 static ngx_str_t ngx_http_status_lines[] = {
 
     ngx_string("200 OK"),
@@ -63,6 +85,8 @@ static ngx_str_t ngx_http_status_lines[] = {
     /* ngx_null_string, */  /* "207 Multi-Status" */
 
 #define NGX_HTTP_LAST_2XX  207
+
+// 使用此偏移量计算3xx的位置
 #define NGX_HTTP_OFF_3XX   (NGX_HTTP_LAST_2XX - 200)
 
     /* ngx_null_string, */  /* "300 Multiple Choices" */
@@ -76,6 +100,8 @@ static ngx_str_t ngx_http_status_lines[] = {
     ngx_string("307 Temporary Redirect"),
 
 #define NGX_HTTP_LAST_3XX  308
+
+// 使用此偏移量计算4xx的位置
 #define NGX_HTTP_OFF_4XX   (NGX_HTTP_LAST_3XX - 301 + NGX_HTTP_OFF_3XX)
 
     ngx_string("400 Bad Request"),
@@ -106,6 +132,8 @@ static ngx_str_t ngx_http_status_lines[] = {
     /* ngx_null_string, */  /* "424 Failed Dependency" */
 
 #define NGX_HTTP_LAST_4XX  417
+
+// 使用此偏移量计算5xx的位置
 #define NGX_HTTP_OFF_5XX   (NGX_HTTP_LAST_4XX - 400 + NGX_HTTP_OFF_4XX)
 
     ngx_string("500 Internal Server Error"),
@@ -126,6 +154,9 @@ static ngx_str_t ngx_http_status_lines[] = {
 };
 
 
+// 常用头与headers_out里成员的映射关系
+// 使用了宏offsetof，直接得到成员的地址
+// 本模块并不使用，供其他模块使用
 ngx_http_header_out_t  ngx_http_headers_out[] = {
     { ngx_string("Server"), offsetof(ngx_http_headers_out_t, server) },
     { ngx_string("Date"), offsetof(ngx_http_headers_out_t, date) },
@@ -147,6 +178,8 @@ ngx_http_header_out_t  ngx_http_headers_out[] = {
 };
 
 
+// 作用是整理headers_out里的头信息，拼接成响应头字符串
+// 最后交给ngx_http_write_filter输出，即发送到socket
 static ngx_int_t
 ngx_http_header_filter(ngx_http_request_t *r)
 {
@@ -624,6 +657,8 @@ ngx_http_header_filter(ngx_http_request_t *r)
 }
 
 
+// 初始化header过滤链表头节点，保证链表末尾不是空指针
+// 此时头节点是ngx_http_header_filter
 static ngx_int_t
 ngx_http_header_filter_init(ngx_conf_t *cf)
 {
