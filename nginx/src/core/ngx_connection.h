@@ -233,6 +233,9 @@ struct ngx_connection_s {
     // 用来控制长连接里可处理的请求次数，指令keepalive_requests
     ngx_uint_t          requests;
 
+    // 标志位，表示连接有数据缓冲待发送
+    // c->buffered |= NGX_HTTP_WRITE_BUFFERED;
+    // 见ngx_http_write_filter_module.c
     unsigned            buffered:8;
 
     unsigned            log_error:3;     /* ngx_connection_log_error_e */

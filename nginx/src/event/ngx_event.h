@@ -92,6 +92,8 @@ struct ngx_event_s {
     // 处理完定时器事件后清除标记
     unsigned         timer_set:1;
 
+    // 需要延迟处理，用于限速，nginx会暂不写数据
+    // 参考ngx_http_write_filter_module.c
     unsigned         delayed:1;
 
     unsigned         deferred_accept:1;
