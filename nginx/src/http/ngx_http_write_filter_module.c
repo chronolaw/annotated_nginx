@@ -49,7 +49,12 @@ ngx_module_t  ngx_http_write_filter_module = {
 };
 
 
-// 真正的向客户端发送数据，调用recv
+// 真正的向客户端发送数据，调用send_chain
+// 如果数据发送不完，就保存在r->out里，返回again
+// 需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
+// 在此函数里处理限速
 ngx_int_t
 ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -68,17 +73,25 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
+    // 数据的长度，
     size = 0;
+
+    // 是否flush的标志
     flush = 0;
+
+    // 是否sync的标志
     sync = 0;
+
+    // 是否是最后一块数据，即数据全部发送完毕
     last = 0;
 
     // 请求里存储的待发送的数据链表
+    // 可能是之前因为again而未能发送出去
     ll = &r->out;
 
     /* find the size, the flush point and the last link of the saved chain */
 
-    // 遍历当前待发送的数据链表，计算长度
+    // 先遍历当前请求里待发送的数据链表，计算长度
     for (cl = r->out; cl; cl = cl->next) {
         ll = &cl->next;
 
@@ -92,6 +105,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
                        cl->buf->file_last - cl->buf->file_pos);
 
 #if 1
+        // 缓冲区0长度，但不是flush、sync等控制用缓冲区，报错
         if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
             ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                           "zero size buf in writer "
@@ -111,16 +125,20 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         }
 #endif
 
+        // 累计数据长度
         size += ngx_buf_size(cl->buf);
 
+        // flush标志
         if (cl->buf->flush || cl->buf->recycled) {
             flush = 1;
         }
 
+        // sync标志
         if (cl->buf->sync) {
             sync = 1;
         }
 
+        // 发送结束的标志
         if (cl->buf->last_buf) {
             last = 1;
         }
@@ -128,12 +146,17 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     /* add the new chain to the existent one */
 
+    // 遍历新的数据链表，计算长度
+    // 把in链表里的数据挂到r->out链表后面
     for (ln = in; ln; ln = ln->next) {
+
+        // 分配一个新的链表节点
         cl = ngx_alloc_chain_link(r->pool);
         if (cl == NULL) {
             return NGX_ERROR;
         }
 
+        // 拷贝缓冲区，然后挂到out后面
         cl->buf = ln->buf;
         *ll = cl;
         ll = &cl->next;
@@ -148,6 +171,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
                        cl->buf->file_last - cl->buf->file_pos);
 
 #if 1
+        // 缓冲区0长度，但不是flush、sync等控制用缓冲区，报错
         if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
             ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                           "zero size buf in writer "
@@ -167,21 +191,26 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         }
 #endif
 
+        // 累计数据长度
         size += ngx_buf_size(cl->buf);
 
+        // flush标志
         if (cl->buf->flush || cl->buf->recycled) {
             flush = 1;
         }
 
+        // sync标志
         if (cl->buf->sync) {
             sync = 1;
         }
 
+        // 发送结束的标志
         if (cl->buf->last_buf) {
             last = 1;
         }
     }
 
+    // 链表的最后节点，必须设置为空指针
     *ll = NULL;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -195,19 +224,29 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
      * is smaller than "postpone_output" directive
      */
 
+    // 不是last、flush，且数据量较小（默认1460）
+    // 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
     if (!last && !flush && in && size < (off_t) clcf->postpone_output) {
         return NGX_OK;
     }
 
+    // flush，用户要求立即发送
+    // last，所有的数据都集齐了，之后不会有新数据
+    // size > postpone_output，数据已经积累的足够多，应该发送了
+
+    // delayed表示需要限速，那么就暂不发送
     if (c->write->delayed) {
+        // 置标志位，表示连接有数据缓冲待发送
         c->buffered |= NGX_HTTP_WRITE_BUFFERED;
         return NGX_AGAIN;
     }
 
+    // 数据长度为0
     if (size == 0
         && !(c->buffered & NGX_LOWLEVEL_BUFFERED)
         && !(last && c->need_last_buf))
     {
+        // 释放r->out里的节点
         if (last || flush || sync) {
             for (cl = r->out; cl; /* void */) {
                 ln = cl;
@@ -229,6 +268,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
+    // 处理限速，不研究
     if (r->limit_rate) {
         if (r->limit_rate_after == 0) {
             r->limit_rate_after = clcf->limit_rate_after;
@@ -254,14 +294,25 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         }
 
     } else {
+        // 不限速，使用配置的参数，默认是0，即不限制，尽量多发
         limit = clcf->sendfile_max_chunk;
     }
 
+    // 已经发送的字节数
     sent = c->sent;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http write filter limit %O", limit);
 
+    // 调用send_chain发送out链表
+    // 实际上调用的是ngx_writev_chain
+    //
+    // 发送limit长度（字节数）的数据
+    // 如果事件not ready，即暂不可写，那么立即返回，无动作
+    // 要求缓冲区必须在内存里，否则报错
+    // 最后返回消费缓冲区之后的链表指针
+    // 发送出错、遇到again、发送完毕，这三种情况函数结束
+    // 返回的是最后发送到的链表节点指针
     chain = c->send_chain(c, r->out, limit);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -272,6 +323,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
+    // 处理限速，不研究
     if (r->limit_rate) {
 
         nsent = c->sent;
@@ -298,6 +350,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         }
     }
 
+    // 处理限速，不研究
     if (limit
         && c->write->ready
         && c->sent - sent >= limit - (off_t) (2 * ngx_pagesize))
@@ -306,19 +359,25 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         ngx_add_timer(c->write, 1);
     }
 
+    // 在out链表里把已经发送过的节点都回收，供以后复用
     for (cl = r->out; cl && cl != chain; /* void */) {
         ln = cl;
         cl = cl->next;
         ngx_free_chain(r->pool, ln);
     }
 
+    // out指向新的位置
     r->out = chain;
 
+    // 不是空指针，表明还有数据没发完
     if (chain) {
+        // 置标志位，表示连接有数据缓冲待发送
         c->buffered |= NGX_HTTP_WRITE_BUFFERED;
         return NGX_AGAIN;
     }
 
+    // 已经发送完了
+    // 清除缓冲标志位
     c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
 
     if ((c->buffered & NGX_LOWLEVEL_BUFFERED) && r->postponed == NULL) {

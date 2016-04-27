@@ -442,14 +442,26 @@ struct ngx_http_core_loc_conf_s {
     off_t         directio_alignment;      /* directio_alignment */
 
     size_t        client_body_buffer_size; /* client_body_buffer_size */
+
+    // 默认值是0,只有socket发送缓冲区大于此值才会触发可写事件
     size_t        send_lowat;              /* send_lowat */
+
+    // 默认值是1460，只有数据大于这个值才会真正发送
+    // 用于提高效率，避免频繁的系统调用
     size_t        postpone_output;         /* postpone_output */
 
     // 限制速率
+    // 用在ngx_http_write_filter_module.c
     size_t        limit_rate;              /* limit_rate */
 
+    // 限制速率
+    // 用在ngx_http_write_filter_module.c
     size_t        limit_rate_after;        /* limit_rate_after */
+
+    // 发送数据的限制，默认是0，即不限制，尽量多发
+    // 用在ngx_http_write_filter_module.c
     size_t        sendfile_max_chunk;      /* sendfile_max_chunk */
+
     size_t        read_ahead;              /* read_ahead */
 
     // 超时相关的参数
@@ -636,6 +648,12 @@ typedef ngx_int_t (*ngx_http_request_body_filter_pt)
 // 发送响应数据，调用过滤链表，执行数据过滤
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 
+// 真正的向客户端发送数据，调用send_chain
+// 如果数据发送不完，就保存在r->out里，返回again
+// 需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
+// 在此函数里处理限速
 ngx_int_t ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 
 // 参数in实际上是ngx_http_request_body_length_filter里的out，即读取到的数据

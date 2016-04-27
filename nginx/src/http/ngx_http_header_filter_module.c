@@ -732,6 +732,12 @@ ngx_http_header_filter(ngx_http_request_t *r)
     out.next = NULL;
 
     // 定义在ngx_http_write_filter_module.c
+    // 真正的向客户端发送数据，调用send_chain
+    // 如果数据发送不完，就保存在r->out里，返回again
+    // 需要再次发生可写事件才能发送
+    // 不是last、flush，且数据量较小（默认1460）
+    // 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
+    // 在此函数里处理限速
     return ngx_http_write_filter(r, &out);
 }
 
