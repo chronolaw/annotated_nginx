@@ -8,7 +8,12 @@ Annotated Nginx Source（中文）
 
 Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得仔细研究。
 
-请参考《Nginx模块开发指南：使用C++11和Boost程序库》。
+请参考：
+* [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)。
+* [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
+
+# 当前状态
+nginx 1.8.1
 
 # 已注解
 
