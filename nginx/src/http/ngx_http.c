@@ -1,6 +1,8 @@
 // annotated by chrono since 2016
 //
 // 可对比stream模块阅读
+// * ngx_http_block
+// * ngx_http_init_phase_handlers
 
 /*
  * Copyright (C) Igor Sysoev

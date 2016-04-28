@@ -242,6 +242,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_main_conf_t, server_names_hash_bucket_size),
       NULL },
 
+    // server{}块
     { ngx_string("server"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
       ngx_http_core_server,
@@ -249,7 +250,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
-    // 每个连接对象的内存池大小，默认4k
+    // 每个连接对象的内存池大小，默认256字节
     { ngx_string("connection_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -265,6 +266,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, request_pool_size),
       &ngx_http_core_pool_size_p },
 
+    // 读取请求头的超时时间
+    // ngx_http_read_request_header里设置
     { ngx_string("client_header_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -272,6 +275,9 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, client_header_timeout),
       NULL },
 
+    // 配置的头缓冲区大小，默认1k
+    // 如果头太大，或者配置的太小
+    // nginx会再多分配内存，保证读取完数据
     { ngx_string("client_header_buffer_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -279,6 +285,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, client_header_buffer_size),
       NULL },
 
+    // 头过大，需要额外的缓冲区
+    // 如果超过此大小则无法处理
     { ngx_string("large_client_header_buffers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE2,
       ngx_conf_set_bufs_slot,
@@ -307,6 +315,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, merge_slashes),
       NULL },
 
+    // 允许在头里使用下划线
     { ngx_string("underscores_in_headers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -314,6 +323,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_srv_conf_t, underscores_in_headers),
       NULL },
 
+    // 定义location
     { ngx_string("location"),
       NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE12,
       ngx_http_core_location,
@@ -321,6 +331,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // 监听端口
+    // 常用的参数sndbuf/rcvbuf/deferred/backlog
     { ngx_string("listen"),
       NGX_HTTP_SRV_CONF|NGX_CONF_1MORE,
       ngx_http_core_listen,
@@ -394,6 +406,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // 允许的最大body长度
     { ngx_string("client_max_body_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_off_slot,
@@ -401,6 +414,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_max_body_size),
       NULL },
 
+    // 读取body的缓冲区大小
     { ngx_string("client_body_buffer_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -408,6 +422,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_buffer_size),
       NULL },
 
+    // 读取body的超时时间
     { ngx_string("client_body_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -429,6 +444,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_in_file_only),
       &ngx_http_core_request_body_in_file },
 
+    // 要求body在一块缓冲区里
     { ngx_string("client_body_in_single_buffer"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -493,6 +509,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, tcp_nodelay),
       NULL },
 
+    // 即send_timeout时间内socket不可写则报错
+    // ngx_http_set_write_handler里设置
     { ngx_string("send_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -500,6 +518,9 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, send_timeout),
       NULL },
 
+    // 使用send_lowat设置epoll写事件
+    // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+    // ngx_http_set_write_handler里设置
     { ngx_string("send_lowat"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -507,6 +528,9 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, send_lowat),
       &ngx_http_core_lowat_post },
 
+    // 不是last、flush，且数据量较小（默认1460）
+    // 那么就不真正调用write发送，减少系统调用的次数，提高性能
+    // in ngx_http_write_filter
     { ngx_string("postpone_output"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -514,6 +538,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, postpone_output),
       NULL },
 
+    // 限速
+    // in ngx_http_write_filter
     { ngx_string("limit_rate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
                         |NGX_CONF_TAKE1,
@@ -522,6 +548,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, limit_rate),
       NULL },
 
+    // 限速
+    // in ngx_http_write_filter
     { ngx_string("limit_rate_after"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
                         |NGX_CONF_TAKE1,
@@ -530,6 +558,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, limit_rate_after),
       NULL },
 
+    // keepalive超时，无数据则关闭连接
+    // 设置为0则不keepalive，直接关闭
     { ngx_string("keepalive_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_core_keepalive,
@@ -584,6 +614,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, lingering_close),
       &ngx_http_core_lingering_close },
 
+    // 延迟关闭，在这段时间里还继续接收数据
     { ngx_string("lingering_time"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -591,6 +622,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, lingering_time),
       NULL },
 
+    // 延迟关闭的超时时间
     { ngx_string("lingering_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
