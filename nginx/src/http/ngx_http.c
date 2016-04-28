@@ -641,10 +641,14 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
         // 检查访问权限
         case NGX_HTTP_ACCESS_PHASE:
+            // 子请求不做访问控制，直接跳过本阶段
+            // decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+            // again/done:暂时中断ngx_http_core_run_phases
             checker = ngx_http_core_access_phase;
             n++;
             break;
 
+        // 检查访问权限后，不能介入
         case NGX_HTTP_POST_ACCESS_PHASE:
             if (use_access) {
                 ph->checker = ngx_http_core_post_access_phase;
@@ -654,6 +658,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
             continue;
 
+        // 访问静态文件，不能介入
         case NGX_HTTP_TRY_FILES_PHASE:
             if (cmcf->try_files) {
                 ph->checker = ngx_http_core_try_files_phase;
@@ -663,10 +668,12 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
             continue;
 
+        // 处理请求，产生响应内容，最常用的阶段
         case NGX_HTTP_CONTENT_PHASE:
             checker = ngx_http_core_content_phase;
             break;
 
+        // NGX_HTTP_POST_READ_PHASE/NGX_HTTP_PREACCESS_PHASE
         default:
             checker = ngx_http_core_generic_phase;
         }

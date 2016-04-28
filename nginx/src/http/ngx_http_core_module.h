@@ -589,6 +589,17 @@ void ngx_http_core_run_phases(ngx_http_request_t *r);
 
 // 各个阶段使用的checker
 
+// NGX_HTTP_POST_READ_PHASE/NGX_HTTP_PREACCESS_PHASE
+// post read/pre-access只有一个模块会执行，之后的就跳过
+//
+// ok:模块已经处理成功，直接跳过本阶段
+// decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+// again/done:暂时中断ngx_http_core_run_phases
+//
+// 由于r->write_event_handler = ngx_http_core_run_phases
+// 当再有写事件时会继续从之前的模块执行
+// 其他的错误，结束请求
+// 但如果count>1，则不会真正结束
 ngx_int_t ngx_http_core_generic_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
@@ -605,16 +616,33 @@ ngx_int_t ngx_http_core_generic_phase(ngx_http_request_t *r,
 ngx_int_t ngx_http_core_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
+// 不研究
 ngx_int_t ngx_http_core_find_config_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+// 不研究
 ngx_int_t ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+
+// NGX_HTTP_ACCESS_PHASE checker
+// 子请求不做访问控制，直接跳过本阶段
+//
+// decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+// again/done:暂时中断ngx_http_core_run_phases
+//
+// 由于r->write_event_handler = ngx_http_core_run_phases
+// 当再有写事件时会继续从之前的模块执行
+// 其他的错误，结束请求
+// 但如果count>1，则不会真正结束
 ngx_int_t ngx_http_core_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+
+// 不研究
 ngx_int_t ngx_http_core_post_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+// 不研究
 ngx_int_t ngx_http_core_try_files_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+
 ngx_int_t ngx_http_core_content_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 

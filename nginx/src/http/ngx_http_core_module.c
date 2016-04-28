@@ -2,6 +2,10 @@
 //
 // * ngx_http_core_run_phases
 // * ngx_http_handler
+// * ngx_http_core_generic_phase
+// * ngx_http_core_rewrite_phase
+// * ngx_http_core_access_phase
+// * ngx_http_core_content_phase
 
 /*
  * Copyright (C) Igor Sysoev
@@ -1007,6 +1011,17 @@ ngx_http_core_run_phases(ngx_http_request_t *r)
 }
 
 
+// NGX_HTTP_POST_READ_PHASE/NGX_HTTP_PREACCESS_PHASE
+// post read/pre-access只有一个模块会执行，之后的就跳过
+//
+// ok:模块已经处理成功，直接跳过本阶段
+// decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+// again/done:暂时中断ngx_http_core_run_phases
+//
+// 由于r->write_event_handler = ngx_http_core_run_phases
+// 当再有写事件时会继续从之前的模块执行
+// 其他的错误，结束请求
+// 但如果count>1，则不会真正结束
 ngx_int_t
 ngx_http_core_generic_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 {
@@ -1020,24 +1035,42 @@ ngx_http_core_generic_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "generic phase: %ui", r->phase_handler);
 
+    // 调用每个模块自己的处理函数
     rc = ph->handler(r);
 
+    // 模块已经处理成功，直接跳过本阶段
+    // 注意不是++，而是next
+    // 意味着post read/pre-access只有一个模块会执行，之后的就跳过
     if (rc == NGX_OK) {
         r->phase_handler = ph->next;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
+    // 模块handler返回decline，表示不处理
     if (rc == NGX_DECLINED) {
+        // 继续在本阶段（rewrite）里查找下一个模块
+        // 索引加1
         r->phase_handler++;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
+    // again/done，暂时中断ngx_http_core_run_phases
+    // 由于r->write_event_handler = ngx_http_core_run_phases
+    // 当再有写事件时会继续从之前的模块执行
     if (rc == NGX_AGAIN || rc == NGX_DONE) {
         return NGX_OK;
     }
 
     /* rc == NGX_ERROR || rc == NGX_HTTP_...  */
 
+    // 其他的错误，见上nginx注释
+
+    // 结束请求
+    // 但如果count>1，则不会真正结束
     ngx_http_finalize_request(r, rc);
 
     return NGX_OK;
@@ -1094,6 +1127,7 @@ ngx_http_core_rewrite_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 }
 
 
+// 不研究
 ngx_int_t
 ngx_http_core_find_config_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1322,6 +1356,7 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 }
 
 
+// 不研究
 ngx_int_t
 ngx_http_core_post_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1349,6 +1384,7 @@ ngx_http_core_post_access_phase(ngx_http_request_t *r,
 }
 
 
+// 不研究
 ngx_int_t
 ngx_http_core_try_files_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
