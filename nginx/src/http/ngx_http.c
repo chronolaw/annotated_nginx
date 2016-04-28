@@ -592,14 +592,20 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
         switch (i) {
 
+        // 地址改写阶段
         case NGX_HTTP_SERVER_REWRITE_PHASE:
             if (cmcf->phase_engine.server_rewrite_index == (ngx_uint_t) -1) {
                 cmcf->phase_engine.server_rewrite_index = n;
             }
+
+            // 使用的checker，参数是当前的引擎数组，里面的handler是每个模块自己的处理函数
+            // decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+            // done:暂时中断ngx_http_core_run_phases
             checker = ngx_http_core_rewrite_phase;
 
             break;
 
+        // 查找配置，不能介入
         case NGX_HTTP_FIND_CONFIG_PHASE:
             find_config_index = n;
 
@@ -609,14 +615,20 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
             continue;
 
+        // 地址改写阶段
         case NGX_HTTP_REWRITE_PHASE:
             if (cmcf->phase_engine.location_rewrite_index == (ngx_uint_t) -1) {
                 cmcf->phase_engine.location_rewrite_index = n;
             }
+
+            // 使用的checker，参数是当前的引擎数组，里面的handler是每个模块自己的处理函数
+            // decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+            // done:暂时中断ngx_http_core_run_phases
             checker = ngx_http_core_rewrite_phase;
 
             break;
 
+        // 改写后，不能介入
         case NGX_HTTP_POST_REWRITE_PHASE:
             if (use_rewrite) {
                 ph->checker = ngx_http_core_post_rewrite_phase;
@@ -627,6 +639,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
             continue;
 
+        // 检查访问权限
         case NGX_HTTP_ACCESS_PHASE:
             checker = ngx_http_core_access_phase;
             n++;

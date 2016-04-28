@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_core_run_phases
+// * ngx_http_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -855,6 +856,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
 };
 
 
+// http core模块在配置解析时调用的函数表
 static ngx_http_module_t  ngx_http_core_module_ctx = {
     // 解析配置前操作，添加http_host、http_user_agent等核心变量
     // 变量的定义存储在ngx_http_variables.c:ngx_http_core_variables
@@ -875,6 +877,7 @@ static ngx_http_module_t  ngx_http_core_module_ctx = {
 
     ngx_http_core_merge_srv_conf,          /* merge server configuration */
 
+    // 创建每个location的配置结构体
     ngx_http_core_create_loc_conf,         /* create location configuration */
     ngx_http_core_merge_loc_conf           /* merge location configuration */
 };
@@ -899,6 +902,9 @@ ngx_module_t  ngx_http_core_module = {
 ngx_str_t  ngx_http_core_get_method = { 3, (u_char *) "GET " };
 
 
+// 读取了完整的http请求头，开始处理请求
+// 在ngx_http_request.c:ngx_http_process_request里调用
+//
 // 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
 // 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
 // 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
@@ -911,6 +917,8 @@ ngx_http_handler(ngx_http_request_t *r)
     r->connection->log->action = NULL;
 
     r->connection->unexpected_eof = 0;
+
+    // internal表示这是一个子请求
 
     // 外部请求设置keepalive、lingering_close
     if (!r->internal) {
@@ -938,8 +946,10 @@ ngx_http_handler(ngx_http_request_t *r)
 
     } else {
         // 内部请求，即子请求
-        // 跳过post read，直接从server rewrite开始执行，即查找server
+
         cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+
+        // 跳过post read，直接从server rewrite开始执行，即查找server
         r->phase_handler = cmcf->phase_engine.server_rewrite_index;
     }
 
@@ -954,6 +964,7 @@ ngx_http_handler(ngx_http_request_t *r)
     r->write_event_handler = ngx_http_core_run_phases;
 
     // 启动引擎数组处理请求
+    // 从phase_handler的位置开始调用模块处理
     ngx_http_core_run_phases(r);
 }
 
@@ -978,8 +989,17 @@ ngx_http_core_run_phases(ngx_http_request_t *r)
     // 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
     while (ph[r->phase_handler].checker) {
 
+        // 调用引擎数组里的checker
         rc = ph[r->phase_handler].checker(r, &ph[r->phase_handler]);
 
+        // checker会检查handler的返回值
+        // 如果handler返回again/done那么就返回ok
+        // 退出引擎数组的处理
+        // 由于r->write_event_handler = ngx_http_core_run_phases
+        // 当再有写事件时会继续从之前的模块执行
+        //
+        // 如果checker返回again，那么继续在引擎数组里执行
+        // 模块由r->phase_handler指定，可能会有阶段的跳跃
         if (rc == NGX_OK) {
             return;
         }
@@ -1024,6 +1044,16 @@ ngx_http_core_generic_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 }
 
 
+// NGX_HTTP_SERVER_REWRITE_PHASE/NGX_HTTP_REWRITE_PHASE
+// 使用的checker，参数是当前的引擎数组，里面的handler是每个模块自己的处理函数
+//
+// decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+// done:暂时中断ngx_http_core_run_phases
+//
+// 由于r->write_event_handler = ngx_http_core_run_phases
+// 当再有写事件时会继续从之前的模块执行
+// 其他的错误，结束请求
+// 但如果count>1，则不会真正结束
 ngx_int_t
 ngx_http_core_rewrite_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 {
@@ -1032,19 +1062,32 @@ ngx_http_core_rewrite_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "rewrite phase: %ui", r->phase_handler);
 
+    // 调用每个模块自己的处理函数
     rc = ph->handler(r);
 
+    // 模块handler返回decline，表示不处理
     if (rc == NGX_DECLINED) {
+        // 继续在本阶段（rewrite）里查找下一个模块
+        // 索引加1
         r->phase_handler++;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
+    // done，暂时中断ngx_http_core_run_phases
+    // 由于r->write_event_handler = ngx_http_core_run_phases
+    // 当再有写事件时会继续从之前的模块执行
     if (rc == NGX_DONE) {
         return NGX_OK;
     }
 
     /* NGX_OK, NGX_AGAIN, NGX_ERROR, NGX_HTTP_...  */
 
+    // 其他的错误，见上nginx注释
+
+    // 结束请求
+    // 但如果count>1，则不会真正结束
     ngx_http_finalize_request(r, rc);
 
     return NGX_OK;
@@ -1146,6 +1189,7 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
 }
 
 
+// 不研究
 ngx_int_t
 ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1190,12 +1234,24 @@ ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
 }
 
 
+// NGX_HTTP_ACCESS_PHASE checker
+// 子请求不做访问控制，直接跳过本阶段
+//
+// decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
+// again/done:暂时中断ngx_http_core_run_phases
+//
+// 由于r->write_event_handler = ngx_http_core_run_phases
+// 当再有写事件时会继续从之前的模块执行
+// 其他的错误，结束请求
+// 但如果count>1，则不会真正结束
 ngx_int_t
 ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 {
     ngx_int_t                  rc;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 子请求不做访问控制，直接跳过本阶段
+    // 注意不是++，而是next
     if (r != r->main) {
         r->phase_handler = ph->next;
         return NGX_AGAIN;
@@ -1204,13 +1260,22 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "access phase: %ui", r->phase_handler);
 
+    // 调用每个模块自己的处理函数
     rc = ph->handler(r);
 
+    // 模块handler返回decline，表示不处理
     if (rc == NGX_DECLINED) {
+        // 继续在本阶段（rewrite）里查找下一个模块
+        // 索引加1
         r->phase_handler++;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
+    // agian/done，暂时中断ngx_http_core_run_phases
+    // 由于r->write_event_handler = ngx_http_core_run_phases
+    // 当再有写事件时会继续从之前的模块执行
     if (rc == NGX_AGAIN || rc == NGX_DONE) {
         return NGX_OK;
     }
@@ -1248,6 +1313,10 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 
     /* rc == NGX_ERROR || rc == NGX_HTTP_...  */
 
+    // 其他的错误，见上nginx注释
+
+    // 结束请求
+    // 但如果count>1，则不会真正结束
     ngx_http_finalize_request(r, rc);
     return NGX_OK;
 }
@@ -3711,6 +3780,7 @@ ngx_http_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 创建每个location的配置结构体
 static void *
 ngx_http_core_create_loc_conf(ngx_conf_t *cf)
 {

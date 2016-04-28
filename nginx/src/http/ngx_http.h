@@ -171,6 +171,8 @@ void ngx_http_process_request(ngx_http_request_t *r);
 
 void ngx_http_update_location_config(ngx_http_request_t *r);
 
+// 读取了完整的http请求头，开始处理请求
+// 在ngx_http_request.c:ngx_http_process_request里调用
 // 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
 // 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post read开始
 // 内部请求，即子请求.跳过post read，直接从server rewrite开始执行，即查找server
