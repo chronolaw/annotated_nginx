@@ -1596,6 +1596,21 @@ ngx_http_core_try_files_phase(ngx_http_request_t *r,
 }
 
 
+// 处理请求，产生响应内容，最常用的阶段
+// 这已经是处理的最后阶段了（log阶段不处理请求，不算）
+// 设置写事件为ngx_http_request_empty_handler
+// 即暂时不再进入ngx_http_core_run_phases
+// 之后发送数据时会改为ngx_http_set_write_handler
+// 但我们也可以修改，让写事件触发我们自己的回调
+// 检查请求是否有handler，也就是location里定义了handler
+// 调用location专用的内容处理handler
+// 返回值传递给ngx_http_finalize_request
+// 相当于处理完后结束请求
+//
+// 没有专门的handler
+// 调用每个模块自己的处理函数
+// 模块handler返回decline，表示不处理
+// 没有一个content模块可以处理,返回404
 ngx_int_t
 ngx_http_core_content_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1604,15 +1619,34 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
     ngx_int_t  rc;
     ngx_str_t  path;
 
+    // 检查请求是否有handler，也就是location里定义了handler
     if (r->content_handler) {
+        // 设置写事件为ngx_http_request_empty_handler
+        // 即暂时不再进入ngx_http_core_run_phases
+        // 之后发送数据时会改为ngx_http_set_write_handler
+        // 但我们也可以修改，让写事件触发我们自己的回调
         r->write_event_handler = ngx_http_request_empty_handler;
+
+        // 调用location专用的内容处理handler
+        // 返回值传递给ngx_http_finalize_request
+        // 相当于处理完后结束请求
+        // 这种用法简化了客户代码，相当于模板方法模式
+        // rc = handler(r); ngx_http_finalize_request(rc);
         ngx_http_finalize_request(r, r->content_handler(r));
+
+        // 结束请求
+        // 但如果count>1，则不会真正结束
+        // handler可能返回done、again
+        // 例如调用read body
+        // 需要在之后的处理函数里继续处理，不能调用write_event_handler
         return NGX_OK;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "content phase: %ui", r->phase_handler);
 
+    // 没有专门的handler
+    // 调用每个模块自己的处理函数
     rc = ph->handler(r);
 
     if (rc != NGX_DECLINED) {
@@ -1622,14 +1656,23 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
 
     /* rc == NGX_DECLINED */
 
+    // 模块handler返回decline，表示不处理
     ph++;
 
+    // 这里要检查引擎数组是否结束，最后一个元素是空的
     if (ph->checker) {
+        // 继续在本阶段（rewrite）里查找下一个模块
+        // 索引加1
         r->phase_handler++;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
     /* no content handler was found */
+
+    // 已经到了引擎数组的最末尾
+    // 没有一个content模块可以处理
 
     if (r->uri.data[r->uri.len - 1] == '/') {
 
@@ -1644,7 +1687,10 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
 
     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "no handler found");
 
+    // 返回404
     ngx_http_finalize_request(r, NGX_HTTP_NOT_FOUND);
+
+    // 结束引擎数组的循环
     return NGX_OK;
 }
 
