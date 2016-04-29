@@ -681,6 +681,7 @@ ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
 
 // 添加写事件的便捷接口，适合epoll/kqueue/select等各种事件模型
 // 内部还是调用ngx_add_event,多了个send_lowat操作
+// linux不支持send_lowat指令，send_lowat总是0
 ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
 
@@ -693,6 +694,7 @@ u_char *ngx_acceptex_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 // 设置发送数据时epoll的响应阈值
 // 当系统空闲缓冲超过lowat时触发epoll可写事件
+// linux不支持send_lowat指令，send_lowat总是0
 ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 
 

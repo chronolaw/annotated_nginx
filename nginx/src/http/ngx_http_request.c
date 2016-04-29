@@ -2957,6 +2957,7 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 
     // 使用send_lowat设置epoll写事件
     // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
+    // linux不支持send_lowat指令，send_lowat总是0
     if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
         ngx_http_close_request(r, 0);
         return NGX_ERROR;
