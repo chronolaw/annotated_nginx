@@ -63,10 +63,20 @@ static void *ngx_http_core_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_core_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
+// 解析server{}配置块，里面有location{}等
+// ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
+// main conf指针直接指向上层http_ctx，复用整个数组，无需再分配内存
+// 调用每个http模块的create_xxx_conf函数，创建配置结构体
+// http core模块的配置ctx保存了本server{}的配置数组
+// 以后通过它就可以获取本server{}的全部模块配置
+// cmcf->servers存储了所有的server{}模块信息
+// 检查是否设置了listen，如果没有就默认80
 static char *ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
+
 static char *ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
+
 static ngx_int_t ngx_http_core_regex_location(ngx_conf_t *cf,
     ngx_http_core_loc_conf_t *clcf, ngx_str_t *regex, ngx_uint_t caseless);
 
@@ -3281,6 +3291,14 @@ ngx_http_get_forwarded_addr_internal(ngx_http_request_t *r, ngx_addr_t *addr,
 }
 
 
+// 解析server{}配置块，里面有location{}等
+// ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
+// main conf指针直接指向上层http_ctx，复用整个数组，无需再分配内存
+// 调用每个http模块的create_xxx_conf函数，创建配置结构体
+// http core模块的配置ctx保存了本server{}的配置数组
+// 以后通过它就可以获取本server{}的全部模块配置
+// cmcf->servers存储了所有的server{}模块信息
+// 检查是否设置了listen，如果没有就默认80
 static char *
 ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -3295,16 +3313,24 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     ngx_http_core_srv_conf_t    *cscf, **cscfp;
     ngx_http_core_main_conf_t   *cmcf;
 
+    // ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
+    // in ngx_http_config.h
+    // ctx是本server的配置结构体数组
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 保存http{}的配置上下文
+    // 也就是http{}里的ngx_http_conf_ctx_t
     http_ctx = cf->ctx;
+
+    // main conf指针直接指向上层http_ctx，复用整个数组，无需再分配内存
     ctx->main_conf = http_ctx->main_conf;
 
     /* the server{}'s srv_conf */
 
+    // srv配置数组，存储本server基本的配置
     ctx->srv_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_CONF_ERROR;
@@ -3312,11 +3338,14 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* the server{}'s loc_conf */
 
+    // location配置数组，在server{}层次存储location基本的配置，用于合并
+    // 本身并无实际意义
     ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->loc_conf == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 调用每个http模块的create_xxx_conf函数，创建配置结构体
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_HTTP_MODULE) {
             continue;
@@ -3324,6 +3353,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
         module = ngx_modules[i]->ctx;
 
+        // 创建每个模块的srv_conf
         if (module->create_srv_conf) {
             mconf = module->create_srv_conf(cf);
             if (mconf == NULL) {
@@ -3333,6 +3363,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             ctx->srv_conf[ngx_modules[i]->ctx_index] = mconf;
         }
 
+        // 创建每个模块的loc_conf
         if (module->create_loc_conf) {
             mconf = module->create_loc_conf(cf);
             if (mconf == NULL) {
@@ -3346,30 +3377,50 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* the server configuration context */
 
+    // 获取本server{}里http core模块的srv配置，它记录了本server的核心参数
     cscf = ctx->srv_conf[ngx_http_core_module.ctx_index];
+
+    // http core模块的配置ctx保存了本server{}的配置数组
+    // 以后通过它就可以获取本server{}的全部模块配置
     cscf->ctx = ctx;
 
 
+    // 获取本server{}里http core模块的main配置，实际存储在http_ctx里
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
 
+    // cmcf->servers存储了所有的server{}模块信息
     cscfp = ngx_array_push(&cmcf->servers);
     if (cscfp == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 把本server{}的配置信息，也就是本server{}里http core模块的srv配置加入数组
+    // 以后再用cscf->ctx即可获取本server{}的全部模块配置
     *cscfp = cscf;
 
 
     /* parse inside server{} */
 
+    // server{}的解析环境已经准备好，下面开始解析server{}配置
+
+    // 暂存当前的解析上下文
     pcf = *cf;
+
+    // 设置事件模块的新解析上下文
+    // 即本server{}的ngx_http_conf_ctx_t结构体
     cf->ctx = ctx;
+
+    // 设置解析的信息，类型在之前的http解析已经设置为NGX_HTTP_MODULE
     cf->cmd_type = NGX_HTTP_SRV_CONF;
 
+    // 递归解析http模块
     rv = ngx_conf_parse(cf, NULL);
 
+    // 恢复之前保存的解析上下文
+    // 可以解析下一个server{}
     *cf = pcf;
 
+    // 检查是否设置了listen，如果没有就默认80
     if (rv == NGX_CONF_OK && !cscf->listen) {
         ngx_memzero(&lsopt, sizeof(ngx_http_listen_opt_t));
 
@@ -3408,6 +3459,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 }
 
 
+// 解析location{}配置块，里面可能还有location{}，但不建议嵌套
 static char *
 ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -3421,20 +3473,31 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     ngx_http_conf_ctx_t       *ctx, *pctx;
     ngx_http_core_loc_conf_t  *clcf, *pclcf;
 
+    // ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
+    // in ngx_http_config.h
+    // ctx是本location的配置结构体数组
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 保存server{}或上一层location{}的配置上下文
+    // 也就是server{}/location{}里的ngx_http_conf_ctx_t
     pctx = cf->ctx;
+
+    // main conf指针直接指向上层http_ctx，复用整个数组，无需再分配内存
     ctx->main_conf = pctx->main_conf;
+
+    // srv conf指针直接指向上层http_ctx，复用整个数组，无需再分配内存
     ctx->srv_conf = pctx->srv_conf;
 
+    // location配置数组，存储location基本的配置
     ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->loc_conf == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 调用每个http模块的create_xxx_conf函数，创建配置结构体
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_HTTP_MODULE) {
             continue;
@@ -3442,6 +3505,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
         module = ngx_modules[i]->ctx;
 
+        // 创建每个模块的loc_conf
         if (module->create_loc_conf) {
             ctx->loc_conf[ngx_modules[i]->ctx_index] =
                                                    module->create_loc_conf(cf);
@@ -3451,9 +3515,14 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
     }
 
+    // 获取本location{}里http core模块的location配置，它记录了本location的核心参数
     clcf = ctx->loc_conf[ngx_http_core_module.ctx_index];
+
+    // http core模块的配置ctx保存了本location{}的配置数组
+    // 以后通过它就可以获取本location{}的全部模块配置
     clcf->loc_conf = ctx->loc_conf;
 
+    // 检查location的名字
     value = cf->args->elts;
 
     if (cf->args->nelts == 3) {
