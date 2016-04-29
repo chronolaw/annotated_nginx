@@ -616,10 +616,15 @@ ngx_int_t ngx_http_core_generic_phase(ngx_http_request_t *r,
 ngx_int_t ngx_http_core_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
-// 不研究
+// 查找请求对应的location
+// 设置location里的content_handler
+// 检查本location里的最大body长度
 ngx_int_t ngx_http_core_find_config_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
-// 不研究
+
+// 检查uri的改写次数，只能nginx框架处理，用户不可介入
+// uri改写次数限制，最多10次，in ngx_http_create_request
+// 次数减到0，那么就出错，不允许无限改写uri跳转
 ngx_int_t ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
@@ -636,9 +641,11 @@ ngx_int_t ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
 ngx_int_t ngx_http_core_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
-// 不研究
+// 检查access阶段设置的access_code
+// 决定是否可以访问，即继续处理
 ngx_int_t ngx_http_core_post_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
+
 // 不研究
 ngx_int_t ngx_http_core_try_files_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);

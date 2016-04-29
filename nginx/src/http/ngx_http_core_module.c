@@ -1141,7 +1141,9 @@ ngx_http_core_rewrite_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 }
 
 
-// 不研究
+// 查找请求对应的location
+// 设置location里的content_handler
+// 检查本location里的最大body长度
 ngx_int_t
 ngx_http_core_find_config_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1154,6 +1156,11 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
     r->content_handler = NULL;
     r->uri_changed = 0;
 
+    // NGX_OK       - exact or regex match
+    // NGX_DONE     - auto redirect
+    // NGX_AGAIN    - inclusive match
+    // NGX_ERROR    - regex error
+    // NGX_DECLINED - no match
     rc = ngx_http_core_find_location(r);
 
     if (rc == NGX_ERROR) {
@@ -1173,12 +1180,15 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
                    (clcf->noname ? "*" : (clcf->exact_match ? "=" : "")),
                    &clcf->name);
 
+    // 把location里的配置拷贝到请求结构体里
+    // 重点是r->content_handler = clcf->handler;
     ngx_http_update_location_config(r);
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http cl:%O max:%O",
                    r->headers_in.content_length_n, clcf->client_max_body_size);
 
+    // 检查本location里的最大body长度
     if (r->headers_in.content_length_n != -1
         && !r->discard_body
         && clcf->client_max_body_size
@@ -1232,12 +1242,15 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 进入下一个阶段，即rewrite
     r->phase_handler++;
     return NGX_AGAIN;
 }
 
 
-// 不研究
+// 检查uri的改写次数，只能nginx框架处理，用户不可介入
+// uri改写次数限制，最多10次，in ngx_http_create_request
+// 次数减到0，那么就出错，不允许无限改写uri跳转
 ngx_int_t
 ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1247,8 +1260,11 @@ ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "post rewrite phase: %ui", r->phase_handler);
 
+    // 没有改写uri，直接进入下一个阶段
     if (!r->uri_changed) {
         r->phase_handler++;
+
+        // again继续引擎数组的循环
         return NGX_AGAIN;
     }
 
@@ -1262,8 +1278,10 @@ ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
      *     unsigned  uri_changes:4
      */
 
+    // uri改写次数限制，最多10次，in ngx_http_create_request
     r->uri_changes--;
 
+    // 次数减到0，那么就出错，不允许无限改写uri跳转
     if (r->uri_changes == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "rewrite or internal redirection cycle "
@@ -1273,11 +1291,13 @@ ngx_http_core_post_rewrite_phase(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 改写了uri，跳转到下一个阶段
     r->phase_handler = ph->next;
 
     cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
     r->loc_conf = cscf->ctx->loc_conf;
 
+    // again继续引擎数组的循环
     return NGX_AGAIN;
 }
 
@@ -1370,7 +1390,8 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 }
 
 
-// 不研究
+// 检查access阶段设置的access_code
+// 决定是否可以访问，即继续处理
 ngx_int_t
 ngx_http_core_post_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -1709,6 +1730,8 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
 }
 
 
+// 把location里的配置拷贝到请求结构体里
+// 重点是r->content_handler = clcf->handler;
 void
 ngx_http_update_location_config(ngx_http_request_t *r)
 {

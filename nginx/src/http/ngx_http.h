@@ -169,6 +169,8 @@ ngx_int_t ngx_http_process_request_header(ngx_http_request_t *r);
 // 如果有子请求，那么都要处理
 void ngx_http_process_request(ngx_http_request_t *r);
 
+// 把location里的配置拷贝到请求结构体里
+// 重点是r->content_handler = clcf->handler;
 void ngx_http_update_location_config(ngx_http_request_t *r);
 
 // 读取了完整的http请求头，开始处理请求
