@@ -130,7 +130,7 @@ static char *ngx_http_disable_symlinks(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
 
-// 对于linux，此函数为空函数
+// linux不支持send_lowat指令，报警
 static char *ngx_http_core_lowat_check(ngx_conf_t *cf, void *post, void *data);
 
 static char *ngx_http_core_pool_size(ngx_conf_t *cf, void *post, void *data);
@@ -267,6 +267,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       NULL },
 
     // 每个连接对象的内存池大小，默认256字节
+    // 会调用ngx_http_core_pool_size检查
     { ngx_string("connection_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -275,6 +276,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       &ngx_http_core_pool_size_p },
 
     // 每个请求对象的内存池大小，默认4k
+    // 会调用ngx_http_core_pool_size检查
     { ngx_string("request_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -534,6 +536,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, send_timeout),
       NULL },
 
+    // linux不支持send_lowat指令，报警
     // 使用send_lowat设置epoll写事件
     // 只有内核socket缓冲区有send_lowat的空间才会触发写事件
     // ngx_http_set_write_handler里设置
@@ -5682,7 +5685,7 @@ ngx_http_disable_symlinks(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
 
 
-// 对于linux，此函数为空函数
+// linux不支持send_lowat指令，报警
 // 检查发送用的lowat是否可用
 static char *
 ngx_http_core_lowat_check(ngx_conf_t *cf, void *post, void *data)
