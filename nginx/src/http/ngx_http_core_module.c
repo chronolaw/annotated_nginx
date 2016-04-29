@@ -74,6 +74,10 @@ static char *ngx_http_core_merge_loc_conf(ngx_conf_t *cf,
 static char *ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
 
+// 解析location{}配置块，里面可能还有location{}，但不建议嵌套
+// 解析 = ^~ ~ ~* @ 等正则标识符
+// http core模块的配置ctx保存了本location{}的配置数组
+// 以后通过它就可以获取本location{}的全部模块配置
 static char *ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
 
@@ -3460,6 +3464,9 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
 
 // 解析location{}配置块，里面可能还有location{}，但不建议嵌套
+// 解析 = ^~ ~ ~* @ 等正则标识符
+// http core模块的配置ctx保存了本location{}的配置数组
+// 以后通过它就可以获取本location{}的全部模块配置
 static char *
 ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -3525,34 +3532,42 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     // 检查location的名字
     value = cf->args->elts;
 
+    // 解析 = ^~ ~ ~* @ 等正则标识符
     if (cf->args->nelts == 3) {
+        // 这里是标识符与名字分离
+        // 例如 = root {}
 
         len = value[1].len;
         mod = value[1].data;
         name = &value[2];
 
+        // = 精确匹配
         if (len == 1 && mod[0] == '=') {
 
             clcf->name = *name;
             clcf->exact_match = 1;
 
+        // ^~ 不使用正则，前缀匹配
         } else if (len == 2 && mod[0] == '^' && mod[1] == '~') {
 
             clcf->name = *name;
             clcf->noregex = 1;
 
+        // ~ 正则匹配，区分大小写
         } else if (len == 1 && mod[0] == '~') {
 
             if (ngx_http_core_regex_location(cf, clcf, name, 0) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
 
+        // ~* 正则匹配，不区分大小写
         } else if (len == 2 && mod[0] == '~' && mod[1] == '*') {
 
             if (ngx_http_core_regex_location(cf, clcf, name, 1) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
 
+        // 非以上标识符，错误
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid location modifier \"%V\"", &value[1]);
@@ -3560,15 +3575,19 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
 
     } else {
+        // 这里是标识符与名字连在一起
+        // 例如 =root {}
 
         name = &value[1];
 
+        // = 精确匹配
         if (name->data[0] == '=') {
 
             clcf->name.len = name->len - 1;
             clcf->name.data = name->data + 1;
             clcf->exact_match = 1;
 
+        // ^~ 不使用正则，前缀匹配
         } else if (name->data[0] == '^' && name->data[1] == '~') {
 
             clcf->name.len = name->len - 2;
@@ -3580,6 +3599,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             name->len--;
             name->data++;
 
+            // ~* 正则匹配，不区分大小写
             if (name->data[0] == '*') {
 
                 name->len--;
@@ -3589,6 +3609,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
                     return NGX_CONF_ERROR;
                 }
 
+            // ~ 正则匹配，区分大小写
             } else {
                 if (ngx_http_core_regex_location(cf, clcf, name, 0) != NGX_OK) {
                     return NGX_CONF_ERROR;
@@ -3596,17 +3617,22 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             }
 
         } else {
+            // 没有标识符
 
             clcf->name = *name;
 
+            // @xxx，仅用于内部调用的location
             if (name->data[0] == '@') {
                 clcf->named = 1;
             }
         }
     }
 
+    // 上一个层次里的http core模块的loc配置，存储所有的location{}
+    // 通常就是server{}
     pclcf = pctx->loc_conf[ngx_http_core_module.ctx_index];
 
+    // 处理嵌套location的情况，暂不研究
     if (pclcf->name.len) {
 
         /* nested location */
@@ -3655,16 +3681,30 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
     }
 
+    // 把本location{}的配置信息加入到上一级的配置里
+    // pclcf->locations是一个queue
+    // in ngx_http.c
     if (ngx_http_add_location(cf, &pclcf->locations, clcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
 
+    // location{}的解析环境已经准备好，下面开始解析location{}配置
+
+    // 暂存当前的解析上下文
     save = *cf;
+
+    // 设置事件模块的新解析上下文
+    // 即本location{}的ngx_http_conf_ctx_t结构体
     cf->ctx = ctx;
+
+    // 设置解析的信息，类型在之前的http解析已经设置为NGX_HTTP_MODULE
     cf->cmd_type = NGX_HTTP_LOC_CONF;
 
+    // 递归解析http模块
     rv = ngx_conf_parse(cf, NULL);
 
+    // 恢复之前保存的解析上下文
+    // 可以解析下一个location{}
     *cf = save;
 
     return rv;

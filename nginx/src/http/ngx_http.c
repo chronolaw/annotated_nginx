@@ -976,12 +976,14 @@ ngx_http_init_static_location_trees(ngx_conf_t *cf,
 }
 
 
+// 把location{}的配置信息加入到上一级的配置里
 ngx_int_t
 ngx_http_add_location(ngx_conf_t *cf, ngx_queue_t **locations,
     ngx_http_core_loc_conf_t *clcf)
 {
     ngx_http_location_queue_t  *lq;
 
+    // 检查队列是否已经创建
     if (*locations == NULL) {
         *locations = ngx_palloc(cf->temp_pool,
                                 sizeof(ngx_http_location_queue_t));
