@@ -1681,12 +1681,12 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
         // 相当于处理完后结束请求
         // 这种用法简化了客户代码，相当于模板方法模式
         // rc = handler(r); ngx_http_finalize_request(rc);
-        ngx_http_finalize_request(r, r->content_handler(r));
-
+        //
         // 结束请求
         // 但如果count>1，则不会真正结束
-        // handler可能返回done、again
-        // 例如调用read body
+        // handler可能返回done、again,例如调用read body
+        ngx_http_finalize_request(r, r->content_handler(r));
+
         // 需要在之后的处理函数里继续处理，不能调用write_event_handler
         return NGX_OK;
     }

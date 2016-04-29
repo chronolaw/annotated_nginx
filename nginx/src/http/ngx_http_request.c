@@ -10,6 +10,9 @@
 // * ngx_http_log_request
 // * ngx_http_free_request
 // * ngx_http_close_connection
+// * ngx_http_close_request
+// * ngx_http_finalize_connection
+// * ngx_http_finalize_request
 
 /*
  * Copyright (C) Igor Sysoev
@@ -89,8 +92,27 @@ static ngx_int_t ngx_http_find_virtual_server(ngx_connection_t *c,
 // 通常写事件就是ngx_http_core_run_phases引擎数组处理请求
 static void ngx_http_request_handler(ngx_event_t *ev);
 
+// 释放主请求相关的资源，调用cleanup链表，相当于析构
+// 如果主请求有多线程任务阻塞，那么不能结束请求
+// 否则调用ngx_http_close_request尝试关闭请求，引用计数减1
 static void ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc);
+
+// 设置为主请求的write_event_handler
+// 强制令引用计数为1，必须关闭
+// 调用ngx_http_close_request
 static void ngx_http_terminate_handler(ngx_http_request_t *r);
+
+// 检查请求相关的异步事件，尝试关闭请求
+//
+// 有多个引用计数，表示有其他异步事件在处理
+// 那么就不能真正结束请求
+// 调用ngx_http_close_request尝试关闭请求，引用计数减1
+// r->main->count == 1，可以结束请求
+// 如果正在读取请求体，那么设置标志位，要求延后读取数据关闭
+// 如果进程正在运行，没有退出，且请求要求keepalive
+// 那么调用ngx_http_set_keepalive而不是关闭请求
+// 不keepalive，也不延后关闭,那么就真正关闭
+// 尝试关闭请求，引用计数减1，表示本操作完成
 static void ngx_http_finalize_connection(ngx_http_request_t *r);
 
 // 设置发送数据的handler，即写事件的回调handler为write_event_handler
@@ -111,6 +133,16 @@ static void ngx_http_keepalive_handler(ngx_event_t *ev);
 static void ngx_http_set_lingering_close(ngx_http_request_t *r);
 static void ngx_http_lingering_close_handler(ngx_event_t *ev);
 static ngx_int_t ngx_http_post_action(ngx_http_request_t *r);
+
+// 尝试关闭请求，引用计数减1，表示本操作完成
+// 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+// 不能关闭，直接返回
+// 引用计数为0，没有任何操作了，可以安全关闭
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 此时请求已经结束，调用log模块记录日志
+// 销毁请求的内存池
+// 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+// 最后销毁连接的内存池
 static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
 
 // 请求已经结束，调用log模块记录日志
@@ -2604,7 +2636,10 @@ ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
 
 // 重要函数，以“适当”的方式“结束”请求
 // 并不一定会真正结束，大部分情况下只是暂时停止处理，等待epoll事件发生
-// 参数rc决定了函数的逻辑
+// 参数rc决定了函数的逻辑，在content阶段就是handler的返回值
+// 调用ngx_http_finalize_connection，检查请求相关的异步事件，尝试关闭请求
+//
+// done，例如调用read body,因为count已经增加，所以不会关闭请求
 void
 ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -2612,32 +2647,50 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     ngx_http_request_t        *pr;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 连接对象
     c = r->connection;
 
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http finalize request: %d, \"%V?%V\" a:%d, c:%d",
                    rc, &r->uri, &r->args, r == c->data, r->main->count);
 
+    // handler返回done，例如调用read body
+    // 因为count已经增加，所以不会关闭请求
     if (rc == NGX_DONE) {
+        // 检查请求相关的异步事件，尝试关闭请求
+        //
+        // 有多个引用计数，表示有其他异步事件在处理
+        // 那么就不能真正结束请求
+        // 调用ngx_http_close_request尝试关闭请求，引用计数减1
         ngx_http_finalize_connection(r);
         return;
     }
 
+    // ok处理成功，但过滤链表出错了
     if (rc == NGX_OK && r->filter_finalize) {
         c->error = 1;
     }
 
+    // 请求被拒绝处理，那么就重新设置r->write_event_handler
+    // 继续走ngx_http_core_run_phases
+    // 使用引擎数组里的content handler处理
     if (rc == NGX_DECLINED) {
+
+        // content_handler设置为空指针，不再使用location专用handler
         r->content_handler = NULL;
         r->write_event_handler = ngx_http_core_run_phases;
         ngx_http_core_run_phases(r);
         return;
     }
 
+    // 不是done、declined，可能是ok、error、again
+
+    // 不是done、declined，是子请求
     if (r != r->main && r->post_subrequest) {
         rc = r->post_subrequest->handler(r, r->post_subrequest->data, rc);
     }
 
+    // 返回错误，或者是http超时等错误
     if (rc == NGX_ERROR
         || rc == NGX_HTTP_REQUEST_TIME_OUT
         || rc == NGX_HTTP_CLIENT_CLOSED_REQUEST
@@ -2651,6 +2704,9 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             r->write_event_handler = ngx_http_request_finalizer;
         }
 
+        // 释放主请求相关的资源，调用cleanup链表，相当于析构
+        // 如果主请求有多线程任务阻塞，那么不能结束请求
+        // 否则调用ngx_http_close_request尝试关闭请求，引用计数减1
         ngx_http_terminate_request(r, rc);
         return;
     }
@@ -2681,6 +2737,9 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+    // 不是done、declined，可能是ok、error、again
+
+    // 是子请求
     if (r != r->main) {
 
         if (r->buffered || r->postponed) {
@@ -2755,8 +2814,10 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
                        &pr->uri, &pr->args);
 
         return;
-    }
+    }   // 子请求处理结束
 
+    // c->buffered，有数据在r->out里还没有发送
+    // r->blocked，有线程task正在阻塞运行
     if (r->buffered || c->buffered || r->postponed || r->blocked) {
 
         // 设置发送数据的handler，即写事件的回调handler为write_event_handler
@@ -2774,6 +2835,8 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+    // c->data里存储的必须是当前请求
+    // 如果设置错了会导致alert
     if (r != c->data) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                       "http finalize non-active request: \"%V?%V\"",
@@ -2792,24 +2855,45 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+    // 准备结束请求
+
+    // 删除读事件超时，不再需要了
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
 
+    // 删除写事件超时，不再需要了
     if (c->write->timer_set) {
         c->write->delayed = 0;
         ngx_del_timer(c->write);
     }
 
     if (c->read->eof) {
+        // 尝试关闭请求，引用计数减1，表示本操作完成
+        // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+        // 不能关闭，直接返回
+        // 引用计数为0，没有任何操作了，可以安全关闭
+        // 释放请求相关的资源，调用cleanup链表，相当于析构
+        // 此时请求已经结束，调用log模块记录日志
+        // 销毁请求的内存池
+        // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+        // 最后销毁连接的内存池
         ngx_http_close_request(r, 0);
         return;
     }
 
+    // 检查请求相关的异步事件，尝试关闭请求
+    //
+    // 有多个引用计数，表示有其他异步事件在处理
+    // 那么就不能真正结束请求
+    // 调用ngx_http_close_request尝试关闭请求，引用计数减1
     ngx_http_finalize_connection(r);
 }
 
 
+// 释放主请求相关的资源，调用cleanup链表，相当于析构
+// 如果主请求有多线程任务阻塞，那么不能结束请求
+// 否则调用ngx_http_close_request尝试关闭请求，引用计数减1
 static void
 ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -2817,15 +2901,18 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
     ngx_http_request_t    *mr;
     ngx_http_ephemeral_t  *e;
 
+    // mr是主请求
     mr = r->main;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http terminate request count:%d", mr->count);
 
+    // rc > 0 是http状态码
     if (rc > 0 && (mr->headers_out.status == 0 || mr->connection->sent == 0)) {
         mr->headers_out.status = rc;
     }
 
+    // 释放主请求相关的资源，调用cleanup链表，相当于析构
     cln = mr->cleanup;
     mr->cleanup = NULL;
 
@@ -2841,35 +2928,77 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
                    "http terminate cleanup count:%d blk:%d",
                    mr->count, mr->blocked);
 
+    // 检查主请求是否还在处理
+    // 把请求加入到mr的延后处理链表末尾
     if (mr->write_event_handler) {
 
+        // 如果主请求有多线程任务阻塞，那么不能结束请求
         if (mr->blocked) {
             return;
         }
 
         e = ngx_http_ephemeral(mr);
         mr->posted_requests = NULL;
+
+        // 设置为主请求的write_event_handler
+        // 强制令引用计数为1，必须关闭
+        // 调用ngx_http_close_request
         mr->write_event_handler = ngx_http_terminate_handler;
+
+        // 把请求加入到mr的延后处理链表末尾
         (void) ngx_http_post_request(mr, &e->terminal_posted_request);
         return;
     }
 
+    // 尝试关闭请求，引用计数减1，表示本操作完成
+    // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+    // 不能关闭，直接返回
+    // 引用计数为0，没有任何操作了，可以安全关闭
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    // 此时请求已经结束，调用log模块记录日志
+    // 销毁请求的内存池
+    // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+    // 最后销毁连接的内存池
     ngx_http_close_request(mr, rc);
 }
 
 
+// 设置为主请求的write_event_handler
+// 强制令引用计数为1，必须关闭
+// 调用ngx_http_close_request
 static void
 ngx_http_terminate_handler(ngx_http_request_t *r)
 {
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http terminate handler count:%d", r->count);
 
+    // 强制令引用计数为1，必须关闭
     r->count = 1;
 
+    // 尝试关闭请求，引用计数减1，表示本操作完成
+    // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+    // 不能关闭，直接返回
+    // 引用计数为0，没有任何操作了，可以安全关闭
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    // 此时请求已经结束，调用log模块记录日志
+    // 销毁请求的内存池
+    // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+    // 最后销毁连接的内存池
     ngx_http_close_request(r, 0);
 }
 
 
+// 检查请求相关的异步事件，尝试关闭请求
+//
+// 有多个引用计数，表示有其他异步事件在处理
+// 那么就不能真正结束请求
+// 调用ngx_http_close_request尝试关闭请求，引用计数减1
+// r->main->count == 1，可以结束请求
+// 如果正在读取请求体，那么设置标志位，要求延后读取数据关闭
+// 如果进程正在运行，没有退出，且请求要求keepalive
+// 那么调用ngx_http_set_keepalive而不是关闭请求
+// 不keepalive，也不延后关闭,那么就真正关闭
+// 尝试关闭请求，引用计数减1，表示本操作完成
 static void
 ngx_http_finalize_connection(ngx_http_request_t *r)
 {
@@ -2884,8 +3013,12 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 有多个引用计数，表示有其他异步事件在处理
+    // 那么就不能真正结束请求
+    // 调用ngx_http_close_request尝试关闭请求，引用计数减1
     if (r->main->count != 1) {
 
+        // 如果正在丢弃请求体，那么设置丢弃handler和超时时间
         if (r->discard_body) {
             r->read_event_handler = ngx_http_discarded_request_body_handler;
             ngx_add_timer(r->connection->read, clcf->lingering_timeout);
@@ -2896,15 +3029,29 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
             }
         }
 
+        // 尝试关闭请求，引用计数减1，表示本操作完成
+        // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+        // 不能关闭，直接返回
+        // 引用计数为0，没有任何操作了，可以安全关闭
+        // 释放请求相关的资源，调用cleanup链表，相当于析构
+        // 此时请求已经结束，调用log模块记录日志
+        // 销毁请求的内存池
+        // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+        // 最后销毁连接的内存池
         ngx_http_close_request(r, 0);
         return;
     }
 
+    // r->main->count == 1，可以结束请求
+
+    // 如果正在读取请求体，那么设置标志位，要求延后读取数据关闭
     if (r->reading_body) {
         r->keepalive = 0;
         r->lingering_close = 1;
     }
 
+    // 如果进程正在运行，没有退出，且请求要求keepalive
+    // 那么调用ngx_http_set_keepalive而不是关闭请求
     if (!ngx_terminate
          && !ngx_exiting
          && r->keepalive
@@ -2914,6 +3061,7 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
         return;
     }
 
+    // 如果要求延后关闭，那么就延后关闭
     if (clcf->lingering_close == NGX_HTTP_LINGERING_ALWAYS
         || (clcf->lingering_close == NGX_HTTP_LINGERING_ON
             && (r->lingering_close
@@ -2924,6 +3072,18 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
         return;
     }
 
+    // 不keepalive，也不延后关闭
+    // 那么就真正关闭
+
+    // 尝试关闭请求，引用计数减1，表示本操作完成
+    // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+    // 不能关闭，直接返回
+    // 引用计数为0，没有任何操作了，可以安全关闭
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    // 此时请求已经结束，调用log模块记录日志
+    // 销毁请求的内存池
+    // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+    // 最后销毁连接的内存池
     ngx_http_close_request(r, 0);
 }
 
@@ -3789,6 +3949,11 @@ ngx_http_post_action(ngx_http_request_t *r)
 // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
 // 不能关闭，直接返回
 // 引用计数为0，没有任何操作了，可以安全关闭
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 此时请求已经结束，调用log模块记录日志
+// 销毁请求的内存池
+// 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+// 最后销毁连接的内存池
 static void
 ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 {
