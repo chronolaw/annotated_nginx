@@ -211,6 +211,10 @@ ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
 ngx_int_t ngx_http_read_unbuffered_request_body(ngx_http_request_t *r);
 
 // 发送http头，调用过滤链表
+// 发送头，调用ngx_http_top_header_filter
+// 如果请求处理有错误，修改输出的状态码
+// 状态行同时清空
+// 走过整个header过滤链表
 ngx_int_t ngx_http_send_header(ngx_http_request_t *r);
 
 ngx_int_t ngx_http_special_response_handler(ngx_http_request_t *r,

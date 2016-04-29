@@ -704,6 +704,14 @@ typedef ngx_int_t (*ngx_http_request_body_filter_pt)
 
 
 // 发送响应数据，调用过滤链表，执行数据过滤
+// 发送响应体，调用ngx_http_top_body_filter
+// 走过整个body过滤链表
+// 最后由ngx_http_write_filter真正的向客户端发送数据，调用send_chain
+// 也由ngx_http_set_write_handler设置epoll的写事件触发
+// 如果数据发送不完，就保存在r->out里，返回again
+// 需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 
 // 真正的向客户端发送数据，调用send_chain

@@ -6,6 +6,13 @@
 // * ngx_http_core_rewrite_phase
 // * ngx_http_core_access_phase
 // * ngx_http_core_content_phase
+// * ngx_http_send_header
+// * ngx_http_output_filter
+// * ngx_http_subrequest
+//
+// * ngx_http_core_server
+// * ngx_http_core_location
+// * ngx_http_core_listen
 
 /*
  * Copyright (C) Igor Sysoev
@@ -63,6 +70,7 @@ static char *ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd,
 static ngx_int_t ngx_http_core_regex_location(ngx_conf_t *cf,
     ngx_http_core_loc_conf_t *clcf, ngx_str_t *regex, ngx_uint_t caseless);
 
+// 各种解析配置指令
 static char *ngx_http_core_types(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_type(ngx_conf_t *cf, ngx_command_t *dummy,
@@ -82,6 +90,7 @@ static char *ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
 // 保存进clcf->root
 static char *ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+// 各种解析配置指令
 static char *ngx_http_core_limit_except(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_set_aio(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -121,7 +130,9 @@ static char *ngx_http_disable_symlinks(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
 
+// 对于linux，此函数为空函数
 static char *ngx_http_core_lowat_check(ngx_conf_t *cf, void *post, void *data);
+
 static char *ngx_http_core_pool_size(ngx_conf_t *cf, void *post, void *data);
 
 static ngx_conf_post_t  ngx_http_core_lowat_post =
@@ -2218,6 +2229,10 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
 }
 
 
+// 发送头，调用ngx_http_top_header_filter
+// 如果请求处理有错误，修改输出的状态码
+// 状态行同时清空
+// 走过整个header过滤链表
 ngx_int_t
 ngx_http_send_header(ngx_http_request_t *r)
 {
@@ -2225,21 +2240,34 @@ ngx_http_send_header(ngx_http_request_t *r)
         return NGX_OK;
     }
 
+    // 检查是否已经发送过，会出个alert级别的错误，但其实无必要
     if (r->header_sent) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                       "header already sent");
         return NGX_ERROR;
     }
 
+    // 如果请求处理有错误，修改输出的状态码
+    // 状态行同时清空
     if (r->err_status) {
         r->headers_out.status = r->err_status;
         r->headers_out.status_line.len = 0;
     }
 
+    // 发送头，调用ngx_http_top_header_filter
+    // 走过整个header过滤链表
     return ngx_http_top_header_filter(r);
 }
 
 
+// 发送响应体，调用ngx_http_top_body_filter
+// 走过整个body过滤链表
+// 最后由ngx_http_write_filter真正的向客户端发送数据，调用send_chain
+// 也由ngx_http_set_write_handler设置epoll的写事件触发
+// 如果数据发送不完，就保存在r->out里，返回again
+// 需要再次发生可写事件才能发送
+// 不是last、flush，且数据量较小（默认1460）
+// 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
 ngx_int_t
 ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -2251,6 +2279,9 @@ ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http output filter \"%V?%V\"", &r->uri, &r->args);
 
+    // 发送响应体，调用ngx_http_top_body_filter
+    // 走过整个body过滤链表
+    // 最后由ngx_http_write_filter真正的向客户端发送数据，调用send_chain
     rc = ngx_http_top_body_filter(r, in);
 
     if (rc == NGX_ERROR) {
@@ -2708,6 +2739,7 @@ ngx_http_gzip_quantity(u_char *p, u_char *last)
 #endif
 
 
+// 创建子请求
 ngx_int_t
 ngx_http_subrequest(ngx_http_request_t *r,
     ngx_str_t *uri, ngx_str_t *args, ngx_http_request_t **psr,
@@ -4257,6 +4289,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 监听端口指令
 static char *
 ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -5649,6 +5682,8 @@ ngx_http_disable_symlinks(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
 
 
+// 对于linux，此函数为空函数
+// 检查发送用的lowat是否可用
 static char *
 ngx_http_core_lowat_check(ngx_conf_t *cf, void *post, void *data)
 {
