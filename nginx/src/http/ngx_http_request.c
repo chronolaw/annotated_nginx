@@ -6,6 +6,10 @@
 // * ngx_http_process_request_headers
 // * ngx_http_request_handler
 // * ngx_http_run_posted_requests
+//
+// * ngx_http_log_request
+// * ngx_http_free_request
+// * ngx_http_close_connection
 
 /*
  * Copyright (C) Igor Sysoev
@@ -49,16 +53,26 @@ static ssize_t ngx_http_read_request_header(ngx_http_request_t *r);
 static ngx_int_t ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
     ngx_uint_t request_line);
 
+// 使用offset设置headers_in里的请求头
 static ngx_int_t ngx_http_process_header_line(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+
+// 使用offset设置headers_in里的请求头，但不允许重复
+// 如Content-Length/If-Modified-Since
 static ngx_int_t ngx_http_process_unique_header_line(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+
+// 使用offset设置headers_in里的请求头，允许重复
+// 加入动态数组headers
 static ngx_int_t ngx_http_process_multi_header_lines(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+
 static ngx_int_t ngx_http_process_host(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_process_connection(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+
+// 检查头里的user_agent，设置ie/chrome/safari标志位
 static ngx_int_t ngx_http_process_user_agent(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
@@ -98,6 +112,11 @@ static void ngx_http_set_lingering_close(ngx_http_request_t *r);
 static void ngx_http_lingering_close_handler(ngx_event_t *ev);
 static ngx_int_t ngx_http_post_action(ngx_http_request_t *r);
 static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
+
+// 请求已经结束，调用log模块记录日志
+// 在ngx_http_free_request里调用
+// log handler不在引擎数组里
+// 不检查handler的返回值，直接调用，不使用checker
 static void ngx_http_log_request(ngx_http_request_t *r);
 
 static u_char *ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len);
@@ -123,6 +142,7 @@ static char *ngx_http_client_errors[] = {
 };
 
 
+// 使用字符串映射操作函数，填充headers_in
 ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_string("Host"), offsetof(ngx_http_headers_in_t, host),
                  ngx_http_process_host },
@@ -1826,6 +1846,7 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 }
 
 
+// 使用offset设置headers_in里的请求头
 static ngx_int_t
 ngx_http_process_header_line(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
@@ -1842,6 +1863,7 @@ ngx_http_process_header_line(ngx_http_request_t *r, ngx_table_elt_t *h,
 }
 
 
+// 使用offset设置headers_in里的请求头，但不允许重复
 static ngx_int_t
 ngx_http_process_unique_header_line(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
@@ -1922,6 +1944,7 @@ ngx_http_process_connection(ngx_http_request_t *r, ngx_table_elt_t *h,
 }
 
 
+// 检查头里的user_agent，设置ie/chrome/safari标志位
 static ngx_int_t
 ngx_http_process_user_agent(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
@@ -1995,6 +2018,8 @@ ngx_http_process_user_agent(ngx_http_request_t *r, ngx_table_elt_t *h,
 }
 
 
+// 使用offset设置headers_in里的请求头，允许重复
+// 加入动态数组headers
 static ngx_int_t
 ngx_http_process_multi_header_lines(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
@@ -2553,6 +2578,7 @@ ngx_http_run_posted_requests(ngx_connection_t *c)
 }
 
 
+// 把请求r加入到pr的延后处理链表末尾
 ngx_int_t
 ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
 {
@@ -2576,6 +2602,9 @@ ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
 }
 
 
+// 重要函数，以“适当”的方式“结束”请求
+// 并不一定会真正结束，大部分情况下只是暂时停止处理，等待epoll事件发生
+// 参数rc决定了函数的逻辑
 void
 ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -3756,6 +3785,10 @@ ngx_http_post_action(ngx_http_request_t *r)
 }
 
 
+// 尝试关闭请求，引用计数减1，表示本操作完成
+// 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+// 不能关闭，直接返回
+// 引用计数为0，没有任何操作了，可以安全关闭
 static void
 ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -3767,16 +3800,23 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http request count:%d blk:%d", r->count, r->blocked);
 
+    // 引用计数至少为1，表示有一个操作，否则就是严重错误
     if (r->count == 0) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "http request count is zero");
     }
 
+    // 减少引用计数，本次操作结束
     r->count--;
 
+    // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+    // 不能关闭，直接返回
+    // blocked表示有线程操作正在阻塞，也不能关闭
+    // blocked必须有线程eventhandler处理
     if (r->count || r->blocked) {
         return;
     }
 
+    // 引用计数为0，没有任何操作了，可以安全关闭
 #if (NGX_HTTP_SPDY)
     if (r->spdy_stream) {
         ngx_http_spdy_close_stream(r->spdy_stream, rc);
@@ -3784,11 +3824,23 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 #endif
 
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    // 此时请求已经结束，调用log模块记录日志
+    // 销毁请求的内存池
+    // 但连接的内存池还在，可以用于长连接继续使用
     ngx_http_free_request(r, rc);
+
+    // 调用ngx_close_connection
+    // 释放连接，加入空闲链表，可以再次使用
+    // 销毁连接的内存池
     ngx_http_close_connection(c);
 }
 
 
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 此时请求已经结束，调用log模块记录日志
+// 销毁请求的内存池
+// 但连接的内存池还在，可以用于长连接继续使用
 void
 ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -3803,11 +3855,13 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0, "http close request");
 
+    // r->pool就是请求的内存池，也当做是请求释放的标志
     if (r->pool == NULL) {
         ngx_log_error(NGX_LOG_ALERT, log, 0, "http request already closed");
         return;
     }
 
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
     cln = r->cleanup;
     r->cleanup = NULL;
 
@@ -3831,12 +3885,14 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 
 #endif
 
+    // rc > 0 是http状态码
     if (rc > 0 && (r->headers_out.status == 0 || r->connection->sent == 0)) {
         r->headers_out.status = rc;
     }
 
     log->action = "logging request";
 
+    // 此时请求已经结束，调用log模块记录日志
     ngx_http_log_request(r);
 
     log->action = "closing request";
@@ -3870,6 +3926,8 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
      * of request since the request object is allocated from its own pool.
      */
 
+    // 销毁请求的内存池
+    // 但连接的内存池还在，可以用于长连接继续使用
     pool = r->pool;
     r->pool = NULL;
 
@@ -3877,6 +3935,10 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 }
 
 
+// 请求已经结束，调用log模块记录日志
+// 在ngx_http_free_request里调用
+// log handler不在引擎数组里
+// 不检查handler的返回值，直接调用，不使用checker
 static void
 ngx_http_log_request(ngx_http_request_t *r)
 {
@@ -3886,15 +3948,20 @@ ngx_http_log_request(ngx_http_request_t *r)
 
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // log handler不在引擎数组里
     log_handler = cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.elts;
     n = cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.nelts;
 
+    // 不检查handler的返回值，直接调用，不使用checker
     for (i = 0; i < n; i++) {
         log_handler[i](r);
     }
 }
 
 
+// 调用ngx_close_connection
+// 释放连接，加入空闲链表，可以再次使用
+// 销毁连接的内存池
 void
 ngx_http_close_connection(ngx_connection_t *c)
 {
@@ -3922,8 +3989,11 @@ ngx_http_close_connection(ngx_connection_t *c)
 
     pool = c->pool;
 
+    // 关闭连接，删除epoll里的读写事件
+    // 释放连接，加入空闲链表，可以再次使用
     ngx_close_connection(c);
 
+    // 关闭连接，销毁连接的内存池
     ngx_destroy_pool(pool);
 }
 

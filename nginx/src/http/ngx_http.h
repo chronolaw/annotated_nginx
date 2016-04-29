@@ -113,6 +113,9 @@ ngx_int_t ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 void ngx_http_init_connection(ngx_connection_t *c);
 
 // 关闭http连接
+// 调用ngx_close_connection
+// 释放连接，加入空闲链表，可以再次使用
+// 销毁连接的内存池
 void ngx_http_close_connection(ngx_connection_t *c);
 
 #if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
@@ -187,9 +190,16 @@ void ngx_http_handler(ngx_http_request_t *r);
 // 通常就是ngx_http_core_run_phases引擎数组处理请求
 void ngx_http_run_posted_requests(ngx_connection_t *c);
 
+// 把请求r加入到pr的延后处理链表末尾
 ngx_int_t ngx_http_post_request(ngx_http_request_t *r,
     ngx_http_posted_request_t *pr);
+
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
+
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 此时请求已经结束，调用log模块记录日志
+// 销毁请求的内存池
+// 但连接的内存池还在，可以用于长连接继续使用
 void ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc);
 
 void ngx_http_empty_handler(ngx_event_t *wev);
