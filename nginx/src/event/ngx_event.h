@@ -96,12 +96,14 @@ struct ngx_event_s {
     // 参考ngx_http_write_filter_module.c
     unsigned         delayed:1;
 
+    // 延迟接收请求，即只有客户端真正发来数据时内核才会触发accept
+    // 可以提高运行效率
     unsigned         deferred_accept:1;
 
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
     unsigned         pending_eof:1;
 
-    // 事件是否已经加入延后处理队列中
+    // 事件是否已经加入延后处理队列中，可以加快事件的处理速度
     // 操作函数宏ngx_post_event/ngx_delete_posted_event
     // ngx_posted_accept_events/ngx_posted_events
     unsigned         posted:1;
@@ -262,9 +264,16 @@ typedef struct {
 
     // 目前仅多线程使用，通知
     // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
+    // 模仿此用法也可以实现自己的通知机制
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
     // 事件模型的核心功能，处理发生的事件
+    //
+    // epoll模块核心功能，调用epoll_wait处理发生的事件
+    // 使用event_list和nevents获取内核返回的事件
+    // timer是无事件发生时最多等待的时间，即超时时间
+    // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
+    // 在ngx_process_events_and_timers里被调用
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
                    ngx_uint_t flags);
 
@@ -325,6 +334,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 /*
  * The event filter requires to do i/o operation until EAGAIN: epoll, rtsig.
  */
+// 即ET模式
 #define NGX_USE_GREEDY_EVENT     0x00000020
 
 /*
@@ -606,6 +616,7 @@ typedef struct {
 extern ngx_atomic_t          *ngx_connection_counter;
 
 // 用共享内存实现的原子变量，负载均衡锁
+// 使用1.9.x的reuseport会自动禁用负载均衡，效率更高
 extern ngx_atomic_t          *ngx_accept_mutex_ptr;
 extern ngx_shmtx_t            ngx_accept_mutex;
 extern ngx_uint_t             ngx_use_accept_mutex;
