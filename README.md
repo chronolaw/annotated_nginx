@@ -11,6 +11,7 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 请参考：
 * [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)。
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
+* [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 
 # 当前状态
 nginx 1.8.1
@@ -21,7 +22,7 @@ nginx 1.8.1
 * [src](/nginx/src/) - nginx源码目录
 * [core](/nginx/src/core) - 60%，md5/sha1/crc等较简单的功能不关注
 * [event](/nginx/src/event) - 90%，只注解核心模块，epoll/kqueue/ssl等不关注
-* [http](/nginx/src/http) - 30%
+* [http](/nginx/src/http) - 50%，modules目录里的具体功能模块暂不关注
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
 * [stream(nginx 1.9.9)](/nginx/src/stream) - 50%
 
