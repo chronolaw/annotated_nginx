@@ -492,6 +492,9 @@ ngx_http_init_connection(ngx_connection_t *c)
     // 把读事件加入epoll，当socket有数据可读时就调用ngx_http_wait_request_handler
     // 因为事件加入了定时器，超时时也会调用ngx_http_wait_request_handler
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
+        // 调用ngx_close_connection
+        // 释放连接，加入空闲链表，可以再次使用
+        // 销毁连接的内存池
         ngx_http_close_connection(c);
         return;
     }
@@ -522,12 +525,20 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // 超时没有发送数据，关闭连接
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
+
+        // 调用ngx_close_connection
+        // 释放连接，加入空闲链表，可以再次使用
+        // 销毁连接的内存池
         ngx_http_close_connection(c);
         return;
     }
 
     // 没有超时，检查连接是否被关闭了
     if (c->close) {
+
+        // 调用ngx_close_connection
+        // 释放连接，加入空闲链表，可以再次使用
+        // 销毁连接的内存池
         ngx_http_close_connection(c);
         return;
     }
