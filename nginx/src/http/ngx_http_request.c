@@ -175,6 +175,7 @@ static char *ngx_http_client_errors[] = {
 
 
 // 使用字符串映射操作函数，填充headers_in
+// 在ngx_http_init_headers_in_hash构造为散列表，提高查找效率
 ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_string("Host"), offsetof(ngx_http_headers_in_t, host),
                  ngx_http_process_host },
