@@ -229,6 +229,14 @@ struct ngx_event_aio_s {
 
 #endif
 
+// 添加读事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event
+// ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
+//
+// 添加写事件的便捷接口，适合epoll/kqueue/select等各种事件模型
+// 内部还是调用ngx_add_event,多了个send_lowat操作
+// linux不支持send_lowat指令，send_lowat总是0
+// ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
 // 全局的事件模块访问接口，是一个函数表
 // 由epoll/kqueue/select等模块实现
