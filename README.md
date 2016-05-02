@@ -9,7 +9,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得仔细研究。
 
 请参考：
-* [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)。
+* [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 
@@ -72,7 +72,9 @@ nginx 1.8.1
 ####部分关键源码（功能分类）
 
 ######数据结构
-* todo
+* [ngx_array.h](/nginx/src/core/ngx_array.h)
+* [ngx_buf.h](/nginx/src/core/ngx_buf.h)
+* [ngx_string.h](/nginx/src/core/ngx_string.h)
 
 ######进程机制
 * [nginx.c](/nginx/src/core/nginx.c)
