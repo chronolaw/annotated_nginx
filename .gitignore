@@ -29,6 +29,7 @@
 
 # swp
 *.swp
+*.swo
 
 # objs
 Makefile
