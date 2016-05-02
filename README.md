@@ -21,7 +21,7 @@ nginx 1.8.1
 ###源码目录快捷入口
 * [src](/nginx/src/) - nginx源码目录
 * [core](/nginx/src/core) - 60%，md5/sha1/crc等较简单的功能不关注
-* [event](/nginx/src/event) - 90%，只注解核心模块，epoll/kqueue/ssl等不关注
+* [event](/nginx/src/event) - 90%，只注解核心模块和epoll，select/kqueue/ssl等不关注
 * [http](/nginx/src/http) - 50%，modules目录里的具体功能模块暂不关注
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
 * [stream(nginx 1.9.9)](/nginx/src/stream) - 50%
