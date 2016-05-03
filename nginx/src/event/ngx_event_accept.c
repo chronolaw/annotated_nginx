@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_event_accept
+// * ngx_trylock_accept_mutex
 
 /*
  * Copyright (C) Igor Sysoev
@@ -42,11 +46,12 @@ ngx_event_accept(ngx_event_t *ev)
 
     // 事件已经超时
     if (ev->timedout) {
-        // 遍历监听端口列表，加入epoll连接事件
+        // 遍历监听端口列表，重新加入epoll连接事件
         if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
             return;
         }
 
+        // 保证监听不超时
         ev->timedout = 0;
     }
 
@@ -164,6 +169,8 @@ ngx_event_accept(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1);
 #endif
 
+        // 此时accept返回了一个socket描述符s
+
         // ngx_accept_disabled是总连接数的1/8-空闲连接数
         // 也就是说空闲连接数小于总数的1/8,那么就暂时停止接受连接
         ngx_accept_disabled = ngx_cycle->connection_n / 8
@@ -172,6 +179,7 @@ ngx_event_accept(ngx_event_t *ev)
         // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
         c = ngx_get_connection(s, ev->log);
 
+        // 如果没有空闲连接，那么关闭socket，无法处理请求
         if (c == NULL) {
             if (ngx_close_socket(s) == -1) {
                 ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
@@ -279,6 +287,7 @@ ngx_event_accept(ngx_event_t *ev)
             rev->ready = 1;
         }
 
+        // 如果listen使用了deferred，那么建立连接时就已经有数据可读了
         if (ev->deferred_accept) {
             rev->ready = 1;
 #if (NGX_HAVE_KQUEUE)
@@ -390,6 +399,7 @@ ngx_event_accept(ngx_event_t *ev)
         }
 #endif
 
+        // 连接的读写事件都加入epoll，即有读写都会由epoll收集事件并处理
         if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
             if (ngx_add_conn(c) == NGX_ERROR) {
                 ngx_close_accepted_connection(c);
@@ -462,10 +472,13 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
+    // try失败，未获得锁，极小的消耗
+
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "accept mutex lock failed: %ui", ngx_accept_mutex_held);
 
     // 未获得锁
+    // 但之前持有锁，也就是说之前在监听端口
     if (ngx_accept_mutex_held) {
         // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
         if (ngx_disable_accept_events(cycle) == NGX_ERROR) {

@@ -814,7 +814,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
 
         // 设置全局变量
-        // 使用负载均衡，刚开始未持有锁，设置抢锁的等待事件
+        // 使用负载均衡，刚开始未持有锁，设置抢锁的等待时间
         ngx_use_accept_mutex = 1;
         ngx_accept_mutex_held = 0;
         ngx_accept_mutex_delay = ecf->accept_mutex_delay;
