@@ -78,6 +78,7 @@ struct ngx_event_s {
     unsigned         complete:1;
 
     // 当前的字节流已经结束即eof，不会再有数据可读
+    // 如果recv() == 0 ，客户端关闭连接，那么置此标记
     unsigned         eof:1;
 
     // 发生了错误
@@ -144,6 +145,7 @@ struct ngx_event_s {
     // 重要！！
     // 事件发生时调用的函数
     // ngx_core.h:typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
+    // 接受连接时的回调是ngx_event_accept
     ngx_event_handler_pt  handler;
 
 
@@ -556,14 +558,14 @@ extern ngx_event_actions_t   ngx_event_actions;
 // ngx_posix_init.c里初始化为linux的底层接口
 // 在epoll模块的ngx_epoll_init里设置
 //
-//typedef struct {
-//    ngx_recv_pt        recv;
-//    ngx_recv_chain_pt  recv_chain;
-//    ngx_recv_pt        udp_recv;
-//    ngx_send_pt        send;
-//    ngx_send_chain_pt  send_chain;
-//    ngx_uint_t         flags;
-//} ngx_os_io_t;
+// typedef struct {
+//     ngx_recv_pt        recv;
+//     ngx_recv_chain_pt  recv_chain;
+//     ngx_recv_pt        udp_recv;
+//     ngx_send_pt        send;
+//     ngx_send_chain_pt  send_chain;
+//     ngx_uint_t         flags;
+// } ngx_os_io_t;
 extern ngx_os_io_t  ngx_io;
 
 // 宏定义简化调用
@@ -677,6 +679,7 @@ extern ngx_module_t           ngx_event_core_module;
 // 监听端口上收到连接请求时的回调函数，即事件handler
 // 从cycle的连接池里获取连接
 // 关键操作 ls->handler(c);调用其他模块的业务handler
+// 例如ngx_http_init_connection,ngx_stream_init_connection
 void ngx_event_accept(ngx_event_t *ev);
 
 // 尝试获取负载均衡锁，监听端口
