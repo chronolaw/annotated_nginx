@@ -585,6 +585,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // 调用接收函数,b->last是缓冲区的末位置，前面可能有数据
     // ngx_event_accept.c:ngx_event_accept()里设置为ngx_recv
     // ngx_posix_init.c里初始化为linux的底层接口
+    // <0 出错， =0 连接关闭， >0 接收到数据大小
     n = c->recv(c, b->last, size);
 
     // 如果返回NGX_AGAIN表示还没有数据
@@ -625,7 +626,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         return;
     }
 
-    // 读到了0字节，还是错误
+    // 读到了0字节，即连接被客户端关闭，client abort
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client closed connection");
@@ -1697,6 +1698,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     // 缓冲区里无数据，需要调用recv收取
+    // <0 出错， =0 连接关闭， >0 接收到数据大小
     if (rev->ready) {
         // 注意缓冲区剩余空间的计算
         n = c->recv(c, r->header_in->last,
@@ -1723,12 +1725,13 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         return NGX_AGAIN;
     }
 
-    // 读取0字节，出错
+    // 读到了0字节，即连接被客户端关闭，client abort
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client prematurely closed connection");
     }
 
+    // 读到了0字节，即连接被客户端关闭，client abort
     if (n == 0 || n == NGX_ERROR) {
         c->error = 1;
         c->log->action = "reading client request headers";

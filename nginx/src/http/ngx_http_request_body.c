@@ -518,6 +518,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             }
 
             // 调用recv，读取数据，放入缓冲区
+            // <0 出错， =0 连接关闭， >0 接收到数据大小
             n = c->recv(c, rb->buf->last, size);
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -528,12 +529,13 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 break;
             }
 
-            // 读到0字节，出错
+            // 读到了0字节，即连接被客户端关闭，client abort
             if (n == 0) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client prematurely closed connection");
             }
 
+            // 读到了0字节，即连接被客户端关闭，client abort
             if (n == 0 || n == NGX_ERROR) {
                 c->error = 1;
                 return NGX_HTTP_BAD_REQUEST;
@@ -1062,7 +1064,8 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
             return NGX_AGAIN;
         }
 
-        // 读取完了数据，也是ok
+        // 读到了0字节，即连接被客户端关闭，client abort
+        // 也是ok
         if (n == 0) {
             return NGX_OK;
         }
