@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_process_events_and_timers
+// * ngx_event_process_init
 
 /*
  * Copyright (C) Igor Sysoev
@@ -48,6 +51,7 @@ static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 // 解析worker_connections指令
 // 取得指令字符串,转换为数字
 // 再设置到cycle里，即连接池数组的大小
+// 决定了nginx同时能够处理的最大连接数量
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -94,6 +98,8 @@ ngx_event_actions_t   ngx_event_actions;
 static ngx_atomic_t   connection_counter = 1;
 ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
+// 1.9.x如果使用了reuseport，那么就会禁用负载均衡锁
+// 由linux系统内核来实现负载均衡，选择恰当的进程接受连接
 
 // 负载均衡锁指针，初始为空指针
 ngx_atomic_t         *ngx_accept_mutex_ptr;
@@ -104,9 +110,11 @@ ngx_shmtx_t           ngx_accept_mutex;
 // 负载均衡锁标志量
 ngx_uint_t            ngx_use_accept_mutex;
 
+// ngx_accept_events在epoll里不使用，暂不关注
 ngx_uint_t            ngx_accept_events;
 
 // 是否已经持有负载均衡锁
+// in ngx_event_accept.c:ngx_trylock_accept_mutex
 ngx_uint_t            ngx_accept_mutex_held;
 
 // 等待多少时间再次尝试获取负载均衡锁
@@ -115,6 +123,7 @@ ngx_msec_t            ngx_accept_mutex_delay;
 
 // ngx_accept_disabled是总连接数的1/8-空闲连接数
 // 也就是说空闲连接数小于总数的1/8,那么就暂时停止接受连接
+// in ngx_event_accept.c:ngx_event_accept
 ngx_int_t             ngx_accept_disabled;
 
 
