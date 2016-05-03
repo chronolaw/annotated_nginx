@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_event_find_timer
+// * ngx_event_expire_timers
 
 /*
  * Copyright (C) Igor Sysoev
@@ -11,7 +14,7 @@
 #include <ngx_event.h>
 
 
-// 定时器红黑树，键值是超时事件（毫秒时间戳）
+// 定时器红黑树，键值是超时时间（毫秒时间戳）
 // 里面使用ngx_event_t.timer成员组织为红黑树
 // timedout表示已经超时，timer_set表示已经加入定时器红黑树
 ngx_rbtree_t              ngx_event_timer_rbtree;
@@ -40,6 +43,11 @@ ngx_event_timer_init(ngx_log_t *log)
 // 在红黑树里查找最小值，即最左边的节点，得到超时的时间差值
 // 如果时间已经超过了，那么时间差值就是0
 // 意味着在红黑树里已经有事件超时了，必须立即处理
+//
+// timer >0 红黑树里即将超时的事件的时间
+// timer <0 表示红黑树为空，即无超时事件
+// timer==0意味着在红黑树里已经有事件超时了，必须立即处理
+// timer==0，epoll就不会等待，收集完事件立即返回
 ngx_msec_t
 ngx_event_find_timer(void)
 {
@@ -90,6 +98,8 @@ ngx_event_expire_timers(void)
         node = ngx_rbtree_min(root, sentinel);
 
         /* node->key > ngx_current_time */
+
+        // 与当前时间进行比较，>0即还没有超时
 
         // 没有了超时事件，循环退出
         if ((ngx_msec_int_t) (node->key - ngx_current_msec) > 0) {

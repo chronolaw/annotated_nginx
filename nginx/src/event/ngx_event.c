@@ -329,6 +329,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     } else {
         // 没有设置时间精度，默认设置
         // 在定时器红黑树里找到最小的时间，二叉树查找很快
+        // timer >0 红黑树里即将超时的事件的时间
+        // timer <0 表示红黑树为空，即无超时事件
         // timer==0意味着在红黑树里已经有事件超时了，必须立即处理
         // timer==0，epoll就不会等待，收集完事件立即返回
         timer = ngx_event_find_timer();
