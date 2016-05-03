@@ -15,6 +15,8 @@
 
 
 // 默认的epoll数组长度
+// 最多同时处理512个连接，太少
+// 通常可以配置到32000或者更多
 #define DEFAULT_CONNECTIONS  512
 
 
@@ -74,6 +76,7 @@ static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
 // nginx更新缓存时间的精度，如果设置了会定时发送sigalarm信号更新时间
+// ngx_timer_resolution = ccf->timer_resolution;默认值是0
 static ngx_uint_t     ngx_timer_resolution;
 
 // 在epoll的ngx_epoll_process_events里检查，更新时间的标志
@@ -317,15 +320,17 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // ccf->timer_resolution
     // nginx更新缓存时间的精度，如果设置了会定时发送sigalarm信号更新时间
+    // ngx_timer_resolution = ccf->timer_resolution;默认值是0
     if (ngx_timer_resolution) {
         // 要求epoll无限等待事件的发生，直至被sigalarm信号中断
         timer = NGX_TIMER_INFINITE;
         flags = 0;
 
     } else {
-        // 没有设置时间精度
+        // 没有设置时间精度，默认设置
         // 在定时器红黑树里找到最小的时间，二叉树查找很快
         // timer==0意味着在红黑树里已经有事件超时了，必须立即处理
+        // timer==0，epoll就不会等待，收集完事件立即返回
         timer = ngx_event_find_timer();
 
         // NGX_UPDATE_TIME要求epoll等待这个时间，然后主动更新时间
@@ -341,7 +346,10 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
+    // 现在已经设置了合适的timer和flag
+
     // 负载均衡锁标志量， accept_mutex on
+    // 1.9.x，如果使用了reuseport，那么ngx_use_accept_mutex==0
     if (ngx_use_accept_mutex) {
         // ngx_accept_disabled = ngx_cycle->connection_n / 8
         //                      - ngx_cycle->free_connection_n;
@@ -383,7 +391,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
                 }
             }
         }
-    }
+    }   //ngx_use_accept_mutex
+
+    // 如果不使用负载均衡，那么就不会使用延后处理队列，即没有NGX_POST_EVENTS标志
 
     // 不管是否获得了负载均衡锁，都要处理事件和定时器
     // 如果获得了负载均衡锁,事件就会多出一个accept事件
@@ -427,6 +437,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 如果消耗了一点时间，那么看看是否定时器里有过期的
     if (delta) {
         // 遍历定时器红黑树，找出所有过期的事件，调用handler处理超时
+        // 其中可能有的socket读写超时，那么就结束请求，断开连接
         ngx_event_expire_timers();
     }
 
@@ -434,6 +445,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // in ngx_event_posted.c
     // 这里因为要处理大量的事件，而且是简单的顺序调用，所以可能会阻塞
     // nginx大部分的工作量都在这里
+    // 注意与accept的函数是相同的，但队列不同，即里面的事件不同
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 

@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_epoll_process_events
+// * ngx_epoll_notify
 
 /*
  * Copyright (C) Igor Sysoev
@@ -953,6 +956,9 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "epoll timer: %M", timer);
 
+    // 如果使用负载均衡，那么flags里有NGX_POST_EVENTS标志
+    // 如果没有设置更新缓存时间的精度，那么flags里有NGX_UPDATE_TIME
+
     // 调用epoll_wait处理发生的事件
     // 使用event_list和nevents获取内核返回的事件
     // 返回值events是实际获得的事件数量
@@ -1073,6 +1079,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
              */
 
             // 加上一个读写事件，保证后续有handler可以处理
+            // 实际上会由读事件来处理
             revents |= EPOLLIN|EPOLLOUT;
         }
 
@@ -1089,6 +1096,8 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             rev->ready = 1;
 
             // 检查此事件是否要延后处理
+            // 如果使用负载均衡，那么flags里有NGX_POST_EVENTS标志
+            // 1.9.x使用reuseport，那么就不延后处理
             if (flags & NGX_POST_EVENTS) {
                 // 是否是接受请求的事件，两个延后处理队列
                 queue = rev->accept ? &ngx_posted_accept_events
@@ -1101,6 +1110,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
             } else {
                 // 不延后，立即调用读事件的handler回调函数处理事件
+                // 1.9.x reuseport直接处理，省去了入队列出队列的成本，更快
                 rev->handler(rev);
             }
         }
@@ -1129,6 +1139,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             wev->ready = 1;
 
             // 检查此事件是否要延后处理
+            // 1.9.x使用reuseport，那么就不延后处理
             if (flags & NGX_POST_EVENTS) {
                 // 暂不处理，而是加入延后处理队列
                 // 加快事件的处理速度，避免其他进程的等待
@@ -1138,6 +1149,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
             } else {
                 // 不延后，立即调用写事件的handler回调函数处理事件
+                // 1.9.x reuseport直接处理，省去了入队列出队列的成本，更快
                 wev->handler(wev);
             }
         }
