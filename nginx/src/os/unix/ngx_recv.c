@@ -144,19 +144,22 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     do {
         // 使用系统调用recv读数据
+        // <0 出错， =0 连接关闭， >0 接收到数据大小
         n = recv(c->fd, buf, size, 0);
 
         ngx_log_debug3(NGX_LOG_DEBUG_EVENT, c->log, 0,
                        "recv: fd:%d %d of %d", c->fd, n, size);
 
-        // 如果读到数据，那么置ready=0
+        // n == 0，客户端关闭了连接
         if (n == 0) {
+            // 置ready=0
             rev->ready = 0;
 
-            // 如果数据长度为0，说明流已经结束，eof=1
+            // 如果数据长度为0，说明流已经结束，即连接被关闭，eof=1
             rev->eof = 1;
             return n;
 
+        // n > 0， 成功从socket接收了一些数据
         } else if (n > 0) {
 
             // 在epoll模块ngx_epoll_init里已经设置了全局变量ngx_event_flags
@@ -170,6 +173,7 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
             // 不修改ready，也就是ready=1
             // 返回读取的字节数，剩余的之后可以再次读取
+            // 被外部函数反复调用
             return n;
         }
 
@@ -183,6 +187,8 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
         if (err == NGX_EAGAIN || err == NGX_EINTR) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
                            "recv() not ready");
+
+            // 返回again，外部函数可以再次尝试读取
             n = NGX_AGAIN;
 
         } else {
@@ -194,6 +200,7 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
     // 只有收到信号被中断才退出循环
     } while (err == NGX_EINTR);
 
+    // 发生了again/intr之外的错误，socket出错，不能继续读了
     rev->ready = 0;
 
     // NGX_EAGAIN不算错误
