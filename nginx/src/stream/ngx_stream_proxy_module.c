@@ -2,6 +2,8 @@
 //
 // * ngx_stream_proxy_pass
 // * ngx_stream_proxy_handler
+// * ngx_stream_proxy_connect_handler
+// * ngx_stream_proxy_init_upstream
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -62,14 +64,31 @@ typedef struct {
 // 最后启动连接
 static void ngx_stream_proxy_handler(ngx_stream_session_t *s);
 
+// 连接上游
+// 使用ngx_peer_connection_t连接上游服务器
+// 连接失败，需要尝试下一个上游server
+// 连接成功要调用init初始化上游
 static void ngx_stream_proxy_connect(ngx_stream_session_t *s);
+
 static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s);
+
+// 连接成功之后的事件处理函数
+// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void ngx_stream_proxy_upstream_handler(ngx_event_t *ev);
+
 static void ngx_stream_proxy_downstream_handler(ngx_event_t *ev);
 static void ngx_stream_proxy_process_connection(ngx_event_t *ev,
     ngx_uint_t from_upstream);
+
+// 第一次连接上游不成功后的handler
+// 当上游连接再次有读写事件发生时测试连接
+// 测试连接是否成功，失败就再试下一个上游
+// 最后还是要调用init初始化上游
 static void ngx_stream_proxy_connect_handler(ngx_event_t *ev);
+
+// 测试连接是否成功，失败就再试下一个上游
 static ngx_int_t ngx_stream_proxy_test_connect(ngx_connection_t *c);
+
 static ngx_int_t ngx_stream_proxy_process(ngx_stream_session_t *s,
     ngx_uint_t from_upstream, ngx_uint_t do_write);
 static void ngx_stream_proxy_next_upstream(ngx_stream_session_t *s);
@@ -451,10 +470,17 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     }
 
     // 最后启动连接
+    // 使用ngx_peer_connection_t连接上游服务器
+    // 连接失败，需要尝试下一个上游server
+    // 连接成功要调用init初始化上游
     ngx_stream_proxy_connect(s);
 }
 
 
+// 连接上游
+// 使用ngx_peer_connection_t连接上游服务器
+// 连接失败，需要尝试下一个上游server
+// 连接成功要调用init初始化上游
 static void
 ngx_stream_proxy_connect(ngx_stream_session_t *s)
 {
@@ -473,6 +499,14 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
     u = s->upstream;
 
     // 连接上游
+    // 使用ngx_peer_connection_t连接上游服务器
+    // 从upstream{}里获取一个上游server地址
+    // 从cycle的连接池获取一个空闲连接
+    // 设置连接的数据收发接口函数
+    // 向epoll添加连接，即同时添加读写事件
+    // 当与上游服务器有任何数据收发时都会触发epoll
+    // socket api调用连接上游服务器
+    // 写事件ready，即可以立即向上游发送数据
     rc = ngx_event_connect_peer(&u->peer);
 
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "proxy connect: %i", rc);
@@ -490,6 +524,7 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
         return;
     }
 
+    // 连接失败，需要尝试下一个上游server
     if (rc == NGX_DECLINED) {
         ngx_stream_proxy_next_upstream(s);
         return;
@@ -505,12 +540,19 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
     pc->read->log = c->log;
     pc->write->log = c->log;
 
+    // 连接成功
     if (rc != NGX_AGAIN) {
         ngx_stream_proxy_init_upstream(s);
         return;
     }
 
+    // again，要再次尝试连接
+
     // 设置上游的读写事件处理函数是ngx_stream_proxy_connect_handler
+    // 第一次连接上游不成功后的handler
+    // 当上游连接再次有读写事件发生时测试连接
+    // 测试连接是否成功，失败就再试下一个上游
+    // 最后还是要调用init初始化上游
     pc->read->handler = ngx_stream_proxy_connect_handler;
     pc->write->handler = ngx_stream_proxy_connect_handler;
 
@@ -519,6 +561,10 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
 }
 
 
+// 分配供上游读取数据的缓冲区
+// 进入此函数，肯定已经成功连接了上游服务器
+// 修改上游读写事件，不再测试连接，改为ngx_stream_proxy_upstream_handler
+// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void
 ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 {
@@ -530,7 +576,10 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     ngx_stream_core_srv_conf_t   *cscf;
     ngx_stream_proxy_srv_conf_t  *pscf;
 
+    // u保存了上游相关的信息
     u = s->upstream;
+
+    // pc是上游的连接对象
     pc = u->peer.connection;
 
     cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
@@ -569,6 +618,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     }
 #endif
 
+    // c是到客户端即下游的连接对象
     c = s->connection;
 
     if (c->log->log_level >= NGX_LOG_INFO) {
@@ -591,6 +641,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 
     c->log->action = "proxying connection";
 
+    // 分配供上游读取数据的缓冲区
     p = ngx_pnalloc(c->pool, pscf->buffer_size);
     if (p == NULL) {
         ngx_stream_proxy_finalize(s, NGX_ERROR);
@@ -602,8 +653,11 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     u->upstream_buf.pos = p;
     u->upstream_buf.last = p;
 
+    // 进入此函数，肯定已经成功连接了上游服务器
     u->connected = 1;
 
+    // 修改上游读写事件，不再测试连接，改为ngx_stream_proxy_upstream_handler
+    // 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
     pc->read->handler = ngx_stream_proxy_upstream_handler;
     pc->write->handler = ngx_stream_proxy_upstream_handler;
 
@@ -922,6 +976,8 @@ ngx_stream_proxy_downstream_handler(ngx_event_t *ev)
 }
 
 
+// 连接成功之后的事件处理函数
+// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void
 ngx_stream_proxy_upstream_handler(ngx_event_t *ev)
 {
@@ -937,10 +993,12 @@ ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
     ngx_stream_upstream_t        *u;
     ngx_stream_proxy_srv_conf_t  *pscf;
 
+    // 连接、会话、上游
     c = ev->data;
     s = c->data;
     u = s->upstream;
 
+    // 超时处理，没有delay则失败
     if (ev->timedout) {
 
         if (ev->delayed) {
@@ -993,15 +1051,21 @@ ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
 }
 
 
+// 第一次连接上游不成功后的handler
+// 当上游连接再次有读写事件发生时测试连接
+// 测试连接是否成功，失败就再试下一个上游
+// 最后还是要调用init初始化上游
 static void
 ngx_stream_proxy_connect_handler(ngx_event_t *ev)
 {
     ngx_connection_t      *c;
     ngx_stream_session_t  *s;
 
+    // 连接、会话对象
     c = ev->data;
     s = c->data;
 
+    // 超时就尝试下一个上游
     if (ev->timedout) {
         ngx_log_error(NGX_LOG_ERR, c->log, NGX_ETIMEDOUT, "upstream timed out");
         ngx_stream_proxy_next_upstream(s);
@@ -1013,15 +1077,18 @@ ngx_stream_proxy_connect_handler(ngx_event_t *ev)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream proxy connect upstream");
 
+    // 测试连接是否成功，失败就再试下一个上游
     if (ngx_stream_proxy_test_connect(c) != NGX_OK) {
         ngx_stream_proxy_next_upstream(s);
         return;
     }
 
+    // 最后还是要调用init初始化上游
     ngx_stream_proxy_init_upstream(s);
 }
 
 
+// 测试连接是否成功，失败就再试下一个上游
 static ngx_int_t
 ngx_stream_proxy_test_connect(ngx_connection_t *c)
 {

@@ -124,7 +124,9 @@ typedef struct {
 #if (NGX_STREAM_SSL)
     ngx_str_t                          ssl_name;
 #endif
+    // 是否已经成功连接上游
     unsigned                           connected:1;
+
     unsigned                           proxy_protocol:1;
 } ngx_stream_upstream_t;
 
