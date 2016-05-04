@@ -298,7 +298,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 暂存当前的解析上下文
     pcf = *cf;
 
-    // 设置事件模块的新解析上下文
+    // 设置stream模块的新解析上下文
     // 使用刚才刚创建的配置结构体存储模块的配置信息
     cf->ctx = ctx;
     cf->cmd_type = NGX_STREAM_SRV_CONF;

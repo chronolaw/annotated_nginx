@@ -11,8 +11,20 @@
 #include <ngx_stream.h>
 
 
+// 解析upstream{}块，它相当于server{}块，级别相同
+// 创建一个upstream{}块的配置信息
+// 检查是否有同名的upstream{}，如有则报错
+// 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
+// 创建数组，存储upstream{}里的服务器信息
+// 要求至少有一个server指定上游服务器，否则出错
 static char *ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
+
+// 解析upstream{}里的server指令，确定一个上游服务器
+// 在servers数组里添加一个元素
+// 检查里面的weight等参数，设置ngx_stream_upstream_server_t结构体
+// 从2开始，第一个是server的地址
+// 要求server必须有端口号
 static char *ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -87,7 +99,12 @@ ngx_module_t  ngx_stream_upstream_module = {
 };
 
 
-// 解析upstream{}块
+// 解析upstream{}块，它相当于server{}块，级别相同
+// 创建一个upstream{}块的配置信息
+// 检查是否有同名的upstream{}，如有则报错
+// 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
+// 创建数组，存储upstream{}里的服务器信息
+// 要求至少有一个server指定上游服务器，否则出错
 static char *
 ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -110,6 +127,9 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     u.no_resolve = 1;
     u.no_port = 1;
 
+    // 创建一个upstream{}块的配置信息
+    // 检查是否有同名的upstream{}，如有则报错
+    // 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
     uscf = ngx_stream_upstream_add(cf, &u, NGX_STREAM_UPSTREAM_CREATE
                                            |NGX_STREAM_UPSTREAM_WEIGHT
                                            |NGX_STREAM_UPSTREAM_MAX_FAILS
@@ -121,26 +141,40 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     }
 
 
+    // tcp流处理的配置结构体
+    // 与http不同的是没有location，只有两级
+    // 在cycle->conf_ctx里存储的是stream{}级别的配置
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_stream_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 保存stream{}的配置上下文
+    // 也就是stream{}里的ngx_stream_conf_ctx_t
     stream_ctx = cf->ctx;
+
+    // main_conf直接指向stream{}的main_conf
     ctx->main_conf = stream_ctx->main_conf;
 
     /* the upstream{}'s srv_conf */
 
+    // 分配存储srv_conf的数组，数量是ngx_stream_max_module
     ctx->srv_conf = ngx_pcalloc(cf->pool,
                                 sizeof(void *) * ngx_stream_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 存储本配置块的配置
+    // ngx_stream_upstream_module相当于ngx_stream_core_module
+    // 同时在main conf的servers数组里也有
     ctx->srv_conf[ngx_stream_upstream_module.ctx_index] = uscf;
 
+    // 保存本upstream{}的配置数组
     uscf->srv_conf = ctx->srv_conf;
 
+    // 遍历模块数组，调用每个stream模块create_srv_conf，创建配置结构体
+    // 但实际上除了负载均衡模块，其他模块不会在这里出现，没有意义
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
             continue;
@@ -158,6 +192,7 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
     }
 
+    // 创建数组，准备存储upstream{}里的服务器信息
     uscf->servers = ngx_array_create(cf->pool, 4,
                                      sizeof(ngx_stream_upstream_server_t));
     if (uscf->servers == NULL) {
@@ -167,18 +202,26 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* parse inside upstream{} */
 
+    // 暂存当前的解析上下文
     pcf = *cf;
+
+    // 设置upstream模块的新解析上下文
+    // 使用刚才刚创建的配置结构体存储模块的配置信息
     cf->ctx = ctx;
     cf->cmd_type = NGX_STREAM_UPS_CONF;
 
+    // 递归解析事件相关模块
+    // 里面主要是server指令和负载均衡算法指令
     rv = ngx_conf_parse(cf, NULL);
 
+    // 恢复之前保存的解析上下文
     *cf = pcf;
 
     if (rv != NGX_CONF_OK) {
         return rv;
     }
 
+    // 要求至少有一个server指定上游服务器，否则出错
     if (uscf->servers->nelts == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "no servers are inside upstream");
@@ -189,6 +232,11 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 }
 
 
+// 解析upstream{}里的server指令，确定一个上游服务器
+// 在servers数组里添加一个元素
+// 检查里面的weight等参数，设置ngx_stream_upstream_server_t结构体
+// 从2开始，第一个是server的地址
+// 要求server必须有端口号
 static char *
 ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -201,6 +249,7 @@ ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                     i;
     ngx_stream_upstream_server_t  *us;
 
+    // 在servers数组里添加一个元素
     us = ngx_array_push(uscf->servers);
     if (us == NULL) {
         return NGX_CONF_ERROR;
@@ -214,6 +263,8 @@ ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     max_fails = 1;
     fail_timeout = 10;
 
+    // 检查里面的weight等参数，设置ngx_stream_upstream_server_t结构体
+    // 从2开始，第一个是server的地址
     for (i = 2; i < cf->args->nelts; i++) {
 
         if (ngx_strncmp(value[i].data, "weight=", 7) == 0) {
@@ -289,6 +340,7 @@ ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         goto invalid;
     }
 
+    // 第一个参数是server地址，解析之
     ngx_memzero(&u, sizeof(ngx_url_t));
 
     u.url = value[1];
@@ -302,12 +354,14 @@ ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 要求server必须有端口号
     if (u.no_port) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "no port in upstream \"%V\"", &u.url);
         return NGX_CONF_ERROR;
     }
 
+    // 解析完毕，填充server信息
     us->name = u.url;
     us->addrs = u.addrs;
     us->naddrs = u.naddrs;
@@ -334,6 +388,9 @@ not_supported:
 }
 
 
+// 创建一个upstream{}块的配置信息
+// 检查是否有同名的upstream{}，如有则报错
+// 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
 ngx_stream_upstream_srv_conf_t *
 ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 {
@@ -354,12 +411,16 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         }
     }
 
+    // 获取main 配置，里面有数组
     umcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_upstream_module);
 
+    // 数组存储所有的upstream{}配置
     uscfp = umcf->upstreams.elts;
 
+    // 检查是否有同名的upstream{}，如有则报错
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
+        // 比较名字
         if (uscfp[i]->host.len != u->host.len
             || ngx_strncasecmp(uscfp[i]->host.data, u->host.data, u->host.len)
                != 0)
@@ -401,11 +462,13 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         return uscfp[i];
     }
 
+    // 创建此upstream{}的srv配置结构体
     uscf = ngx_pcalloc(cf->pool, sizeof(ngx_stream_upstream_srv_conf_t));
     if (uscf == NULL) {
         return NULL;
     }
 
+    // 填充基本信息
     uscf->flags = flags;
     uscf->host = u->host;
     uscf->file_name = cf->conf_file->file.name.data;
@@ -413,6 +476,8 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
     uscf->port = u->port;
     uscf->no_port = u->no_port;
 
+    // upstream指定了一个具体的上游server
+    // 那么就把它加入servers数组
     if (u->naddrs == 1) {
         uscf->servers = ngx_array_create(cf->pool, 1,
                                          sizeof(ngx_stream_upstream_server_t));
@@ -431,6 +496,7 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         us->naddrs = 1;
     }
 
+    // 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
     uscfp = ngx_array_push(&umcf->upstreams);
     if (uscfp == NULL) {
         return NULL;

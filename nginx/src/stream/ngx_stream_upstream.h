@@ -53,6 +53,8 @@ typedef struct {
 } ngx_stream_upstream_peer_t;
 
 
+// 描述一个上游服务器的基本信息
+// 包括权重、失败次数等
 typedef struct {
     ngx_str_t                          name;
     ngx_addr_t                        *addrs;
@@ -66,22 +68,38 @@ typedef struct {
 } ngx_stream_upstream_server_t;
 
 
+// upstream{}块的配置，包含负载均衡算法和上游集群里的server信息
 struct ngx_stream_upstream_srv_conf_s {
     // load balance算法入口，用于初始化
     // 在ngx_stream_upstream_init_main_conf里调用
     // 每个upstream{}只能使用一种负载均衡算法
     ngx_stream_upstream_peer_t         peer;
 
+    // 保存本upstream{}的配置数组
+    // 里面用srv_conf[ngx_stream_upstream_module.ctx_index]可以获取
     void                             **srv_conf;
 
+    // 存储上游集群里的server信息
     ngx_array_t                       *servers;
                                               /* ngx_stream_upstream_server_t */
 
+    // upstream{}的标志位
+    // 通常有NGX_STREAM_UPSTREAM_CREATE|NGX_STREAM_UPSTREAM_CREATE等
     ngx_uint_t                         flags;
+
+    // url的主机名
     ngx_str_t                          host;
+
+    // upstream{}所在的配置文件
     u_char                            *file_name;
+
+    // upstream{}所在的行号
     ngx_uint_t                         line;
+
+    // 端口号
     in_port_t                          port;
+
+    // 无端口号的标志位
     ngx_uint_t                         no_port;  /* unsigned no_port:1 */
 
 #if (NGX_STREAM_UPSTREAM_ZONE)
@@ -104,6 +122,9 @@ typedef struct {
 } ngx_stream_upstream_t;
 
 
+// 创建一个upstream{}块的配置信息
+// 检查是否有同名的upstream{}，如有则报错
+// 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
 ngx_stream_upstream_srv_conf_t *ngx_stream_upstream_add(ngx_conf_t *cf,
     ngx_url_t *u, ngx_uint_t flags);
 
