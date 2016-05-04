@@ -478,6 +478,8 @@ extern ngx_event_actions_t   ngx_event_actions;
 #elif (NGX_HAVE_EPOLL)
 
 // 读事件，即可读或者有accept连接
+// EPOLLRDHUP表示客户端关闭连接（断连），也当做读事件处理
+// 这时recv返回0
 #define NGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
 
 // 写事件，可写

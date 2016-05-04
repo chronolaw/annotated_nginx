@@ -31,7 +31,9 @@
 #define EPOLLERR       0x008
 #define EPOLLHUP       0x010
 
-#define EPOLLRDHUP     0x2000       //RDHUP也属于读事件
+// EPOLLRDHUP表示客户端关闭连接（断连），也当做读事件处理
+// 这时recv返回0
+#define EPOLLRDHUP     0x2000
 
 #define EPOLLET        0x80000000   //ET模式，即边缘触发
 #define EPOLLONESHOT   0x40000000
