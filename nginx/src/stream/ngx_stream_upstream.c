@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * ngx_stream_upstream
+// * ngx_stream_upstream_server
+// * ngx_stream_upstream_add
 
 /*
  * Copyright (C) Igor Sysoev
@@ -127,8 +131,9 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     u.no_resolve = 1;
     u.no_port = 1;
 
-    // 创建一个upstream{}块的配置信息
-    // 检查是否有同名的upstream{}，如有则报错
+    // 创建或者获取一个upstream{}块的配置信息
+    // 获取时flags==0
+    // 检查是否有同名的upstream{}，如果是创建时有则报错
     // 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
     uscf = ngx_stream_upstream_add(cf, &u, NGX_STREAM_UPSTREAM_CREATE
                                            |NGX_STREAM_UPSTREAM_WEIGHT
@@ -388,8 +393,9 @@ not_supported:
 }
 
 
-// 创建一个upstream{}块的配置信息
-// 检查是否有同名的upstream{}，如有则报错
+// 创建或者获取一个upstream{}块的配置信息
+// 获取时flags==0
+// 检查是否有同名的upstream{}，如果是创建时有则报错
 // 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
 ngx_stream_upstream_srv_conf_t *
 ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
@@ -459,6 +465,7 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
             uscfp[i]->flags = flags;
         }
 
+        // 返回找到的匹配upstream配置
         return uscfp[i];
     }
 
@@ -549,6 +556,8 @@ ngx_stream_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
     uscfp = umcf->upstreams.elts;
 
     // 检查每一个upstream{}块
+    // 此时在uscfp里已经存储了多个上游server的信息
+    // 包括地址、权重、失败次数等
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
         // 查看是否有load balance初始化指针

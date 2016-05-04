@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_stream_proxy_pass
+// * ngx_stream_proxy_handler
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -44,11 +48,20 @@ typedef struct {
     ngx_ssl_t                       *ssl;
 #endif
 
+    // 将要转发的上游服务器集群
+    // 定义为一个upstream{}
     ngx_stream_upstream_srv_conf_t  *upstream;
 } ngx_stream_proxy_srv_conf_t;
 
 
+// ngx_stream_init_connection->ngx_stream_init_session之后调用，处理请求
+// 创建连接上游的结构体
+// 里面有如何获取负载均衡server、上下游buf等
+// 负载均衡算法初始化
+// 准备开始连接，设置开始时间，秒数，没有毫秒
+// 最后启动连接
 static void ngx_stream_proxy_handler(ngx_stream_session_t *s);
+
 static void ngx_stream_proxy_connect(ngx_stream_session_t *s);
 static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s);
 static void ngx_stream_proxy_upstream_handler(ngx_event_t *ev);
@@ -67,8 +80,12 @@ static u_char *ngx_stream_proxy_log_error(ngx_log_t *log, u_char *buf,
 static void *ngx_stream_proxy_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_stream_proxy_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
+
+// 解析proxy_pass指令，设置处理handler，在init建立连接之后会调用
+// 获取一个upstream{}块的配置信息
 static char *ngx_stream_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
 static char *ngx_stream_proxy_bind(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_stream_proxy_send_proxy_protocol(ngx_stream_session_t *s);
@@ -324,6 +341,12 @@ ngx_module_t  ngx_stream_proxy_module = {
 };
 
 
+// ngx_stream_init_connection->ngx_stream_init_session之后调用，处理请求
+// 创建连接上游的结构体
+// 里面有如何获取负载均衡server、上下游buf等
+// 负载均衡算法初始化
+// 准备开始连接，设置开始时间，秒数，没有毫秒
+// 最后启动连接
 static void
 ngx_stream_proxy_handler(ngx_stream_session_t *s)
 {
@@ -333,6 +356,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     ngx_stream_proxy_srv_conf_t     *pscf;
     ngx_stream_upstream_srv_conf_t  *uscf;
 
+    // 获取连接对象
     c = s->connection;
 
     pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
@@ -340,12 +364,15 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "proxy connection handler");
 
+    // 创建连接上游的结构体
+    // 里面有如何获取负载均衡server、上下游buf等
     u = ngx_pcalloc(c->pool, sizeof(ngx_stream_upstream_t));
     if (u == NULL) {
         ngx_stream_proxy_finalize(s, NGX_ERROR);
         return;
     }
 
+    // 关联到会话对象
     s->upstream = u;
 
     s->log_handler = ngx_stream_proxy_log_error;
@@ -355,15 +382,20 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
 
     u->peer.local = pscf->local;
 
+    // 获取上游的配置结构体
+    // 在ngx_stream_proxy_pass里设置的
     uscf = pscf->upstream;
 
+    // 负载均衡算法初始化
     if (uscf->peer.init(s, uscf) != NGX_OK) {
         ngx_stream_proxy_finalize(s, NGX_ERROR);
         return;
     }
 
+    // 准备开始连接，设置开始时间，秒数，没有毫秒
     u->peer.start_time = ngx_current_msec;
 
+    // 设置负载均衡的重试次数
     if (pscf->next_upstream_tries
         && u->peer.tries > pscf->next_upstream_tries)
     {
@@ -371,8 +403,11 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     }
 
     u->proxy_protocol = pscf->proxy_protocol;
+
+    // 准备开始连接，设置开始时间，秒数，没有毫秒
     u->start_sec = ngx_time();
 
+    // 缓冲区，给下游用
     p = ngx_pnalloc(c->pool, pscf->buffer_size);
     if (p == NULL) {
         ngx_stream_proxy_finalize(s, NGX_ERROR);
@@ -384,6 +419,8 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     u->downstream_buf.pos = p;
     u->downstream_buf.last = p;
 
+    // 连接的读写事件都设置为ngx_stream_proxy_downstream_handler
+    // 注意这个连接是客户端发起的连接，即下游
     c->write->handler = ngx_stream_proxy_downstream_handler;
     c->read->handler = ngx_stream_proxy_downstream_handler;
 
@@ -413,6 +450,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         return;
     }
 
+    // 最后启动连接
     ngx_stream_proxy_connect(s);
 }
 
@@ -425,12 +463,16 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
     ngx_stream_upstream_t        *u;
     ngx_stream_proxy_srv_conf_t  *pscf;
 
+    // 获取连接对象
     c = s->connection;
 
     c->log->action = "connecting to upstream";
 
+    // 连接上游的结构体
+    // 里面有如何获取负载均衡server、上下游buf等
     u = s->upstream;
 
+    // 连接上游
     rc = ngx_event_connect_peer(&u->peer);
 
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "proxy connect: %i", rc);
@@ -468,9 +510,11 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
         return;
     }
 
+    // 设置上游的读写事件处理函数是ngx_stream_proxy_connect_handler
     pc->read->handler = ngx_stream_proxy_connect_handler;
     pc->write->handler = ngx_stream_proxy_connect_handler;
 
+    // 连接上游先写，所以设置写事件的超时时间
     ngx_add_timer(pc->write, pscf->connect_timeout);
 }
 
@@ -1511,6 +1555,8 @@ ngx_stream_proxy_set_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *pscf)
 #endif
 
 
+// 解析proxy_pass指令，设置处理handler，在init建立连接之后会调用
+// 获取一个upstream{}块的配置信息
 static char *
 ngx_stream_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1520,14 +1566,18 @@ ngx_stream_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                   *value, *url;
     ngx_stream_core_srv_conf_t  *cscf;
 
+    // upstream是将要转发的上游服务器集群
+    // 如果不空表示指令重复定义了
     if (pscf->upstream) {
         return "is duplicate";
     }
 
     cscf = ngx_stream_conf_get_module_srv_conf(cf, ngx_stream_core_module);
 
+    // 设置处理handler，在init建立连接之后会调用
     cscf->handler = ngx_stream_proxy_handler;
 
+    // 获取upstream名字
     value = cf->args->elts;
 
     url = &value[1];
@@ -1537,6 +1587,8 @@ ngx_stream_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     u.url = *url;
     u.no_resolve = 1;
 
+    // 获取一个upstream{}块的配置信息
+    // 获取时flags==0
     pscf->upstream = ngx_stream_upstream_add(cf, &u, 0);
     if (pscf->upstream == NULL) {
         return NGX_CONF_ERROR;

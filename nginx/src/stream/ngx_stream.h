@@ -227,7 +227,8 @@ struct ngx_stream_session_s {
     // s->srv_conf = addr_conf->ctx->srv_conf;
     void                  **srv_conf;
 
-    // 连接上游
+    // 连接上游相关的信息，用于转发请求
+    // 里面有如何获取负载均衡server、上下游buf等
     ngx_stream_upstream_t  *upstream;
 };
 

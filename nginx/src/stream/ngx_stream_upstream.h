@@ -108,11 +108,18 @@ struct ngx_stream_upstream_srv_conf_s {
 };
 
 
+// 处理转发上游请求时的结构体
 typedef struct {
+    // 从upstream{}里获取一个上游server
     ngx_peer_connection_t              peer;
+
     ngx_buf_t                          downstream_buf;
     ngx_buf_t                          upstream_buf;
+
+    // 收到的字节数
     off_t                              received;
+
+    // 开始的时间，只是秒数
     time_t                             start_sec;
 #if (NGX_STREAM_SSL)
     ngx_str_t                          ssl_name;
@@ -122,8 +129,9 @@ typedef struct {
 } ngx_stream_upstream_t;
 
 
-// 创建一个upstream{}块的配置信息
-// 检查是否有同名的upstream{}，如有则报错
+// 创建或者获取一个upstream{}块的配置信息
+// 获取时flags==0
+// 检查是否有同名的upstream{}，如果是创建时有则报错
 // 加入main conf里的upstreams数组，之后就可以在这里找到所有的upstream{}
 ngx_stream_upstream_srv_conf_t *ngx_stream_upstream_add(ngx_conf_t *cf,
     ngx_url_t *u, ngx_uint_t flags);
