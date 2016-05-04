@@ -23,6 +23,8 @@
 #define NGX_STREAM_UPSTREAM_BACKUP        0x0020
 
 
+// upstream{}的配置结构体，只有一个数组
+// 用来存储每个上游upstream{}的信息
 typedef struct {
     ngx_array_t                        upstreams;
                                            /* ngx_stream_upstream_srv_conf_t */
@@ -38,9 +40,15 @@ typedef ngx_int_t (*ngx_stream_upstream_init_peer_pt)(ngx_stream_session_t *s,
     ngx_stream_upstream_srv_conf_t *us);
 
 
+// load balance模块入口
 typedef struct {
+    // 配置解析时初始化
     ngx_stream_upstream_init_pt        init_upstream;
+
+    // 发生请求时初始化
     ngx_stream_upstream_init_peer_pt   init;
+
+    // 上游服务器列表指针
     void                              *data;
 } ngx_stream_upstream_peer_t;
 
@@ -59,7 +67,11 @@ typedef struct {
 
 
 struct ngx_stream_upstream_srv_conf_s {
+    // load balance算法入口，用于初始化
+    // 在ngx_stream_upstream_init_main_conf里调用
+    // 每个upstream{}只能使用一种负载均衡算法
     ngx_stream_upstream_peer_t         peer;
+
     void                             **srv_conf;
 
     ngx_array_t                       *servers;

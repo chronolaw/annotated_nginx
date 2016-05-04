@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -14,12 +15,23 @@ static char *ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd,
     void *dummy);
 static char *ngx_stream_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// upstream{}的配置结构体，只有一个数组
+// 用来存储每个上游upstream{}的信息
 static void *ngx_stream_upstream_create_main_conf(ngx_conf_t *cf);
+
+// 在ngx_stream_block解析完配置后调用，初始化main conf
+// 检查每一个upstream{}块
+// 查看是否有load balance初始化指针
+// 没有指定特别的算法就使用默认的round robin
+// 对本upstream{}块做初始化
 static char *ngx_stream_upstream_init_main_conf(ngx_conf_t *cf, void *conf);
 
 
+// 在stream{}块里的upstream相关指令，只有两个
 static ngx_command_t  ngx_stream_upstream_commands[] = {
 
+    // 定义upstream{}块
     { ngx_string("upstream"),
       NGX_STREAM_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE1,
       ngx_stream_upstream,
@@ -27,6 +39,7 @@ static ngx_command_t  ngx_stream_upstream_commands[] = {
       0,
       NULL },
 
+    // 定义上游的服务器地址
     { ngx_string("server"),
       NGX_STREAM_UPS_CONF|NGX_CONF_1MORE,
       ngx_stream_upstream_server,
@@ -41,7 +54,15 @@ static ngx_command_t  ngx_stream_upstream_commands[] = {
 static ngx_stream_module_t  ngx_stream_upstream_module_ctx = {
     NULL,                                  /* postconfiguration */
 
+    // upstream{}的配置结构体，只有一个数组
+    // 用来存储每个上游upstream{}的信息
     ngx_stream_upstream_create_main_conf,  /* create main configuration */
+
+    // 在ngx_stream_block解析完配置后调用，初始化main conf
+    // 检查每一个upstream{}块
+    // 查看是否有load balance初始化指针
+    // 没有指定特别的算法就使用默认的round robin
+    // 对本upstream{}块做初始化
     ngx_stream_upstream_init_main_conf,    /* init main configuration */
 
     NULL,                                  /* create server configuration */
@@ -49,6 +70,7 @@ static ngx_stream_module_t  ngx_stream_upstream_module_ctx = {
 };
 
 
+// upstream模块定义
 ngx_module_t  ngx_stream_upstream_module = {
     NGX_MODULE_V1,
     &ngx_stream_upstream_module_ctx,       /* module context */
@@ -65,6 +87,7 @@ ngx_module_t  ngx_stream_upstream_module = {
 };
 
 
+// 解析upstream{}块
 static char *
 ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -81,6 +104,8 @@ ngx_stream_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     ngx_memzero(&u, sizeof(ngx_url_t));
 
     value = cf->args->elts;
+
+    // 指令的第一个参数是upstream块的名字
     u.host = value[1];
     u.no_resolve = 1;
     u.no_port = 1;
@@ -417,6 +442,8 @@ ngx_stream_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 }
 
 
+// upstream{}的配置结构体，只有一个数组
+// 用来存储每个上游upstream{}的信息
 static void *
 ngx_stream_upstream_create_main_conf(ngx_conf_t *cf)
 {
@@ -438,6 +465,11 @@ ngx_stream_upstream_create_main_conf(ngx_conf_t *cf)
 }
 
 
+// 在ngx_stream_block解析完配置后调用，初始化main conf
+// 检查每一个upstream{}块
+// 查看是否有load balance初始化指针
+// 没有指定特别的算法就使用默认的round robin
+// 对本upstream{}块做初始化
 static char *
 ngx_stream_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 {
@@ -447,14 +479,19 @@ ngx_stream_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
     ngx_stream_upstream_init_pt       init;
     ngx_stream_upstream_srv_conf_t  **uscfp;
 
+    // umcf里存储的是ngx_stream_upstream_srv_conf_t数组
     uscfp = umcf->upstreams.elts;
 
+    // 检查每一个upstream{}块
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
+        // 查看是否有load balance初始化指针
+        // 没有指定特别的算法就使用默认的round robin
         init = uscfp[i]->peer.init_upstream
                                          ? uscfp[i]->peer.init_upstream
                                          : ngx_stream_upstream_init_round_robin;
 
+        // 对本upstream{}块做初始化
         if (init(cf, uscfp[i]) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
