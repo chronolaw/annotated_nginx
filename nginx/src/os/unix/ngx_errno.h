@@ -18,6 +18,12 @@
 typedef int               ngx_err_t;
 
 // 重定义unix错误码
+// 较重要的有：
+// NGX_EINTR，发生系统中断
+// NGX_ENFILE/NGX_EMFILE，系统文件描述符不足
+// NGX_EINPROGRESS，发起上游连接，但还没有连接成功
+// NGX_ETIMEDOUT，超时错误
+// NGX_EAGAIN，非阻塞调用专用错误码，未准备好，需重试
 #define NGX_EPERM         EPERM
 #define NGX_ENOENT        ENOENT
 #define NGX_ENOPATH       ENOENT
