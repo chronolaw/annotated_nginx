@@ -23,11 +23,11 @@
 // nginx作为客户端发起的主动连接，连接上游服务器
 typedef struct ngx_peer_connection_s  ngx_peer_connection_t;
 
-// 从连接池里获取一个主动连接
+// 从upstream{}里获取一个上游server地址
 typedef ngx_int_t (*ngx_event_get_peer_pt)(ngx_peer_connection_t *pc,
     void *data);
 
-// 释放主动连接，归还连接池
+// 释放一个上游地址，维护upstream{}负载均衡信息
 typedef void (*ngx_event_free_peer_pt)(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state);
 #if (NGX_SSL)
@@ -45,9 +45,11 @@ typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
 struct ngx_peer_connection_s {
     // cycle里的连接对象，实际上使用了装饰模式
     // 在ngx_event_connect_peer()里获取空闲连接并设置
+    // 连接上游服务器
     ngx_connection_t                *connection;
 
     // 上游服务器的sockaddr
+    // 由下面的get/free操作
     struct sockaddr                 *sockaddr;
     socklen_t                        socklen;
     ngx_str_t                       *name;
@@ -56,12 +58,18 @@ struct ngx_peer_connection_s {
     ngx_uint_t                       tries;
 
     // 连接开始的时间，即发起主动连接的时刻
+    // 开始的时间，只是秒数
     ngx_msec_t                       start_time;
 
-    // 从连接池里获取一个主动连接
+    // 从upstream{}里获取一个上游server地址
+    // 由负载均衡模块的init_perr设置
+    // 例如ngx_stream_upstream_get_round_robin_peer
+    // 设置sockaddr、socklen、name用于连接
     ngx_event_get_peer_pt            get;
 
-    // 释放主动连接，归还连接池
+    // 释放一个上游地址，维护upstream{}负载均衡信息
+    // 由负载均衡模块的init_perr设置
+    // ngx_stream_upstream_free_round_robin_peer
     ngx_event_free_peer_pt           free;
 
     // get/free函数所需的参数

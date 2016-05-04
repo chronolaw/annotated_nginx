@@ -13,7 +13,13 @@
 
 
 // 使用ngx_peer_connection_t连接上游服务器
+// 从upstream{}里获取一个上游server地址
 // 从cycle的连接池获取一个空闲连接
+// 设置连接的数据收发接口函数
+// 向epoll添加连接，即同时添加读写事件
+// 当与上游服务器有任何数据收发时都会触发epoll
+// socket api调用连接上游服务器
+// 写事件ready，即可以立即向上游发送数据
 // 可对比ngx_event_accept建立被动连接
 ngx_int_t
 ngx_event_connect_peer(ngx_peer_connection_t *pc)
@@ -26,7 +32,10 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
 
-    // 调用ngx_event_get_peer_pt获取一个主动连接
+    // 从upstream{}里获取一个上游server地址
+    // 由负载均衡模块的init_perr设置
+    // 例如ngx_stream_upstream_get_round_robin_peer
+    // 设置sockaddr、socklen、name用于连接
     rc = pc->get(pc, pc->data);
     if (rc != NGX_OK) {
         return rc;
@@ -46,6 +55,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
 
 
     // 从cycle的连接池获取一个空闲连接
+    // 这个c是连接上游的连接
     c = ngx_get_connection(s, pc->log);
 
     // 如果没有空闲连接则失败
@@ -77,6 +87,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         goto failed;
     }
 
+    // 本地地址
     if (pc->local) {
         if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
             ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
@@ -87,6 +98,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
     // 设置连接的数据收发接口函数
+    // 这个c是连接上游的连接
     // #define ngx_recv             ngx_io.recv
     // #define ngx_recv_chain       ngx_io.recv_chain
     // ngx_posix_init.c里初始化为linux的底层接口
@@ -144,6 +156,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         err = ngx_socket_errno;
 
 
+        // 不是NGX_EINPROGRESS那么就是错误
         if (err != NGX_EINPROGRESS
 #if (NGX_WIN32)
             /* Winsock returns WSAEWOULDBLOCK (NGX_EAGAIN) */
@@ -255,6 +268,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
 
     ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
 
+    // 写事件ready，即可以立即向上游发送数据
     wev->ready = 1;
 
     return NGX_OK;
