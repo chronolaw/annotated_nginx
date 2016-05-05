@@ -62,6 +62,7 @@ struct ngx_log_s {
     ngx_open_file_t     *file;
 
     // 日志关联的连接计数
+    // c->log->connection = c->number;
     ngx_atomic_uint_t    connection;
 
     // 记录写日志磁盘满错误发生的时间
@@ -70,7 +71,11 @@ struct ngx_log_s {
     // 记录错误日志时可以执行的回调函数
     // 参数是消息缓冲区里剩余的空间
     // 只有高于debug才会执行
+    // 例如ngx_http_log_error
     ngx_log_handler_pt   handler;
+
+    // handler执行时需要的数据
+    // 例如ngx_http_log_ctx_t，里面有请求、连接等
     void                *data;
 
     ngx_log_writer_pt    writer;
@@ -82,6 +87,8 @@ struct ngx_log_s {
      * their types all the time
      */
 
+    // 通常由handler使用，定制特殊的日志消息
+    // 例如 while ...
     char                *action;
 
     // 下一个日志对象
