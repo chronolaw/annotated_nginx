@@ -151,7 +151,9 @@ static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
 // 不检查handler的返回值，直接调用，不使用checker
 static void ngx_http_log_request(ngx_http_request_t *r);
 
+// 记录错误日志时由log对象调用的函数，增加http请求的专有信息
 static u_char *ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len);
+
 static u_char *ngx_http_log_error_handler(ngx_http_request_t *r,
     ngx_http_request_t *sr, u_char *buf, size_t len);
 
@@ -821,9 +823,12 @@ ngx_http_create_request(ngx_connection_t *c)
     r->http_state = NGX_HTTP_READING_REQUEST_STATE;
 
     // 日志的ctx
+    // 在记录错误日志时使用
     ctx = c->log->data;
     ctx->request = r;
     ctx->current_request = r;
+
+    // 在记录错误日志时回调
     r->log_handler = ngx_http_log_error_handler;
 
     // 在共享内存里增加计数器
@@ -4178,6 +4183,7 @@ ngx_http_close_connection(ngx_connection_t *c)
 }
 
 
+// 记录错误日志时由log对象调用的函数，增加http请求的专有信息
 static u_char *
 ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len)
 {
@@ -4210,6 +4216,7 @@ ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len)
 }
 
 
+// 在记录错误日志时回调
 static u_char *
 ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
     u_char *buf, size_t len)

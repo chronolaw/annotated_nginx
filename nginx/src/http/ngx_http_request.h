@@ -556,6 +556,8 @@ struct ngx_http_request_s {
     ngx_http_spdy_stream_t           *spdy_stream;
 #endif
 
+    // 记录错误日志时可以调用的函数
+    // 在ngx_http_log_error里调用
     ngx_http_log_handler_pt           log_handler;
 
     // 清理结构体链表，结束时会逐个调用
