@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,6 +14,7 @@
 #include <ngx_core.h>
 
 
+// 错误日志的级别，0最高，8最低
 #define NGX_LOG_STDERR            0
 #define NGX_LOG_EMERG             1
 #define NGX_LOG_ALERT             2
@@ -42,19 +44,32 @@
 #define NGX_LOG_DEBUG_ALL         0x7ffffff0
 
 
+// 记录错误日志时可以执行的回调函数
+// 参数是消息缓冲区里剩余的空间
 typedef u_char *(*ngx_log_handler_pt) (ngx_log_t *log, u_char *buf, size_t len);
+
 typedef void (*ngx_log_writer_pt) (ngx_log_t *log, ngx_uint_t level,
     u_char *buf, size_t len);
 
 
+// 错误日志结构体
 struct ngx_log_s {
+    // 日志对象的级别，会过滤掉低级别的日志信息
+    // 即if ((log)->log_level >= level)
     ngx_uint_t           log_level;
+
+    // 日志文件对象
     ngx_open_file_t     *file;
 
+    // 日志关联的连接计数
     ngx_atomic_uint_t    connection;
 
+    // 记录写日志磁盘满错误发生的时间
     time_t               disk_full_time;
 
+    // 记录错误日志时可以执行的回调函数
+    // 参数是消息缓冲区里剩余的空间
+    // 只有高于debug才会执行
     ngx_log_handler_pt   handler;
     void                *data;
 
@@ -69,15 +84,19 @@ struct ngx_log_s {
 
     char                *action;
 
+    // 下一个日志对象
+    // 多个日志对象形成一个链表
     ngx_log_t           *next;
 };
 
 
+// 错误消息的最大长度，2k字节
 #define NGX_MAX_ERROR_STR   2048
 
 
 /*********************************/
 
+// 通常我们使用c99的可变参数宏
 #if (NGX_HAVE_C99_VARIADIC_MACROS)
 
 #define NGX_HAVE_VARIADIC_MACROS  1

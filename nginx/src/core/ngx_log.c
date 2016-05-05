@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -31,6 +32,7 @@ typedef struct {
 #endif
 
 
+// error_log指令只能出现在最外部，不能在event{}http{}里
 static ngx_command_t  ngx_errlog_commands[] = {
 
     {ngx_string("error_log"),
@@ -44,6 +46,7 @@ static ngx_command_t  ngx_errlog_commands[] = {
 };
 
 
+// 没有配置结构体需要创建
 static ngx_core_module_t  ngx_errlog_module_ctx = {
     ngx_string("errlog"),
     NULL,
@@ -72,6 +75,7 @@ static ngx_open_file_t  ngx_log_file;
 ngx_uint_t              ngx_use_stderr = 1;
 
 
+// 错误级别与字符串的对应数组
 static ngx_str_t err_levels[] = {
     ngx_null_string,
     ngx_string("emerg"),
@@ -90,6 +94,7 @@ static const char *debug_levels[] = {
 };
 
 
+// 通常我们使用c99的可变参数宏
 #if (NGX_HAVE_VARIADIC_MACROS)
 
 void
@@ -112,23 +117,35 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     ngx_uint_t   wrote_stderr, debug_connection;
     u_char       errstr[NGX_MAX_ERROR_STR];
 
+    // 错误消息的最大长度，2k字节
     last = errstr + NGX_MAX_ERROR_STR;
 
+    // 先拷贝当前的时间
+    // 格式是"1970/09/28 12:00:00"
     p = ngx_cpymem(errstr, ngx_cached_err_log_time.data,
                    ngx_cached_err_log_time.len);
 
+    // 打印错误等级的字符串描述信息，使用关联数组err_levels
     p = ngx_slprintf(p, last, " [%V] ", &err_levels[level]);
+
+    // 打印pid和tid
+    // #define ngx_log_pid  ngx_pid
+    // #define ngx_log_tid           ngx_thread_tid()
+    // in os/unix
 
     /* pid#tid */
     p = ngx_slprintf(p, last, "%P#" NGX_TID_T_FMT ": ",
                     ngx_log_pid, ngx_log_tid);
 
+    // 如果有连接计数则打印
     if (log->connection) {
         p = ngx_slprintf(p, last, "*%uA ", log->connection);
     }
 
+    // 前面输出的是基本的信息：当前时间+[错误级别]+pid#tid:
     msg = p;
 
+    // 打印可变参数
 #if (NGX_HAVE_VARIADIC_MACROS)
 
     va_start(args, fmt);
@@ -141,23 +158,30 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 #endif
 
+    // 如果有系统错误码，那么记录(err)
     if (err) {
         p = ngx_log_errno(p, last, err);
     }
 
+    // 记录错误日志时可以执行的回调函数
+    // 参数是消息缓冲区里剩余的空间
+    // 只有高于debug才会执行
     if (level != NGX_LOG_DEBUG && log->handler) {
         p = log->handler(log, p, last - p);
     }
 
+    // #define NGX_LINEFEED_SIZE        1
     if (p > last - NGX_LINEFEED_SIZE) {
         p = last - NGX_LINEFEED_SIZE;
     }
 
+    // #define ngx_linefeed(p)          *p++ = LF;
     ngx_linefeed(p);
 
     wrote_stderr = 0;
     debug_connection = (log->log_level & NGX_LOG_DEBUG_CONNECTION) != 0;
 
+    // 对整个日志链表执行写入操作
     while (log) {
 
         if (log->log_level < level && !debug_connection) {
@@ -180,8 +204,10 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
             goto next;
         }
 
+        // 写错误日志消息到关联的文件
         n = ngx_write_fd(log->file->fd, errstr, p - errstr);
 
+        // 写入失败，且错误是磁盘满
         if (n == -1 && ngx_errno == NGX_ENOSPC) {
             log->disk_full_time = ngx_time();
         }
@@ -192,6 +218,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
     next:
 
+        // 使用下一个日志对象记录日志
         log = log->next;
     }
 
@@ -284,6 +311,7 @@ ngx_log_stderr(ngx_err_t err, const char *fmt, ...)
 }
 
 
+// 如果有系统错误码，那么记录(err)
 u_char *
 ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
 {
