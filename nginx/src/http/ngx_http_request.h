@@ -14,7 +14,12 @@
 #define _NGX_HTTP_REQUEST_H_INCLUDED_
 
 
+// nginx不允许无限改写uri跳转，最多10次
+// 检查在ngx_http_core_post_rewrite_phase
 #define NGX_HTTP_MAX_URI_CHANGES           10
+
+// 最多只能产生200个子请求
+// 避免过多子请求导致处理效率降低
 #define NGX_HTTP_MAX_SUBREQUESTS           200
 
 /* must be 2^n */
@@ -504,20 +509,38 @@ struct ngx_http_request_s {
     // 请求行字符串
     ngx_str_t                         request_line;
 
+    // uri地址，不含参数，即$uri
     ngx_str_t                         uri;
+
+    // uri后的参数，不含问号，即$args
     ngx_str_t                         args;
+
+    // uri里文件的扩展名
     ngx_str_t                         exten;
+
+    // 原始请求uri，未解码，即$request_uri
     ngx_str_t                         unparsed_uri;
 
+    // 请求的方法名字符串，例如GET/POST/DELETE
+    // 因为字符串比较慢，所以应该尽量用method来判断方法
     ngx_str_t                         method_name;
+
+    // http协议字符串，通常不需要关注
     ngx_str_t                         http_protocol;
 
     // 发送的数据链表
     // 所有的header、body数据都会存在这里
     ngx_chain_t                      *out;
 
+    // 指向主请求，即由客户端发起的请求
+    // 如果没有子请求，那么r == main
     ngx_http_request_t               *main;
+
+    // 父请求，如果是子请求，那么指向产生它的父请求
+    // 如果是主请求，指针是空
     ngx_http_request_t               *parent;
+
+    // 子请求处理相关的数据结构
     ngx_http_postponed_request_t     *postponed;
     ngx_http_post_subrequest_t       *post_subrequest;
     ngx_http_posted_request_t        *posted_requests;
@@ -525,7 +548,10 @@ struct ngx_http_request_s {
     // 执行ngx_http_core_run_phases时的重要参数，标记在引擎数组里的位置
     ngx_int_t                         phase_handler;
 
+    // 重要！！
+    // 本location专门的内容处理函数，产生响应内容
     ngx_http_handler_pt               content_handler;
+
     ngx_uint_t                        access_code;
 
     // 变量值数组，每个请求都不同
@@ -613,7 +639,9 @@ struct ngx_http_request_s {
     // 1-不缓存请求体数据
     unsigned                          request_body_no_buffering:1;
 
+    // 要求upstream的数据都在内存里，方便处理
     unsigned                          subrequest_in_memory:1;
+
     unsigned                          waited:1;
 
 #if (NGX_HTTP_CACHE)
