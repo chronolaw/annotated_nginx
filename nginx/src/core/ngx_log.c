@@ -95,6 +95,13 @@ static const char *debug_levels[] = {
 
 
 // 通常我们使用c99的可变参数宏
+
+// 错误消息的最大长度，2k字节
+// 先拷贝当前的时间,格式是"1970/09/28 12:00:00"
+// 打印错误等级的字符串描述信息，使用关联数组err_levels
+// 打印pid和tid
+// 打印函数里的字符串可变参数
+// 对整个日志链表执行写入操作
 #if (NGX_HAVE_VARIADIC_MACROS)
 
 void
@@ -205,6 +212,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
         }
 
         // 写错误日志消息到关联的文件
+        // 实际上就是系统调用write，见ngx_files.h
         n = ngx_write_fd(log->file->fd, errstr, p - errstr);
 
         // 写入失败，且错误是磁盘满
@@ -237,6 +245,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 }
 
 
+// 没有可变参数宏不研究，其实比较简单
 #if !(NGX_HAVE_VARIADIC_MACROS)
 
 void ngx_cdecl
@@ -266,6 +275,7 @@ ngx_log_debug_core(ngx_log_t *log, ngx_err_t err, const char *fmt, ...)
 #endif
 
 
+// 直接以alert级别记录日志
 void ngx_cdecl
 ngx_log_abort(ngx_err_t err, const char *fmt, ...)
 {
@@ -282,6 +292,7 @@ ngx_log_abort(ngx_err_t err, const char *fmt, ...)
 }
 
 
+// 在标准错误流输出信息，里面有nginx前缀
 void ngx_cdecl
 ngx_log_stderr(ngx_err_t err, const char *fmt, ...)
 {
@@ -342,12 +353,14 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
 }
 
 
+// 初始化日志
 ngx_log_t *
 ngx_log_init(u_char *prefix)
 {
     u_char  *p, *name;
     size_t   nlen, plen;
 
+    // 初始化为notice级别，即只有warn,error等才能记录日志
     ngx_log.file = &ngx_log_file;
     ngx_log.log_level = NGX_LOG_NOTICE;
 

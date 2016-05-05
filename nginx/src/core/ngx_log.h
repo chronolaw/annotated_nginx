@@ -104,6 +104,11 @@ struct ngx_log_s {
 #define ngx_log_error(level, log, ...)                                        \
     if ((log)->log_level >= level) ngx_log_error_core(level, log, __VA_ARGS__)
 
+// 先拷贝当前的时间,格式是"1970/09/28 12:00:00"
+// 打印错误等级的字符串描述信息，使用关联数组err_levels
+// 打印pid和tid
+// 打印函数里的字符串可变参数
+// 对整个日志链表执行写入操作
 void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
 
@@ -247,9 +252,15 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 
 /*********************************/
 
+// 初始化日志
 ngx_log_t *ngx_log_init(u_char *prefix);
+
+// 直接以alert级别记录日志
 void ngx_cdecl ngx_log_abort(ngx_err_t err, const char *fmt, ...);
+
+// 在标准错误流输出信息，里面有nginx前缀
 void ngx_cdecl ngx_log_stderr(ngx_err_t err, const char *fmt, ...);
+
 u_char *ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err);
 ngx_int_t ngx_log_open_default(ngx_cycle_t *cycle);
 ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle);
