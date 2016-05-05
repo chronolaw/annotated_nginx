@@ -43,6 +43,8 @@ struct ngx_event_s {
     void            *data;
 
     // 写事件，也就是说tcp连接是写状态，可以发送数据
+    // 如果是0，意味着这个事件是读事件
+    // ngx_connection.c:ngx_get_connection里设置
     unsigned         write:1;
 
     // 监听状态标志位，只有listening相关的事件才置此标志位

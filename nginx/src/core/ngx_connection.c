@@ -937,7 +937,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     rev->data = c;
     wev->data = c;
 
-    // 默认写事件可用
+    // 设置写事件的标志
+    // 用于区分读写事件
     wev->write = 1;
 
     return c;
