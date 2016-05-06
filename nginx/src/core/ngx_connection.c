@@ -17,6 +17,11 @@
 ngx_os_io_t  ngx_io;
 
 
+// 检查最多32个在可复用连接队列里的元素
+// 设置为连接关闭c->close = 1;
+// 调用事件的处理函数，里面会检查c->close
+// 这样就会调用ngx_http_close_connection
+// 释放连接，加入空闲链表，可以再次使用
 static void ngx_drain_connections(void);
 
 
@@ -862,6 +867,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
 
 // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
+// 如果没有空闲连接，调用ngx_drain_connections释放一些可复用的连接
 ngx_connection_t *
 ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 {
@@ -883,10 +889,19 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     c = ngx_cycle->free_connections;
 
     if (c == NULL) {
+        // 检查最多32个在可复用连接队列里的元素
+        // 设置为连接关闭c->close = 1;
+        // 调用事件的处理函数，里面会检查c->close
+        // 这样就会调用ngx_http_close_connection
+        // 释放连接，加入空闲链表，可以再次使用
         ngx_drain_connections();
+
+        // 此时应该有了一些空闲连接
+        // 再次获取
         c = ngx_cycle->free_connections;
     }
 
+    // 如果还没有获取到连接，那么就报错
     if (c == NULL) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
                       "%ui worker_connections are not enough",
@@ -894,6 +909,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
         return NULL;
     }
+
+    // 此时已经拿到了空闲连接
 
     // 调整空闲链表的指针，复用data成员
     ngx_cycle->free_connections = c->data;
@@ -1064,6 +1081,7 @@ ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
                    "reusable connection: %ui", reusable);
 
+    // 连接已经加入了队列，需要移出
     if (c->reusable) {
         ngx_queue_remove(&c->queue);
 
@@ -1072,8 +1090,10 @@ ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
 #endif
     }
 
+    // 设置标志位，是否已经加入队列
     c->reusable = reusable;
 
+    // 要求加入队列，插入队列头
     if (reusable) {
         /* need cast as ngx_cycle is volatile */
 
@@ -1087,6 +1107,11 @@ ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
 }
 
 
+// 检查最多32个在可复用连接队列里的元素
+// 设置为连接关闭c->close = 1;
+// 调用事件的处理函数，里面会检查c->close
+// 这样就会调用ngx_http_close_connection
+// 释放连接，加入空闲链表，可以再次使用
 static void
 ngx_drain_connections(void)
 {
@@ -1094,18 +1119,28 @@ ngx_drain_connections(void)
     ngx_queue_t       *q;
     ngx_connection_t  *c;
 
+    // 只检查32次，避免过多消耗时间
     for (i = 0; i < 32; i++) {
+
+        // 如果队列是空的那么直接退出
         if (ngx_queue_empty(&ngx_cycle->reusable_connections_queue)) {
             break;
         }
 
+        // 取出队列末尾的连接对象，必定是c->reusable == true
         q = ngx_queue_last(&ngx_cycle->reusable_connections_queue);
         c = ngx_queue_data(q, ngx_connection_t, queue);
 
         ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
                        "reusing connection");
 
+        // 注意！设置为连接关闭
         c->close = 1;
+
+        // 调用事件的处理函数，里面会检查c->close
+        // 这样就会调用ngx_http_close_connection
+        // 释放连接，加入空闲链表，可以再次使用
+        // 例如ngx_http_wait_request_handler
         c->read->handler(c->read);
     }
 }

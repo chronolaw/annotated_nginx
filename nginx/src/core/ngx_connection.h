@@ -255,6 +255,7 @@ struct ngx_connection_s {
     unsigned            idle:1;
 
     // 连接可以复用，对应上面的queue成员
+    // 即已经加入了ngx_cycle_t::reusable_connections_queue
     unsigned            reusable:1;
 
     // tcp连接已经关闭
@@ -315,6 +316,7 @@ ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
 ngx_int_t ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text);
 
 // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
+// 如果没有空闲连接，调用ngx_drain_connections释放一些可复用的连接
 ngx_connection_t *ngx_get_connection(ngx_socket_t s, ngx_log_t *log);
 
 // 释放一个连接，加入空闲链表
