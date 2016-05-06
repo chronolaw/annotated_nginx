@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// * ngx_log_error_core
 
 /*
  * Copyright (C) Igor Sysoev

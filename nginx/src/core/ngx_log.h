@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// * ngx_log_s
 
 /*
  * Copyright (C) Igor Sysoev
