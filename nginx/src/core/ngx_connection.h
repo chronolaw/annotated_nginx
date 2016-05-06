@@ -183,6 +183,17 @@ struct ngx_connection_s {
     ngx_send_pt         send;
 
     ngx_recv_chain_pt   recv_chain;
+
+    // linux下实际上是ngx_writev_chain.c:ngx_writev_chain
+    //
+    // 发送limit长度（字节数）的数据
+    // 如果事件not ready，即暂不可写，那么立即返回，无动作
+    // 要求缓冲区必须在内存里，否则报错
+    // 最后返回消费缓冲区之后的链表指针
+    // 发送出错、遇到again、发送完毕，这三种情况函数结束
+    // 返回的是最后发送到的链表节点指针
+    //
+    // 发送后需要把已经发送过的节点都回收，供以后复用
     ngx_send_chain_pt   send_chain;
 
     // 连接对应的ngx_listening_t监听对象
@@ -196,6 +207,7 @@ struct ngx_connection_s {
     ngx_log_t          *log;
 
     // 连接的内存池
+    // 默认大小是256字节
     ngx_pool_t         *pool;
 
     // 客户端的sockaddr
@@ -259,6 +271,7 @@ struct ngx_connection_s {
     unsigned            reusable:1;
 
     // tcp连接已经关闭
+    // 可以回收复用
     unsigned            close:1;
 
     // 正在发送文件
@@ -322,6 +335,8 @@ ngx_connection_t *ngx_get_connection(ngx_socket_t s, ngx_log_t *log);
 // 释放一个连接，加入空闲链表
 void ngx_free_connection(ngx_connection_t *c);
 
+// 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
+// 参数reusable表示是否可以复用，即加入队列
 void ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable);
 
 #endif /* _NGX_CONNECTION_H_INCLUDED_ */
