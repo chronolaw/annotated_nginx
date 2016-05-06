@@ -2,6 +2,8 @@
 //
 // * ngx_create_listening
 // * ngx_configure_listening_sockets
+// * ngx_get_connection
+// * ngx_close_connection
 
 /*
  * Copyright (C) Igor Sysoev

@@ -1,6 +1,8 @@
 // annotated by chrono since 2016
+//
 // 本文件包含两个重要结构体
-// ngx_listening_t和ngx_connection_t
+// * ngx_listening_s
+// * ngx_connection_s
 
 /*
  * Copyright (C) Igor Sysoev
