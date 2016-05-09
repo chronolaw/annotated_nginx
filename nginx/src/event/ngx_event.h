@@ -164,6 +164,7 @@ struct ngx_event_s {
     // 在epoll通知机制里用作简单的计数器ngx_epoll_notify_handler
     ngx_uint_t       index;
 
+    // 日志对象
     ngx_log_t       *log;
 
     // 红黑树节点成员，用于把事件加入定时器
