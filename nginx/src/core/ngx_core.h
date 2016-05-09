@@ -32,7 +32,10 @@ typedef struct ngx_connection_s  ngx_connection_t;
 typedef struct ngx_thread_task_s  ngx_thread_task_t;
 #endif
 
+// 事件发生时调用的函数
+// 例如监听端口时会回调ngx_event_accept
 typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
+
 typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 
 
@@ -93,6 +96,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_proxy_protocol.h>
 
 
+// 回车换行定义，用于http解析
 #define LF     (u_char) '\n'
 #define CR     (u_char) '\r'
 #define CRLF   "\r\n"
