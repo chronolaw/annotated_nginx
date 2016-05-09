@@ -12,6 +12,9 @@
 
 
 // 两个双端队列，保存epoll获取的事件
+//
+// 如果使用了reuseport，或者不使用负载均衡
+// 那么这两个队列就完全不会用到
 
 // 保存accept事件，即客户端发起的连接请求
 ngx_queue_t  ngx_posted_accept_events;
