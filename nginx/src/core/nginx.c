@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * main
+// * ngx_process_options
+// * ngx_get_options
 
 /*
  * Copyright (C) Igor Sysoev
@@ -18,6 +22,8 @@ static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
 
 static ngx_int_t ngx_process_options(ngx_cycle_t *cycle);
+
+// 保存命令行参数到全局变量ngx_argc/ngx_argv
 static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv);
 
 // ngx_core_module的函数指针表，创建配置结构体
@@ -914,7 +920,7 @@ ngx_get_options(int argc, char *const *argv)
 }
 
 
-// 保存茉莉花参数到全局变量ngx_argc/ngx_argv
+// 保存命令行参数到全局变量ngx_argc/ngx_argv
 static ngx_int_t
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
