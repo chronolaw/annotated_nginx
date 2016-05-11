@@ -919,6 +919,7 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
 
     // 检查超时，使用的是lingering_timeout
     // 普通的丢弃不会进入这里
+    // 用在keepalive，见ngx_http_set_keepalive
     if (rev->timedout) {
         c->timedout = 1;
         c->error = 1;

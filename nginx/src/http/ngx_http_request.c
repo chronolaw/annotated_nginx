@@ -125,10 +125,23 @@ static void ngx_http_finalize_connection(ngx_http_request_t *r);
 // 那么就不真正调用write发送，减少系统调用的次数，提高性能
 static ngx_int_t ngx_http_set_write_handler(ngx_http_request_t *r);
 
+// 写事件handler是ngx_http_writer
+// 检查写事件是否已经超时
+// delayed表示限速,如果不限速那么就结束请求
+// 调用过滤链表发送数据
+// 有数据被缓存，没有完全发送
+// 加上超时等待，注册写事件，等socket可写再发送
 static void ngx_http_writer(ngx_http_request_t *r);
+
 static void ngx_http_request_finalizer(ngx_http_request_t *r);
 
+// 代替关闭连接的动作，保持连接
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 但连接的内存池还在，可以用于长连接继续使用
+// 关注读事件，等待客户端发送数据
+// rev->handler = ngx_http_keepalive_handler;
 static void ngx_http_set_keepalive(ngx_http_request_t *r);
+
 static void ngx_http_keepalive_handler(ngx_event_t *ev);
 static void ngx_http_set_lingering_close(ngx_http_request_t *r);
 static void ngx_http_lingering_close_handler(ngx_event_t *ev);
@@ -3176,6 +3189,12 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 }
 
 
+// 写事件handler是ngx_http_writer
+// 检查写事件是否已经超时
+// delayed表示限速,如果不限速那么就结束请求
+// 调用过滤链表发送数据
+// 有数据被缓存，没有完全发送
+// 加上超时等待，注册写事件，等socket可写再发送
 static void
 ngx_http_writer(ngx_http_request_t *r)
 {
@@ -3184,6 +3203,7 @@ ngx_http_writer(ngx_http_request_t *r)
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 从请求里获得连接和写事件
     c = r->connection;
     wev = c->write;
 
@@ -3192,7 +3212,10 @@ ngx_http_writer(ngx_http_request_t *r)
 
     clcf = ngx_http_get_module_loc_conf(r->main, ngx_http_core_module);
 
+    // 检查写事件是否已经超时
     if (wev->timedout) {
+        // delayed表示限速
+        // 如果不限速那么就结束请求
         if (!wev->delayed) {
             ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
                           "client timed out");
@@ -3202,9 +3225,13 @@ ngx_http_writer(ngx_http_request_t *r)
             return;
         }
 
+        // 限速，超时就不处理，暂时不发送数据
+
+        // 清除超时标志位
         wev->timedout = 0;
         wev->delayed = 0;
 
+        // 再次加上超时检查
         if (!wev->ready) {
             ngx_add_timer(wev, clcf->send_timeout);
 
@@ -3217,6 +3244,8 @@ ngx_http_writer(ngx_http_request_t *r)
 
     }
 
+    // 没有超时， 但限速
+    // 那么继续等待写事件
     if (wev->delayed || r->aio) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, wev->log, 0,
                        "http writer delayed");
@@ -3228,17 +3257,31 @@ ngx_http_writer(ngx_http_request_t *r)
         return;
     }
 
+    // 调用过滤链表发送数据
+    //
+    // 真正的向客户端发送数据，调用send_chain
+    // 如果数据发送不完，就保存在r->out里，返回again
+    // 需要再次发生可写事件才能发送
+    // 不是last、flush，且数据量较小（默认1460）
+    // 那么这次就不真正调用write发送，减少系统调用的次数，提高性能
+    // 在此函数里处理限速
     rc = ngx_http_output_filter(r, NULL);
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http writer output filter: %d, \"%V?%V\"",
                    rc, &r->uri, &r->args);
 
+    // 出错直接结束请求
     if (rc == NGX_ERROR) {
         ngx_http_finalize_request(r, rc);
         return;
     }
 
+    // rc == NGX_AGAIN/NGX_OK
+
+    // 有数据被缓存，没有完全发送
+    // 加上超时等待，注册写事件，等socket可写再发送
+    // rc == NGX_AGAIN
     if (r->buffered || r->postponed || (r == r->main && c->buffered)) {
 
 #if (NGX_HTTP_SPDY)
@@ -3258,11 +3301,17 @@ ngx_http_writer(ngx_http_request_t *r)
         return;
     }
 
+    // rc == NGX_OK
+    // 数据已经发送完毕
+
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, wev->log, 0,
                    "http writer done: \"%V?%V\"", &r->uri, &r->args);
 
+    // 设置写事件处理函数，不再有任何发送动作
     r->write_event_handler = ngx_http_request_empty_handler;
 
+    // 结束请求，注意传入的rc，会有其他判断动作
+    // 写事件处理函数也可能在这里再变为其他函数
     ngx_http_finalize_request(r, rc);
 }
 
@@ -3411,6 +3460,11 @@ closed:
 }
 
 
+// 代替关闭连接的动作，保持连接
+// 释放请求相关的资源，调用cleanup链表，相当于析构
+// 但连接的内存池还在，可以用于长连接继续使用
+// 关注读事件，等待客户端发送数据
+// rev->handler = ngx_http_keepalive_handler;
 static void
 ngx_http_set_keepalive(ngx_http_request_t *r)
 {
@@ -3423,6 +3477,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     ngx_http_core_srv_conf_t  *cscf;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 从请求里获得连接和读事件
     c = r->connection;
     rev = c->read;
 
@@ -3430,6 +3485,9 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "set http keepalive handler");
 
+    // 请求正在丢弃body
+    // 使用lingering_time延迟关闭，如果一段时间内没有数据发过来就关闭连接
+    // r->read_event_handler = ngx_http_discarded_request_body_handler;
     if (r->discard_body) {
         r->write_event_handler = ngx_http_request_empty_handler;
         r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
@@ -3440,8 +3498,11 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     c->log->action = "closing request";
 
     hc = r->http_connection;
+
+    // b是请求的读取缓冲区
     b = r->header_in;
 
+    // 检查缓冲区里是否还有数据没有处理
     if (b->pos < b->last) {
 
         /* the pipelined request */
@@ -3483,15 +3544,23 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     /* guard against recursive call from ngx_http_finalize_connection() */
     r->keepalive = 0;
 
+    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    // 此时请求已经结束，调用log模块记录日志
+    // 销毁请求的内存池
+    // 但连接的内存池还在，可以用于长连接继续使用
     ngx_http_free_request(r, 0);
 
+    // 请求已经销毁，连接的data成员改为保存hc
     c->data = hc;
 
+    // 关注读事件，等待客户端发送数据
+    // rev->handler = ngx_http_keepalive_handler;
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 写事件暂时阻塞
     wev = c->write;
     wev->handler = ngx_http_empty_handler;
 
@@ -3576,6 +3645,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     }
 #endif
 
+    // 这里设置读事件处理函数
     rev->handler = ngx_http_keepalive_handler;
 
     if (wev->active && (ngx_event_flags & NGX_USE_LEVEL_EVENT)) {
@@ -3601,6 +3671,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         tcp_nodelay = 1;
     }
 
+    // 设置tcp nodelay选项
     if (tcp_nodelay
         && clcf->tcp_nodelay
         && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET)
@@ -3632,9 +3703,11 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     r->http_state = NGX_HTTP_KEEPALIVE_STATE;
 #endif
 
+    // 连接可以复用，加入复用队列
     c->idle = 1;
     ngx_reusable_connection(c, 1);
 
+    // 设置keepalive超时时间
     ngx_add_timer(rev, clcf->keepalive_timeout);
 
     if (rev->ready) {
