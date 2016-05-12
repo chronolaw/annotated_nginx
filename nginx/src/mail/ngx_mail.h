@@ -27,7 +27,18 @@ typedef struct {
 
 
 typedef struct {
-    u_char                  sockaddr[NGX_SOCKADDRLEN];
+    union {
+        struct sockaddr     sockaddr;
+        struct sockaddr_in  sockaddr_in;
+#if (NGX_HAVE_INET6)
+        struct sockaddr_in6 sockaddr_in6;
+#endif
+#if (NGX_HAVE_UNIX_DOMAIN)
+        struct sockaddr_un  sockaddr_un;
+#endif
+        u_char              sockaddr_data[NGX_SOCKADDRLEN];
+    } u;
+
     socklen_t               socklen;
 
     /* server ctx */
@@ -47,6 +58,7 @@ typedef struct {
     int                     tcp_keepintvl;
     int                     tcp_keepcnt;
 #endif
+    int                     backlog;
 } ngx_mail_listen_t;
 
 
@@ -89,25 +101,7 @@ typedef struct {
 
 
 typedef struct {
-    struct sockaddr        *sockaddr;
-    socklen_t               socklen;
-
-    ngx_mail_conf_ctx_t    *ctx;
-
-    unsigned                bind:1;
-    unsigned                wildcard:1;
-#if (NGX_MAIL_SSL)
-    unsigned                ssl:1;
-#endif
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
-    unsigned                ipv6only:1;
-#endif
-    unsigned                so_keepalive:2;
-#if (NGX_HAVE_KEEPALIVE_TUNABLE)
-    int                     tcp_keepidle;
-    int                     tcp_keepintvl;
-    int                     tcp_keepcnt;
-#endif
+    ngx_mail_listen_t       opt;
 } ngx_mail_conf_addr_t;
 
 
@@ -131,14 +125,13 @@ typedef struct {
     ngx_msec_t              timeout;
     ngx_msec_t              resolver_timeout;
 
-    ngx_flag_t              so_keepalive;
-
     ngx_str_t               server_name;
 
     u_char                 *file_name;
     ngx_int_t               line;
 
     ngx_resolver_t         *resolver;
+    ngx_log_t              *error_log;
 
     /* server ctx */
     ngx_mail_conf_ctx_t    *ctx;
@@ -349,7 +342,7 @@ typedef struct {
 
     void                       *(*create_srv_conf)(ngx_conf_t *cf);
     char                       *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
-                                      void *conf);
+                                                  void *conf);
 } ngx_mail_module_t;
 
 
