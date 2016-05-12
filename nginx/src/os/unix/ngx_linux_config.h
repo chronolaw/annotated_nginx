@@ -55,6 +55,8 @@
 #include <crypt.h>
 #include <sys/utsname.h>        /* uname() */
 
+#include <dlfcn.h>
+
 
 #include <ngx_auto_config.h>
 
@@ -79,12 +81,6 @@ extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
 
 #if (NGX_HAVE_POLL)
 #include <poll.h>
-#endif
-
-
-#if (NGX_HAVE_RTSIG)
-#include <poll.h>
-#include <sys/sysctl.h>
 #endif
 
 
