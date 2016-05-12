@@ -14,7 +14,7 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 
 # 当前状态
-nginx 1.8.1
+开始迁移至nginx 1.10.0
 
 # 已注解
 
@@ -73,8 +73,9 @@ nginx 1.8.1
 
 ######数据结构
 * [ngx_array.h](/nginx/src/core/ngx_array.h)
-* [ngx_buf.h](/nginx/src/core/ngx_buf.h)
+* [ngx_list.h](/nginx/src/core/ngx_list.h)
 * [ngx_string.h](/nginx/src/core/ngx_string.h)
+* [ngx_buf.h](/nginx/src/core/ngx_buf.h)
 
 ######进程机制
 * [nginx.c](/nginx/src/core/nginx.c)
