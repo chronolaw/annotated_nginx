@@ -498,7 +498,7 @@ ngx_http_set_last_modified(ngx_http_request_t *r, ngx_http_header_val_t *hv,
     }
 
     r->headers_out.last_modified_time =
-        (value->len) ? ngx_http_parse_time(value->data, value->len) : -1;
+        (value->len) ? ngx_parse_http_time(value->data, value->len) : -1;
 
     return NGX_OK;
 }
@@ -712,17 +712,17 @@ ngx_http_headers_add(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (value[2].len == 0) {
         ngx_memzero(&hv->value, sizeof(ngx_http_complex_value_t));
-        return NGX_CONF_OK;
-    }
 
-    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+    } else {
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
-    ccv.cf = cf;
-    ccv.value = &value[2];
-    ccv.complex_value = &hv->value;
+        ccv.cf = cf;
+        ccv.value = &value[2];
+        ccv.complex_value = &hv->value;
 
-    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
-        return NGX_CONF_ERROR;
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
     }
 
     if (cf->args->nelts == 3) {
