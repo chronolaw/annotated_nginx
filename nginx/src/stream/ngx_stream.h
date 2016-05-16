@@ -71,6 +71,7 @@ typedef struct {
 
     // 已经绑定
     unsigned                bind:1;
+
     // 使用通配符标志位
     unsigned                wildcard:1;
 #if (NGX_STREAM_SSL)
