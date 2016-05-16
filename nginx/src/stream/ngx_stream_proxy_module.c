@@ -73,6 +73,7 @@ static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s);
 // 连接成功之后的事件处理函数
 // 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void ngx_stream_proxy_upstream_handler(ngx_event_t *ev);
+
 static void ngx_stream_proxy_downstream_handler(ngx_event_t *ev);
 static void ngx_stream_proxy_process_connection(ngx_event_t *ev,
     ngx_uint_t from_upstream);
@@ -85,6 +86,7 @@ static void ngx_stream_proxy_connect_handler(ngx_event_t *ev);
 
 // 测试连接是否成功，失败就再试下一个上游
 static ngx_int_t ngx_stream_proxy_test_connect(ngx_connection_t *c);
+
 static void ngx_stream_proxy_process(ngx_stream_session_t *s,
     ngx_uint_t from_upstream, ngx_uint_t do_write);
 static void ngx_stream_proxy_next_upstream(ngx_stream_session_t *s);
