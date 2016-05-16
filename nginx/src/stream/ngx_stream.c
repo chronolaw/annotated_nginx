@@ -156,15 +156,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 得到所有的stream模块数量
     // 设置stream模块的ctx_index
-    ngx_stream_max_module = 0;
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
-            continue;
-        }
-
-        // 设置stream模块的ctx_index
-        ngx_modules[m]->ctx_index = ngx_stream_max_module++;
-    }
+    // 1.10不再遍历模块数组，不直接使用ngx_stream_max_module
+    ngx_stream_max_module = ngx_count_modules(cf->cycle, NGX_STREAM_MODULE);
 
 
     /* the stream main_conf context, it's the same in the all stream contexts */
@@ -196,13 +189,13 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 遍历模块数组，调用每个stream模块create_xxx_conf，创建配置结构体
     // 这些配置结构体存储在最顶层，也就是stream_main
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
-        mi = ngx_modules[m]->ctx_index;
+        module = cf->cycle->modules[m]->ctx;
+        mi = cf->cycle->modules[m]->ctx_index;
 
         // 创建每个模块的main_conf
         if (module->create_main_conf) {
@@ -260,14 +253,14 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 初始化main_conf，合并srv_conf
     // 注意cf->ctx会不断变化
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
             continue;
         }
 
         // module是流模块的函数表，用于解析配置时调用
-        module = ngx_modules[m]->ctx;
-        mi = ngx_modules[m]->ctx_index;
+        module = cf->cycle->modules[m]->ctx;
+        mi = cf->cycle->modules[m]->ctx_index;
 
         /* init stream{} main_conf's */
 
@@ -305,13 +298,13 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 配置解析完毕，调用模块的postconfiguration
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
             continue;
         }
 
         // module是stream模块的函数表，用于解析配置时调用
-        module = ngx_modules[m]->ctx;
+        module = cf->cycle->modules[m]->ctx;
 
         if (module->postconfiguration) {
             if (module->postconfiguration(cf) != NGX_OK) {
@@ -395,8 +388,11 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     // 因为可能多个server都用listen监听同一个端口
     port = ports->elts;
     for (i = 0; i < ports->nelts; i++) {
-        if (p == port[i].port && sa->sa_family == port[i].family) {
 
+        if (p == port[i].port
+            && listen->type == port[i].type
+            && sa->sa_family == port[i].family)
+        {
             /* a port is already in the port list */
 
             port = &port[i];
@@ -414,6 +410,10 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     }
 
     port->family = sa->sa_family;
+
+    // 这里设置了type，标志tcp/udp
+    port->type = listen->type;
+
     port->port = p;
 
     // 把listen结构体存储在addrs数组里供以后使用
@@ -507,6 +507,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             // 设置连接的内存池是256bytes，不可配置
             ls->pool_size = 256;
+            ls->type = addr[i].opt.type;
 
             // addr[i].opt就是ngx_stream_listen_t
             // 在ngx_stream_add_ports里添加
@@ -524,6 +525,8 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             // 端口的backlog
             ls->backlog = addr[i].opt.backlog;
 
+            ls->wildcard = addr[i].opt.wildcard;
+
             ls->keepalive = addr[i].opt.so_keepalive;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
             ls->keepidle = addr[i].opt.tcp_keepidle;
@@ -535,7 +538,6 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             ls->ipv6only = addr[i].opt.ipv6only;
 #endif
 
-#if (NGX_HAVE_REUSEPORT)
             // 新的reuseport设置
             ls->reuseport = addr[i].opt.reuseport;
 #endif
