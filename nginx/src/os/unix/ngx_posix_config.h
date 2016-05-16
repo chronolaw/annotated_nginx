@@ -21,6 +21,14 @@
 #endif
 
 
+#if (NGX_GNU_HURD)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE             /* accept4() */
+#endif
+#define _FILE_OFFSET_BITS       64
+#endif
+
+
 #ifdef __CYGWIN__
 #define timezonevar             /* timezone is variable */
 #define NGX_BROKEN_SCM_RIGHTS   1
@@ -100,6 +108,11 @@
 #include <ngx_auto_config.h>
 
 
+#if (NGX_HAVE_DLOPEN)
+#include <dlfcn.h>
+#endif
+
+
 #if (NGX_HAVE_POSIX_SEM)
 #include <semaphore.h>
 #endif
@@ -115,7 +128,7 @@
 #endif
 
 
-#if (NGX_HAVE_DEVPOLL)
+#if (NGX_HAVE_DEVPOLL) && !(NGX_TEST_BUILD_DEVPOLL)
 #include <sys/ioctl.h>
 #include <sys/devpoll.h>
 #endif

@@ -29,11 +29,12 @@ typedef ngx_chain_t *(*ngx_send_chain_pt)(ngx_connection_t *c, ngx_chain_t *in,
 // 屏蔽linux/bsd/darwin等的差异
 // 在ngx_posix_init.c:ngx_os_init里初始化
 typedef struct {
-    ngx_recv_pt        recv;            // ngx_unix_recv
-    ngx_recv_chain_pt  recv_chain;      // ngx_readv_chain
-    ngx_recv_pt        udp_recv;        // ngx_udp_unix_recv
-    ngx_send_pt        send;            // ngx_unix_send
-    ngx_send_chain_pt  send_chain;      // ngx_writev_chain
+    ngx_recv_pt        recv;        // ngx_unix_recv
+    ngx_recv_chain_pt  recv_chain;  // ngx_readv_chain
+    ngx_recv_pt        udp_recv;    // ngx_udp_unix_recv
+    ngx_send_pt        send;        // ngx_unix_send
+    ngx_send_pt        udp_send;
+    ngx_send_chain_pt  send_chain;  // ngx_writev_chain
     ngx_uint_t         flags;
 } ngx_os_io_t;
 
@@ -64,7 +65,7 @@ ngx_int_t ngx_daemon(ngx_log_t *log);
 // 被ngx_cycle.c里的ngx_signal_process()调用
 // 发送reload/stop等信号
 // in ngx_process.c
-ngx_int_t ngx_os_signal_process(ngx_cycle_t *cycle, char *sig, ngx_int_t pid);
+ngx_int_t ngx_os_signal_process(ngx_cycle_t *cycle, char *sig, ngx_pid_t pid);
 
 
 // nginx实际调用的接收数据函数 in ngx_recv.c
@@ -91,14 +92,7 @@ ssize_t ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size);
 // 发送出错、遇到again、发送完毕，这三种情况函数结束
 ngx_chain_t *ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
-
-#if (NGX_HAVE_AIO)
-ssize_t ngx_aio_read(ngx_connection_t *c, u_char *buf, size_t size);
-ssize_t ngx_aio_read_chain(ngx_connection_t *c, ngx_chain_t *cl, off_t limit);
-ssize_t ngx_aio_write(ngx_connection_t *c, u_char *buf, size_t size);
-ngx_chain_t *ngx_aio_write_chain(ngx_connection_t *c, ngx_chain_t *in,
-    off_t limit);
-#endif
+ssize_t ngx_udp_unix_send(ngx_connection_t *c, u_char *buf, size_t size);
 
 
 // nginx分配iovec的最大数量，用在ngx_iovec_t.nalloc
