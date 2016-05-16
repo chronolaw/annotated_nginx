@@ -538,6 +538,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             ls->ipv6only = addr[i].opt.ipv6only;
 #endif
 
+#if (NGX_HAVE_REUSEPORT)
             // 新的reuseport设置
             ls->reuseport = addr[i].opt.reuseport;
 #endif
