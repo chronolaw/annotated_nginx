@@ -71,7 +71,6 @@ typedef struct {
 
     // 已经绑定
     unsigned                bind:1;
-
     // 使用通配符标志位
     unsigned                wildcard:1;
 #if (NGX_STREAM_SSL)
@@ -90,6 +89,7 @@ typedef struct {
     int                     tcp_keepcnt;
 #endif
     int                     backlog;
+    int                     type;
 } ngx_stream_listen_t;
 
 
@@ -132,6 +132,7 @@ typedef struct {
 // 用在ngx_stream_add_ports
 typedef struct {
     int                     family;
+    int                     type;
     in_port_t               port;
     ngx_array_t             addrs;       /* array of ngx_stream_conf_addr_t */
 } ngx_stream_conf_port_t;
