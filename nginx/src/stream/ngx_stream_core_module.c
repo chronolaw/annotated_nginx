@@ -245,13 +245,13 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 遍历模块数组，调用每个stream模块create_srv_conf，创建配置结构体
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_STREAM_MODULE) {
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
             continue;
         }
 
         // module是流模块的函数表，用于解析配置时调用
-        module = ngx_modules[m]->ctx;
+        module = cf->cycle->modules[m]->ctx;
 
         // 创建每个模块的srv_conf
         if (module->create_srv_conf) {
@@ -260,7 +260,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 return NGX_CONF_ERROR;
             }
 
-            ctx->srv_conf[ngx_modules[m]->ctx_index] = mconf;
+            ctx->srv_conf[cf->cycle->modules[m]->ctx_index] = mconf;
         }
     }
 
@@ -323,7 +323,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     in_port_t                     port;
     ngx_str_t                    *value;
     ngx_url_t                     u;
-    ngx_uint_t                    i;
+    ngx_uint_t                    i, backlog;
     struct sockaddr              *sa;
     struct sockaddr_in           *sin;
     ngx_stream_listen_t          *ls;
@@ -419,6 +419,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 从ngx_url_t里拷贝信息
     ls->socklen = u.socklen;
     ls->backlog = NGX_LISTEN_BACKLOG;
+    ls->type = SOCK_STREAM;
     ls->wildcard = u.wildcard;
 
     // 注意这里,存储了cf->ctx，也就是此server的配置数组ngx_stream_conf_ctx_t
@@ -428,8 +429,17 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->ipv6only = 1;
 #endif
 
+    backlog = 0;
+
     // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
     for (i = 2; i < cf->args->nelts; i++) {
+
+#if !(NGX_WIN32)
+        if (ngx_strcmp(value[i].data, "udp") == 0) {
+            ls->type = SOCK_DGRAM;
+            continue;
+        }
+#endif
 
         if (ngx_strcmp(value[i].data, "bind") == 0) {
             ls->bind = 1;
@@ -445,6 +455,8 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                    "invalid backlog \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;
             }
+
+            backlog = 1;
 
             continue;
         }
@@ -607,6 +619,22 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the invalid \"%V\" parameter", &value[i]);
         return NGX_CONF_ERROR;
+    }
+
+    if (ls->type == SOCK_DGRAM) {
+        if (backlog) {
+            return "\"backlog\" parameter is incompatible with \"udp\"";
+        }
+
+#if (NGX_STREAM_SSL)
+        if (ls->ssl) {
+            return "\"ssl\" parameter is incompatible with \"udp\"";
+        }
+#endif
+
+        if (ls->so_keepalive) {
+            return "\"so_keepalive\" parameter is incompatible with \"udp\"";
+        }
     }
 
     return NGX_CONF_OK;
