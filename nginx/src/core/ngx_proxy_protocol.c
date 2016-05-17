@@ -10,7 +10,7 @@
 
 
 u_char *
-ngx_proxy_protocol_parse(ngx_connection_t *c, u_char *buf, u_char *last)
+ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
 {
     size_t  len;
     u_char  ch, *p, *addr;
@@ -88,4 +88,53 @@ invalid:
                   "broken header: \"%*s\"", (size_t) (last - buf), buf);
 
     return NULL;
+}
+
+
+u_char *
+ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last)
+{
+    ngx_uint_t  port, lport;
+
+    if (last - buf < NGX_PROXY_PROTOCOL_MAX_HEADER) {
+        return NULL;
+    }
+
+    if (ngx_connection_local_sockaddr(c, NULL, 0) != NGX_OK) {
+        return NULL;
+    }
+
+    switch (c->sockaddr->sa_family) {
+
+    case AF_INET:
+        buf = ngx_cpymem(buf, "PROXY TCP4 ", sizeof("PROXY TCP4 ") - 1);
+
+        port = ntohs(((struct sockaddr_in *) c->sockaddr)->sin_port);
+        lport = ntohs(((struct sockaddr_in *) c->local_sockaddr)->sin_port);
+
+        break;
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        buf = ngx_cpymem(buf, "PROXY TCP6 ", sizeof("PROXY TCP6 ") - 1);
+
+        port = ntohs(((struct sockaddr_in6 *) c->sockaddr)->sin6_port);
+        lport = ntohs(((struct sockaddr_in6 *) c->local_sockaddr)->sin6_port);
+
+        break;
+#endif
+
+    default:
+        return ngx_cpymem(buf, "PROXY UNKNOWN" CRLF,
+                          sizeof("PROXY UNKNOWN" CRLF) - 1);
+    }
+
+    buf += ngx_sock_ntop(c->sockaddr, c->socklen, buf, last - buf, 0);
+
+    *buf++ = ' ';
+
+    buf += ngx_sock_ntop(c->local_sockaddr, c->local_socklen, buf, last - buf,
+                         0);
+
+    return ngx_slprintf(buf, last, " %ui %ui" CRLF, port, lport);
 }
