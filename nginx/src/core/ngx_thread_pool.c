@@ -502,6 +502,9 @@ ngx_thread_pool_cycle(void *data)
         *ngx_thread_pool_done.last = task;
         ngx_thread_pool_done.last = &task->next;
 
+        // 1.10新增
+        ngx_memory_barrier();
+
         // 自旋锁
         ngx_unlock(&ngx_thread_pool_done_lock);
 
@@ -535,6 +538,8 @@ ngx_thread_pool_handler(ngx_event_t *ev)
     // 即ngx_thread_pool_queue_init
     ngx_thread_pool_done.first = NULL;
     ngx_thread_pool_done.last = &ngx_thread_pool_done.first;
+
+    ngx_memory_barrier();
 
     ngx_unlock(&ngx_thread_pool_done_lock);
 
