@@ -67,7 +67,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
          * is the "*:port" wildcard so getsockname() is needed to determine
          * the server address.
          *
-         * AcceptEx() already gave this address.
+         * AcceptEx() and recvmsg() already gave this address.
          */
 
         if (ngx_connection_local_sockaddr(c, NULL, 0) != NGX_OK) {
@@ -164,8 +164,9 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
     len = ngx_sock_ntop(c->sockaddr, c->socklen, text, NGX_SOCKADDR_STRLEN, 1);
 
-    ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%uA client %*s connected to %V",
-                  c->number, len, text, &addr_conf->addr_text);
+    ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%uA %sclient %*s connected to %V",
+                  c->number, c->type == SOCK_DGRAM ? "udp " : "",
+                  len, text, &addr_conf->addr_text);
 
     // log的一些参数
     c->log->connection = c->number;
@@ -200,7 +201,10 @@ ngx_stream_init_connection(ngx_connection_t *c)
     }
 
     // 设置TCP_NODELAY，默认启用
-    if (cscf->tcp_nodelay && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET) {
+    if (c->type == SOCK_STREAM
+        && cscf->tcp_nodelay
+        && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET)
+    {
         ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "tcp_nodelay");
 
         tcp_nodelay = 1;
@@ -373,7 +377,8 @@ ngx_stream_log_error(ngx_log_t *log, u_char *buf, size_t len)
 
     s = log->data;
 
-    p = ngx_snprintf(buf, len, ", client: %V, server: %V",
+    p = ngx_snprintf(buf, len, ", %sclient: %V, server: %V",
+                     s->connection->type == SOCK_DGRAM ? "udp " : "",
                      &s->connection->addr_text,
                      &s->connection->listening->addr_text);
     len -= p - buf;
