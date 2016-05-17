@@ -4,7 +4,7 @@ Annotated Nginx Source（中文）
 # 简介
 Nginx源码分析，注解代码，帮助学习Nginx。
 
-当前使用的是1.8.1稳定版，待注解较完善后升级至1.10。
+当前使用的是1.10.0稳定版。
 
 Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得仔细研究。
 
@@ -15,6 +15,7 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 
 # 当前状态
 开始迁移至nginx 1.10.0
+完成：os/unix、stream
 
 # 已注解
 
@@ -24,7 +25,7 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 * [event](/nginx/src/event) - 90%，只注解核心模块和epoll，select/kqueue/ssl等不关注
 * [http](/nginx/src/http) - 50%，modules目录里的具体功能模块暂不关注
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
-* [stream(nginx 1.9.9)](/nginx/src/stream) - 50%
+* [stream](/nginx/src/stream) - 70%
 
 ####UML图解
 [UML图示](/diagrams/readme.md)
