@@ -28,11 +28,8 @@ static ngx_event_t     ngx_cleaner_event;
 
 // 用于main，检测配置文件的标识量
 ngx_uint_t             ngx_test_config;
+ngx_uint_t             ngx_dump_config;
 ngx_uint_t             ngx_quiet_mode;
-
-#if (NGX_OLD_THREADS)
-ngx_tls_key_t          ngx_core_tls_key;
-#endif
 
 
 /* STUB NAME */
@@ -147,6 +144,13 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     cycle->paths.pool = pool;
 
 
+    if (ngx_array_init(&cycle->config_dump, pool, 1, sizeof(ngx_conf_dump_t))
+        != NGX_OK)
+    {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
     // 打开的文件列表
     if (old_cycle->open_files.part.nelts) {
         n = old_cycle->open_files.part.nelts;
@@ -235,15 +239,21 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
 
 
+    if (ngx_cycle_modules(cycle) != NGX_OK) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+
     // 初始化core模块
-    for (i = 0; ngx_modules[i]; i++) {
+    for (i = 0; cycle->modules[i]; i++) {
         // 检查type，只处理core模块，数量很少
-        if (ngx_modules[i]->type != NGX_CORE_MODULE) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
             continue;
         }
 
         //获取core模块的函数表
-        module = ngx_modules[i]->ctx;
+        module = cycle->modules[i]->ctx;
 
         // 创建core模块的配置结构体
         // 有的core模块可能没有这个函数，所以做一个空指针检查
@@ -253,9 +263,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 ngx_destroy_pool(pool);
                 return NULL;
             }
-
             // 存储到cycle的配置数组里，用的是index，不是ctx_index
-            cycle->conf_ctx[ngx_modules[i]->index] = rv;
+            cycle->conf_ctx[cycle->modules[i]->index] = rv;
         }
     }
 
@@ -319,19 +328,20 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     // 其他类型的模块都已经配置好了，最后对core模块配置初始化
     // 如果有的参数没有明确配置，这里就调用init_conf设置默认值
-    for (i = 0; ngx_modules[i]; i++) {
+    for (i = 0; cycle->modules[i]; i++) {
         // 检查type，只处理core模块，数量很少
-        if (ngx_modules[i]->type != NGX_CORE_MODULE) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
             continue;
         }
 
         //获取core模块的函数表
-        module = ngx_modules[i]->ctx;
+        module = cycle->modules[i]->ctx;
 
         // 调用core模块的初始化函数
         // 有的core模块可能没有这个函数，所以做一个空指针检查
         if (module->init_conf) {
-            if (module->init_conf(cycle, cycle->conf_ctx[ngx_modules[i]->index])
+            if (module->init_conf(cycle,
+                                  cycle->conf_ctx[cycle->modules[i]->index])
                 == NGX_CONF_ERROR)
             {
                 environ = senv;
@@ -497,9 +507,13 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             }
 
             if (shm_zone[i].tag == oshm_zone[n].tag
-                && shm_zone[i].shm.size == oshm_zone[n].shm.size)
+                && shm_zone[i].shm.size == oshm_zone[n].shm.size
+                && !shm_zone[i].noreuse)
             {
                 shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
+#if (NGX_WIN32)
+                shm_zone[i].shm.handle = oshm_zone[n].shm.handle;
+#endif
 
                 if (shm_zone[i].init(&shm_zone[i], oshm_zone[n].data)
                     != NGX_OK)
@@ -550,6 +564,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                     continue;
                 }
 
+                if (ls[i].remain) {
+                    continue;
+                }
+
+                if (ls[i].type != nls[n].type) {
+                    continue;
+                }
+
                 if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
                                      ls[i].sockaddr, ls[i].socklen, 1)
                     == NGX_OK)
@@ -597,6 +619,13 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                         nls[n].add_deferred = 1;
                     }
 #endif
+
+#if (NGX_HAVE_REUSEPORT)
+                    if (nls[n].reuseport && !ls[i].reuseport) {
+                        nls[n].add_reuseport = 1;
+                    }
+#endif
+
                     break;
                 }
             }
@@ -656,13 +685,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     pool->log = cycle->log;
 
     // 调用所有模块的init_module函数指针，初始化模块
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->init_module) {
-            if (ngx_modules[i]->init_module(cycle) != NGX_OK) {
-                /* fatal */
-                exit(1);
-            }
-        }
+    if (ngx_init_modules(cycle) != NGX_OK) {
+        /* fatal */
+        exit(1);
     }
 
 
@@ -927,6 +952,22 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
             return NGX_OK;
         }
 
+#if (NGX_WIN32)
+
+        /* remap at the required address */
+
+        if (ngx_shm_remap(&zn->shm, sp->addr) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        sp = (ngx_slab_pool_t *) zn->shm.addr;
+
+        if (sp == sp->addr) {
+            return NGX_OK;
+        }
+
+#endif
+
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                       "shared zone \"%V\" has no equal addresses: %p vs %p",
                       &zn->shm.name, sp->addr, sp);
@@ -1030,7 +1071,7 @@ ngx_int_t
 ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 {
     ssize_t           n;
-    ngx_int_t         pid;
+    ngx_pid_t         pid;
     ngx_file_t        file;
     ngx_core_conf_t  *ccf;
     u_char            buf[NGX_INT64_LEN + 2];
@@ -1073,7 +1114,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
     // 转化为数字pid
     pid = ngx_atoi(buf, ++n);
 
-    if (pid == NGX_ERROR) {
+    if (pid == (ngx_pid_t) NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
                       "invalid PID number \"%*s\" in \"%s\"",
                       n, buf, file.name.data);
@@ -1282,6 +1323,10 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             return NULL;
         }
 
+        if (shm_zone[i].shm.size == 0) {
+            shm_zone[i].shm.size = size;
+        }
+
         if (size && size != shm_zone[i].shm.size) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                             "the size %uz of shared memory zone \"%V\" "
@@ -1306,6 +1351,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     shm_zone->shm.exists = 0;
     shm_zone->init = NULL;
     shm_zone->tag = tag;
+    shm_zone->noreuse = 0;
 
     return shm_zone;
 }
@@ -1338,7 +1384,7 @@ ngx_clean_old_cycles(ngx_event_t *ev)
             if (cycle[i]->connections[n].fd != (ngx_socket_t) -1) {
                 found = 1;
 
-                ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "live fd:%d", n);
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "live fd:%ui", n);
 
                 break;
             }
@@ -1349,13 +1395,13 @@ ngx_clean_old_cycles(ngx_event_t *ev)
             continue;
         }
 
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "clean old cycle: %d", i);
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "clean old cycle: %ui", i);
 
         ngx_destroy_pool(cycle[i]->pool);
         cycle[i] = NULL;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "old cycles status: %d", live);
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "old cycles status: %ui", live);
 
     if (live) {
         ngx_add_timer(ev, 30000);
