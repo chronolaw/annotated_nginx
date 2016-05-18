@@ -1139,6 +1139,8 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
             // 写事件可用
             wev->ready = 1;
+
+            // 1.10新增，使用complete标记多线程异步操作已经完成
 #if (NGX_THREADS)
             wev->complete = 1;
 #endif
