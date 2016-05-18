@@ -4,6 +4,8 @@
 // * ngx_configure_listening_sockets
 // * ngx_get_connection
 // * ngx_close_connection
+//
+// 1.10增加对reuseport的支持
 
 /*
  * Copyright (C) Igor Sysoev
@@ -109,15 +111,19 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 }
 
 
+// 1.10新函数，专为reuseport使用
 ngx_int_t
 ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 {
+// configure脚本可以检测系统是否支持reuseport
+// 使用宏来控制条件编译
 #if (NGX_HAVE_REUSEPORT)
 
     ngx_int_t         n;
     ngx_core_conf_t  *ccf;
     ngx_listening_t   ols;
 
+    // 监听指令需要配置了reuseport
     if (!ls->reuseport) {
         return NGX_OK;
     }
@@ -127,6 +133,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
     ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                            ngx_core_module);
 
+    // ccf->worker_processes是nginx的worker进程数
     for (n = 1; n < ccf->worker_processes; n++) {
 
         /* create a socket for each worker process */
@@ -137,6 +144,8 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
         }
 
         *ls = ols;
+
+        // 设置worker的序号
         ls->worker = n;
     }
 
