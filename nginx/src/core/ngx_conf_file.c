@@ -101,10 +101,13 @@ char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 {
     char             *rv;
+    u_char           *p;
+    off_t             size;
     ngx_fd_t          fd;
     ngx_int_t         rc;
-    ngx_buf_t         buf;
+    ngx_buf_t         buf, *tbuf;
     ngx_conf_file_t  *prev, conf_file;
+    ngx_conf_dump_t  *cd;
     enum {
         parse_file = 0,
         parse_block,
@@ -157,6 +160,39 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
         cf->conf_file->line = 1;
 
         type = parse_file;
+
+        if (ngx_dump_config
+#if (NGX_DEBUG)
+            || 1
+#endif
+           )
+        {
+            p = ngx_pstrdup(cf->cycle->pool, filename);
+            if (p == NULL) {
+                goto failed;
+            }
+
+            size = ngx_file_size(&cf->conf_file->file.info);
+
+            tbuf = ngx_create_temp_buf(cf->cycle->pool, (size_t) size);
+            if (tbuf == NULL) {
+                goto failed;
+            }
+
+            cd = ngx_array_push(&cf->cycle->config_dump);
+            if (cd == NULL) {
+                goto failed;
+            }
+
+            cd->name.len = filename->len;
+            cd->name.data = p;
+            cd->buffer = tbuf;
+
+            cf->conf_file->dump = tbuf;
+
+        } else {
+            cf->conf_file->dump = NULL;
+        }
 
     } else if (cf->conf_file->file.fd != NGX_INVALID_FILE) {
 
@@ -293,9 +329,9 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
     found = 0;
 
-    for (i = 0; ngx_modules[i]; i++) {
+    for (i = 0; cf->cycle->modules[i]; i++) {
 
-        cmd = ngx_modules[i]->commands;
+        cmd = cf->cycle->modules[i]->commands;
         if (cmd == NULL) {
             continue;
         }
@@ -312,8 +348,8 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             found = 1;
 
-            if (ngx_modules[i]->type != NGX_CONF_MODULE
-                && ngx_modules[i]->type != cf->module_type)
+            if (cf->cycle->modules[i]->type != NGX_CONF_MODULE
+                && cf->cycle->modules[i]->type != cf->module_type)
             {
                 continue;
             }
@@ -375,16 +411,16 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
             conf = NULL;
 
             if (cmd->type & NGX_DIRECT_CONF) {
-                conf = ((void **) cf->ctx)[ngx_modules[i]->index];
+                conf = ((void **) cf->ctx)[cf->cycle->modules[i]->index];
 
             } else if (cmd->type & NGX_MAIN_CONF) {
-                conf = &(((void **) cf->ctx)[ngx_modules[i]->index]);
+                conf = &(((void **) cf->ctx)[cf->cycle->modules[i]->index]);
 
             } else if (cf->ctx) {
                 confp = *(void **) ((char *) cf->ctx + cmd->conf);
 
                 if (confp) {
-                    conf = confp[ngx_modules[i]->ctx_index];
+                    conf = confp[cf->cycle->modules[i]->ctx_index];
                 }
             }
 
@@ -437,7 +473,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
     ngx_uint_t   found, need_space, last_space, sharp_comment, variable;
     ngx_uint_t   quoted, s_quoted, d_quoted, start_line;
     ngx_str_t   *word;
-    ngx_buf_t   *b;
+    ngx_buf_t   *b, *dump;
 
     found = 0;
     need_space = 0;
@@ -450,6 +486,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
 
     cf->args->nelts = 0;
     b = cf->conf_file->buffer;
+    dump = cf->conf_file->dump;
     start = b->pos;
     start_line = cf->conf_file->line;
 
@@ -531,6 +568,10 @@ ngx_conf_read_token(ngx_conf_t *cf)
             b->pos = b->start + len;
             b->last = b->pos + n;
             start = b->start;
+
+            if (dump) {
+                dump->last = ngx_cpymem(dump->last, b->pos, size);
+            }
         }
 
         ch = *b->pos++;
@@ -572,9 +613,9 @@ ngx_conf_read_token(ngx_conf_t *cf)
                 need_space = 0;
 
             } else {
-                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                    "unexpected \"%c\"", ch);
-                 return NGX_ERROR;
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "unexpected \"%c\"", ch);
+                return NGX_ERROR;
             }
         }
 
@@ -680,7 +721,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
                     return NGX_ERROR;
                 }
 
-                word->data = ngx_pnalloc(cf->pool, b->pos - start + 1);
+                word->data = ngx_pnalloc(cf->pool, b->pos - 1 - start + 1);
                 if (word->data == NULL) {
                     return NGX_ERROR;
                 }
