@@ -15,6 +15,7 @@
 #include <nginx.h>
 
 
+// 显示帮助信息，1.10增加-T，可以dump整个配置文件
 static void ngx_show_version_info(void);
 
 // 检查NGINX环境变量，获取之前监听的socket
@@ -40,6 +41,8 @@ static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 1.10新的动态模块特性，调用dlopen
 static char *ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 #if (NGX_HAVE_DLOPEN)
 static void ngx_unload_module(void *data);
@@ -160,6 +163,7 @@ static ngx_command_t  ngx_core_commands[] = {
 
     // old threads 在1.9.x里已经被删除，不再使用
 
+    // 加载动态模块的指令
     { ngx_string("load_module"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_load_module,
@@ -197,6 +201,7 @@ ngx_module_t  ngx_core_module = {
 };
 
 
+// 1.10引入动态模块后此变量不再使用
 // 模块计数器，声明在ngx_conf_file.h, 在main里统计得到总数
 // ngx_uint_t          ngx_max_module;
 
@@ -376,6 +381,7 @@ main(int argc, char *const *argv)
                            cycle->conf_file.data);
         }
 
+        // 1.10, dump整个配置文件
         if (ngx_dump_config) {
             cd = cycle->config_dump.elts;
 
@@ -488,10 +494,11 @@ main(int argc, char *const *argv)
 }
 
 
-// NGINX_VER_BUILD in nginx.h
+// 显示帮助信息，1.10增加-T，可以dump整个配置文件
 static void
 ngx_show_version_info(void)
 {
+    // NGINX_VER_BUILD in nginx.h
     ngx_write_stderr("nginx version: " NGINX_VER_BUILD NGX_LINEFEED);
 
     if (ngx_show_help) {
