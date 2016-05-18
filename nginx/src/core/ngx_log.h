@@ -33,7 +33,7 @@
 #define NGX_LOG_DEBUG_EVENT       0x080
 #define NGX_LOG_DEBUG_HTTP        0x100
 #define NGX_LOG_DEBUG_MAIL        0x200
-#define NGX_LOG_DEBUG_MYSQL       0x400
+#define NGX_LOG_DEBUG_STREAM      0x400
 
 /*
  * do not forget to update debug_levels[] in src/core/ngx_log.c
@@ -41,7 +41,7 @@
  */
 
 #define NGX_LOG_DEBUG_FIRST       NGX_LOG_DEBUG_CORE
-#define NGX_LOG_DEBUG_LAST        NGX_LOG_DEBUG_MYSQL
+#define NGX_LOG_DEBUG_LAST        NGX_LOG_DEBUG_STREAM
 #define NGX_LOG_DEBUG_CONNECTION  0x80000000
 #define NGX_LOG_DEBUG_ALL         0x7ffffff0
 
@@ -143,7 +143,7 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 /*********************************/
 
-#else /* NO VARIADIC MACROS */
+#else /* no variadic macros */
 
 #define NGX_HAVE_VARIADIC_MACROS  0
 
@@ -155,7 +155,7 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
 
 
-#endif /* VARIADIC MACROS */
+#endif /* variadic macros */
 
 
 /*********************************/
@@ -198,7 +198,7 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
                        arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 
 
-#else /* NO VARIADIC MACROS */
+#else /* no variadic macros */
 
 #define ngx_log_debug0(level, log, err, fmt)                                  \
     if ((log)->log_level & level)                                             \
@@ -243,7 +243,7 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 
 #endif
 
-#else /* NO NGX_DEBUG */
+#else /* !NGX_DEBUG */
 
 #define ngx_log_debug0(level, log, err, fmt)
 #define ngx_log_debug1(level, log, err, fmt, arg1)
@@ -290,6 +290,13 @@ static ngx_inline void
 ngx_write_stderr(char *text)
 {
     (void) ngx_write_fd(ngx_stderr, text, ngx_strlen(text));
+}
+
+
+static ngx_inline void
+ngx_write_stdout(char *text)
+{
+    (void) ngx_write_fd(ngx_stdout, text, ngx_strlen(text));
 }
 
 
