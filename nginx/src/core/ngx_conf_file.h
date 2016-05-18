@@ -55,7 +55,9 @@
 #define NGX_DIRECT_CONF      0x00010000
 
 #define NGX_MAIN_CONF        0x01000000     //指令出现在配置文件的最外层
-#define NGX_ANY_CONF         0x0F000000     //指令可以在任意位置出现
+
+// in 1.8.1 #define NGX_ANY_CONF         0x0F000000
+#define NGX_ANY_CONF         0x1F000000     //指令可以在任意位置出现
 
 
 
@@ -127,6 +129,9 @@ struct ngx_open_file_s {
     void                 *data;
 };
 
+
+/*
+// 1.10增加动态模块，ngx_module_s移动到ngx_module.h
 
 // 填充宏，填充ngx_module_t的前7个字段，即ctx_index...version
 #define NGX_MODULE_V1          0, 0, 0, 0, 0, 0, 1
@@ -212,12 +217,20 @@ typedef struct {
     char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
 } ngx_core_module_t;
 
+*/
 
 typedef struct {
     ngx_file_t            file;
     ngx_buf_t            *buffer;
+    ngx_buf_t            *dump;
     ngx_uint_t            line;
 } ngx_conf_file_t;
+
+
+typedef struct {
+    ngx_str_t             name;
+    ngx_buf_t            *buffer;
+} ngx_conf_dump_t;
 
 
 // 解析配置的函数指针
@@ -427,11 +440,13 @@ char *ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
+// 下面两个变量转移到ngx_module.h
+
 // 声明nginx模块计数器变量，静态模块，nginx.c
-extern ngx_uint_t     ngx_max_module;
+// extern ngx_uint_t     ngx_max_module;
 
 // nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
-extern ngx_module_t  *ngx_modules[];
+// extern ngx_module_t  *ngx_modules[];
 
 
 #endif /* _NGX_CONF_FILE_H_INCLUDED_ */
