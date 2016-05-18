@@ -87,6 +87,8 @@ struct ngx_listening_s {
     // 监听端口对应的连接对象
     ngx_connection_t   *connection;
 
+    ngx_uint_t          worker;
+
     // 以下是一些标志位
     unsigned            open:1;
     unsigned            remain:1;
@@ -102,9 +104,14 @@ struct ngx_listening_s {
     unsigned            nonblocking:1;
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
+    unsigned            wildcard:1;
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned            ipv6only:1;
+#endif
+#if (NGX_HAVE_REUSEPORT)
+    unsigned            reuseport:1;
+    unsigned            add_reuseport:1;
 #endif
     unsigned            keepalive:2;
 
@@ -128,31 +135,31 @@ struct ngx_listening_s {
 
 
 typedef enum {
-     NGX_ERROR_ALERT = 0,
-     NGX_ERROR_ERR,
-     NGX_ERROR_INFO,
-     NGX_ERROR_IGNORE_ECONNRESET,
-     NGX_ERROR_IGNORE_EINVAL
+    NGX_ERROR_ALERT = 0,
+    NGX_ERROR_ERR,
+    NGX_ERROR_INFO,
+    NGX_ERROR_IGNORE_ECONNRESET,
+    NGX_ERROR_IGNORE_EINVAL
 } ngx_connection_log_error_e;
 
 
 typedef enum {
-     NGX_TCP_NODELAY_UNSET = 0,
-     NGX_TCP_NODELAY_SET,
-     NGX_TCP_NODELAY_DISABLED
+    NGX_TCP_NODELAY_UNSET = 0,
+    NGX_TCP_NODELAY_SET,
+    NGX_TCP_NODELAY_DISABLED
 } ngx_connection_tcp_nodelay_e;
 
 
 typedef enum {
-     NGX_TCP_NOPUSH_UNSET = 0,
-     NGX_TCP_NOPUSH_SET,
-     NGX_TCP_NOPUSH_DISABLED
+    NGX_TCP_NOPUSH_UNSET = 0,
+    NGX_TCP_NOPUSH_SET,
+    NGX_TCP_NOPUSH_DISABLED
 } ngx_connection_tcp_nopush_e;
 
 
 #define NGX_LOWLEVEL_BUFFERED  0x0f
 #define NGX_SSL_BUFFERED       0x01
-#define NGX_SPDY_BUFFERED      0x02
+#define NGX_HTTP_V2_BUFFERED   0x02
 
 
 // 连接结构体，表示nginx里的一个tcp连接
@@ -211,6 +218,8 @@ struct ngx_connection_s {
     // 连接的内存池
     // 默认大小是256字节
     ngx_pool_t         *pool;
+
+    int                 type;
 
     // 客户端的sockaddr
     struct sockaddr    *sockaddr;
@@ -275,6 +284,7 @@ struct ngx_connection_s {
     // tcp连接已经关闭
     // 可以回收复用
     unsigned            close:1;
+    unsigned            shared:1;
 
     // 正在发送文件
     unsigned            sendfile:1;
@@ -302,12 +312,23 @@ struct ngx_connection_s {
 };
 
 
+#define ngx_set_connection_log(c, l)                                         \
+                                                                             \
+    c->log->file = l->file;                                                  \
+    c->log->next = l->next;                                                  \
+    c->log->writer = l->writer;                                              \
+    c->log->wdata = l->wdata;                                                \
+    if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {                   \
+        c->log->log_level = l->log_level;                                    \
+    }
+
+
 // http/ngx_http.c:ngx_http_add_listening()里调用
 // ngx_stream.c:ngx_stream_optimize_servers()里调用
 // 添加到cycle的监听端口数组
 ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
     socklen_t socklen);
-
+ngx_int_t ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls);
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
 
 // ngx_cycle.c : init_cycle()里被调用
@@ -325,6 +346,9 @@ void ngx_close_listening_sockets(ngx_cycle_t *cycle);
 // 关闭连接，删除epoll里的读写事件
 // 释放连接，加入空闲链表，可以再次使用
 void ngx_close_connection(ngx_connection_t *c);
+
+// 1.10新函数
+void ngx_close_idle_connections(ngx_cycle_t *cycle);
 
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     ngx_uint_t port);

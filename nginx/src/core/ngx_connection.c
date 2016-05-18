@@ -64,21 +64,21 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     switch (ls->sockaddr->sa_family) {
 #if (NGX_HAVE_INET6)
     case AF_INET6:
-         ls->addr_text_max_len = NGX_INET6_ADDRSTRLEN;
-         break;
+        ls->addr_text_max_len = NGX_INET6_ADDRSTRLEN;
+        break;
 #endif
 #if (NGX_HAVE_UNIX_DOMAIN)
     case AF_UNIX:
-         ls->addr_text_max_len = NGX_UNIX_ADDRSTRLEN;
-         len++;
-         break;
+        ls->addr_text_max_len = NGX_UNIX_ADDRSTRLEN;
+        len++;
+        break;
 #endif
     case AF_INET:
-         ls->addr_text_max_len = NGX_INET_ADDRSTRLEN;
-         break;
+        ls->addr_text_max_len = NGX_INET_ADDRSTRLEN;
+        break;
     default:
-         ls->addr_text_max_len = NGX_SOCKADDR_STRLEN;
-         break;
+        ls->addr_text_max_len = NGX_SOCKADDR_STRLEN;
+        break;
     }
 
     ls->addr_text.data = ngx_pnalloc(cf->pool, len);
@@ -110,6 +110,43 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 
 
 ngx_int_t
+ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
+{
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_int_t         n;
+    ngx_core_conf_t  *ccf;
+    ngx_listening_t   ols;
+
+    if (!ls->reuseport) {
+        return NGX_OK;
+    }
+
+    ols = *ls;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
+                                           ngx_core_module);
+
+    for (n = 1; n < ccf->worker_processes; n++) {
+
+        /* create a socket for each worker process */
+
+        ls = ngx_array_push(&cf->cycle->listening);
+        if (ls == NULL) {
+            return NGX_ERROR;
+        }
+
+        *ls = ols;
+        ls->worker = n;
+    }
+
+#endif
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
 ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 {
     size_t                     len;
@@ -124,6 +161,9 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 #endif
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
     int                        timeout;
+#endif
+#if (NGX_HAVE_REUSEPORT)
+    int                        reuseport;
 #endif
 
     ls = cycle->listening.elts;
@@ -147,22 +187,22 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_INET6)
         case AF_INET6:
-             ls[i].addr_text_max_len = NGX_INET6_ADDRSTRLEN;
-             len = NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1;
-             break;
+            ls[i].addr_text_max_len = NGX_INET6_ADDRSTRLEN;
+            len = NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1;
+            break;
 #endif
 
 #if (NGX_HAVE_UNIX_DOMAIN)
         case AF_UNIX:
-             ls[i].addr_text_max_len = NGX_UNIX_ADDRSTRLEN;
-             len = NGX_UNIX_ADDRSTRLEN;
-             break;
+            ls[i].addr_text_max_len = NGX_UNIX_ADDRSTRLEN;
+            len = NGX_UNIX_ADDRSTRLEN;
+            break;
 #endif
 
         case AF_INET:
-             ls[i].addr_text_max_len = NGX_INET_ADDRSTRLEN;
-             len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
-             break;
+            ls[i].addr_text_max_len = NGX_INET_ADDRSTRLEN;
+            len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+            break;
 
         default:
             ngx_log_error(NGX_LOG_CRIT, cycle->log, ngx_socket_errno,
@@ -186,6 +226,18 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
         ls[i].addr_text.len = len;
 
         ls[i].backlog = NGX_LISTEN_BACKLOG;
+
+        olen = sizeof(int);
+
+        if (getsockopt(ls[i].fd, SOL_SOCKET, SO_TYPE, (void *) &ls[i].type,
+                       &olen)
+            == -1)
+        {
+            ngx_log_error(NGX_LOG_CRIT, cycle->log, ngx_socket_errno,
+                          "getsockopt(SO_TYPE) %V failed", &ls[i].addr_text);
+            ls[i].ignore = 1;
+            continue;
+        }
 
         olen = sizeof(int);
 
@@ -233,6 +285,29 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 #endif
 #endif
+
+#if (NGX_HAVE_REUSEPORT)
+
+        reuseport = 0;
+        olen = sizeof(int);
+
+        if (getsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT,
+                       (void *) &reuseport, &olen)
+            == -1)
+        {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                          "getsockopt(SO_REUSEPORT) %V failed, ignored",
+                          &ls[i].addr_text);
+
+        } else {
+            ls[i].reuseport = reuseport ? 1 : 0;
+        }
+
+#endif
+
+        if (ls[i].type != SOCK_STREAM) {
+            continue;
+        }
 
 #if (NGX_HAVE_TCP_FASTOPEN)
 
@@ -357,6 +432,31 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ls[i].add_reuseport) {
+
+                /*
+                 * to allow transition from a socket without SO_REUSEPORT
+                 * to multiple sockets with SO_REUSEPORT, we have to set
+                 * SO_REUSEPORT on the old socket before opening new ones
+                 */
+
+                int  reuseport = 1;
+
+                if (setsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT,
+                               (const void *) &reuseport, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                                  "setsockopt(SO_REUSEPORT) %V failed, ignored",
+                                  &ls[i].addr_text);
+                }
+
+                ls[i].add_reuseport = 0;
+            }
+#endif
+
             // 已经打开的端口不再处理
             if (ls[i].fd != (ngx_socket_t) -1) {
                 continue;
@@ -398,6 +498,32 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ls[i].reuseport) {
+                int  reuseport;
+
+                reuseport = 1;
+
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                               (const void *) &reuseport, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  "setsockopt(SO_REUSEPORT) %V failed, ignored",
+                                  &ls[i].addr_text);
+
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+
+                    return NGX_ERROR;
+                }
+            }
+#endif
+
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 
             if (ls[i].sockaddr->sa_family == AF_INET6) {
@@ -417,7 +543,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 #endif
             /* TODO: close on exit */
 
-            if (!(ngx_event_flags & NGX_USE_AIO_EVENT)) {
+            if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
 
                 // 设置为nonblocking，使用FIONBIO
                 if (ngx_nonblocking(s) == -1) {
@@ -487,11 +613,27 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 #endif
 
+            // 检查是否是tcp，即SOCK_STREAM
+            if (ls[i].type != SOCK_STREAM) {
+                ls[i].fd = s;
+                continue;
+            }
+
             // 开始监听，设置backlog
             if (listen(s, ls[i].backlog) == -1) {
-                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                              "listen() to %V, backlog %d failed",
-                              &ls[i].addr_text, ls[i].backlog);
+                err = ngx_socket_errno;
+
+                /*
+                 * on OpenVZ after suspend/resume EADDRINUSE
+                 * may be returned by listen() instead of bind(), see
+                 * https://bugzilla.openvz.org/show_bug.cgi?id=2470
+                 */
+
+                if (err != NGX_EADDRINUSE || !ngx_test_config) {
+                    ngx_log_error(NGX_LOG_EMERG, log, err,
+                                  "listen() to %V, backlog %d failed",
+                                  &ls[i].addr_text, ls[i].backlog);
+                }
 
                 if (ngx_close_socket(s) == -1) {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -499,7 +641,15 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                                   &ls[i].addr_text);
                 }
 
-                return NGX_ERROR;
+                if (err != NGX_EADDRINUSE) {
+                    return NGX_ERROR;
+                }
+
+                if (!ngx_test_config) {
+                    failed = 1;
+                }
+
+                continue;
             }
 
             // 设置已经监听标志
@@ -783,6 +933,67 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 #endif
 
 #endif /* NGX_HAVE_DEFERRED_ACCEPT */
+
+#if (NGX_HAVE_IP_RECVDSTADDR)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_RECVDSTADDR,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_RECVDSTADDR) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#elif (NGX_HAVE_IP_PKTINFO)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_PKTINFO,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_PKTINFO) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
+
+#if (NGX_HAVE_INET6 && NGX_HAVE_IPV6_RECVPKTINFO)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET6)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IPV6_RECVPKTINFO) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
     }
 
     return;
@@ -813,10 +1024,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
         if (c) {
             if (c->read->active) {
-                if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
-                    ngx_del_conn(c, NGX_CLOSE_EVENT);
-
-                } else if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
 
                     /*
                      * it seems that Linux-2.6.x OpenVZ sends events
@@ -920,7 +1128,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     // 空闲连接计数器减少
     ngx_cycle->free_connection_n--;
 
-    if (ngx_cycle->files) {
+    if (ngx_cycle->files && ngx_cycle->files[s] == NULL) {
         ngx_cycle->files[s] = c;
     }
 
@@ -973,7 +1181,7 @@ ngx_free_connection(ngx_connection_t *c)
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
 
-    if (ngx_cycle->files) {
+    if (ngx_cycle->files && ngx_cycle->files[c->fd] == c) {
         ngx_cycle->files[c->fd] = NULL;
     }
 }
@@ -1003,20 +1211,22 @@ ngx_close_connection(ngx_connection_t *c)
         ngx_del_timer(c->write);
     }
 
-    // in event/ngx_event.h
-    // 宏，实际上是ngx_event_actions.del_conn
-    if (ngx_del_conn) {
-        ngx_del_conn(c, NGX_CLOSE_EVENT);
+    if (!c->shared) {
+        // in event/ngx_event.h
+        // 宏，实际上是ngx_event_actions.del_conn
+        if (ngx_del_conn) {
+            ngx_del_conn(c, NGX_CLOSE_EVENT);
 
-    } else {
-        if (c->read->active || c->read->disabled) {
-            // 宏，实际上是ngx_event_actions.del
-            ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
-        }
+        } else {
+            if (c->read->active || c->read->disabled) {
+                // 宏，实际上是ngx_event_actions.del
+                ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
+            }
 
-        if (c->write->active || c->write->disabled) {
-            // 宏，实际上是ngx_event_actions.del
-            ngx_del_event(c->write, NGX_WRITE_EVENT, NGX_CLOSE_EVENT);
+            if (c->write->active || c->write->disabled) {
+                // 宏，实际上是ngx_event_actions.del
+                ngx_del_event(c->write, NGX_WRITE_EVENT, NGX_CLOSE_EVENT);
+            }
         }
     }
 
@@ -1041,6 +1251,10 @@ ngx_close_connection(ngx_connection_t *c)
 
     fd = c->fd;
     c->fd = (ngx_socket_t) -1;
+
+    if (c->shared) {
+        return;
+    }
 
     // 关闭socket
     if (ngx_close_socket(fd) == -1) {
@@ -1144,6 +1358,26 @@ ngx_drain_connections(void)
         // 释放连接，加入空闲链表，可以再次使用
         // 例如ngx_http_wait_request_handler
         c->read->handler(c->read);
+    }
+}
+
+
+void
+ngx_close_idle_connections(ngx_cycle_t *cycle)
+{
+    ngx_uint_t         i;
+    ngx_connection_t  *c;
+
+    c = cycle->connections;
+
+    for (i = 0; i < cycle->connection_n; i++) {
+
+        /* THREAD: lock */
+
+        if (c[i].fd != (ngx_socket_t) -1 && c[i].idle) {
+            c[i].close = 1;
+            c[i].read->handler(c[i].read);
+        }
     }
 }
 
