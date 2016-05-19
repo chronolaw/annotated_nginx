@@ -50,7 +50,7 @@ struct ngx_event_s {
     // 监听状态标志位，只有listening相关的事件才置此标志位
     unsigned         accept:1;
 
-    /* used to detect the stale events in kqueue, rtsig, and epoll */
+    /* used to detect the stale events in kqueue and epoll */
     // 检测事件是否失效
     // 存储在epoll数据结构体里的指针低位
     // 在ngx_get_connection里获取空闲连接时，这个标志位会取反
@@ -111,6 +111,14 @@ struct ngx_event_s {
     // ngx_posted_accept_events/ngx_posted_events
     unsigned         posted:1;
 
+    unsigned         closed:1;
+
+    /* to test on worker exit */
+    unsigned         channel:1;
+    unsigned         resolver:1;
+
+    unsigned         cancelable:1;
+
 #if (NGX_WIN32)
     /* setsockopt(SO_UPDATE_ACCEPT_CONTEXT) was successful */
     unsigned         accept_context_updated:1;
@@ -151,14 +159,8 @@ struct ngx_event_s {
     ngx_event_handler_pt  handler;
 
 
-#if (NGX_HAVE_AIO)
-
 #if (NGX_HAVE_IOCP)
     ngx_event_ovlp_t ovlp;
-#else
-    struct aiocb     aiocb;
-#endif
-
 #endif
 
     // 在epoll通知机制里用作简单的计数器ngx_epoll_notify_handler
@@ -174,15 +176,6 @@ struct ngx_event_s {
     // 队列成员，加入延后处理的队列
     // ngx_posted_accept_events/ngx_posted_events
     ngx_queue_t      queue;
-
-    unsigned         closed:1;
-
-    /* to test on worker exit */
-    unsigned         channel:1;
-    unsigned         resolver:1;
-
-    unsigned         cancelable:1;
-
 
 #if 0
 
@@ -288,7 +281,7 @@ typedef struct {
     // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
     // 在ngx_process_events_and_timers里被调用
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
-                   ngx_uint_t flags);
+                                 ngx_uint_t flags);
 
     // 初始化事件模块
     // 调用epoll_create初始化epoll机制
@@ -345,7 +338,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_USE_LOWAT_EVENT      0x00000010
 
 /*
- * The event filter requires to do i/o operation until EAGAIN: epoll, rtsig.
+ * The event filter requires to do i/o operation until EAGAIN: epoll.
  */
 // 即ET模式
 #define NGX_USE_GREEDY_EVENT     0x00000020
@@ -357,27 +350,25 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_USE_EPOLL_EVENT      0x00000040
 
 /*
- * No need to add or delete the event filters: rtsig.
+ * Obsolete.
  */
 // rtsig在nginx 1.9.x里已经被删除
 #define NGX_USE_RTSIG_EVENT      0x00000080
 
 /*
- * No need to add or delete the event filters: overlapped, aio_read,
- * aioread, io_submit.
+ * Obsolete.
  */
 // aio在nginx 1.9.x里已经被删除
 #define NGX_USE_AIO_EVENT        0x00000100
 
 /*
  * Need to add socket or handle only once: i/o completion port.
- * It also requires NGX_HAVE_AIO and NGX_USE_AIO_EVENT to be set.
  */
 #define NGX_USE_IOCP_EVENT       0x00000200
 
 /*
  * The event filter has no opaque data and requires file descriptors table:
- * poll, /dev/poll, rtsig.
+ * poll, /dev/poll.
  */
 #define NGX_USE_FD_EVENT         0x00000400
 
@@ -402,7 +393,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 /*
  * The event filter is deleted just before the closing file.
  * Has no meaning for select and poll.
- * kqueue, epoll, rtsig, eventport:  allows to avoid explicit delete,
+ * kqueue, epoll, eventport:         allows to avoid explicit delete,
  *                                   because filter automatically is deleted
  *                                   on file close,
  *
@@ -468,7 +459,8 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_DISABLE_EVENT  EV_DISABLE
 
 
-#elif (NGX_HAVE_DEVPOLL || NGX_HAVE_EVENTPORT)
+#elif (NGX_HAVE_DEVPOLL && !(NGX_TEST_BUILD_DEVPOLL)) \
+      || (NGX_HAVE_EVENTPORT && !(NGX_TEST_BUILD_EVENTPORT))
 
 #define NGX_READ_EVENT     POLLIN
 #define NGX_WRITE_EVENT    POLLOUT
@@ -478,7 +470,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 
 
 // linux使用epoll
-#elif (NGX_HAVE_EPOLL)
+#elif (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
 
 // 读事件，即可读或者有accept连接
 // EPOLLRDHUP表示客户端关闭连接（断连），也当做读事件处理
@@ -579,6 +571,7 @@ extern ngx_os_io_t  ngx_io;
 #define ngx_udp_recv         ngx_io.udp_recv
 #define ngx_send             ngx_io.send
 #define ngx_send_chain       ngx_io.send_chain
+#define ngx_udp_send         ngx_io.udp_send
 
 
 // event模块的type标记
@@ -686,6 +679,10 @@ extern ngx_module_t           ngx_event_core_module;
 // 关键操作 ls->handler(c);调用其他模块的业务handler
 // 例如ngx_http_init_connection,ngx_stream_init_connection
 void ngx_event_accept(ngx_event_t *ev);
+
+#if !(NGX_WIN32)
+void ngx_event_recvmsg(ngx_event_t *ev);
+#endif
 
 // 尝试获取负载均衡锁，监听端口
 // 如未获取则不监听端口

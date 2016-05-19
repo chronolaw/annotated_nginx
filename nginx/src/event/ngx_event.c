@@ -26,7 +26,6 @@ extern ngx_module_t ngx_kqueue_module;
 extern ngx_module_t ngx_eventport_module;
 extern ngx_module_t ngx_devpoll_module;
 extern ngx_module_t ngx_epoll_module;
-extern ngx_module_t ngx_rtsig_module;
 extern ngx_module_t ngx_select_module;
 
 
@@ -207,12 +206,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       NULL },
 
     // 功能同worker_connections，但已经被废弃，不要使用
-    { ngx_string("connections"),
-      NGX_EVENT_CONF|NGX_CONF_TAKE1,
-      ngx_event_connections,
-      0,
-      0,
-      NULL },
+    // { ngx_string("connections"),...}
 
     // 决定使用哪个事件模型，linux上通常是epoll
     { ngx_string("use"),
@@ -338,8 +332,10 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         // NGX_UPDATE_TIME要求epoll等待这个时间，然后主动更新时间
         flags = NGX_UPDATE_TIME;
 
-// nginx 1.9.x不再使用old threads代码
-#if (NGX_OLD_THREADS)
+        // nginx 1.9.x不再使用old threads代码
+#if (NGX_WIN32)
+
+        /* handle signals from master in case of network inactivity */
 
         if (timer == NGX_TIMER_INFINITE || timer > 500) {
             timer = 500;
@@ -517,7 +513,7 @@ ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
         }
     }
 
-    /* aio, iocp, rtsig */
+    /* iocp */
 
     return NGX_OK;
 }
@@ -602,7 +598,7 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
         }
     }
 
-    /* aio, iocp, rtsig */
+    /* iocp */
 
     return NGX_OK;
 }
@@ -717,7 +713,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     // 创建共享内存，存放负载均衡锁和统计用的原子变量
     shm.size = size;
-    shm.name.len = sizeof("nginx_shared_zone");
+    shm.name.len = sizeof("nginx_shared_zone") - 1;
     shm.name.data = (u_char *) "nginx_shared_zone";
     shm.log = cycle->log;
 
@@ -745,7 +741,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     (void) ngx_atomic_cmp_set(ngx_connection_counter, 0, 1);
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "counter: %p, %d",
+                   "counter: %p, %uA",
                    ngx_connection_counter, *ngx_connection_counter);
 
     // 临时文件用
@@ -847,17 +843,17 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     }
 
     // 遍历事件模块，但只执行实际使用的事件模块对应初始化函数
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_EVENT_MODULE) {
+    for (m = 0; cycle->modules[m]; m++) {
+        if (cycle->modules[m]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
         // 找到use指令使用的事件模型，或者是默认事件模型
-        if (ngx_modules[m]->ctx_index != ecf->use) {
+        if (cycle->modules[m]->ctx_index != ecf->use) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
+        module = cycle->modules[m]->ctx;
 
         // 调用事件模块的事件初始化函数
         //
@@ -922,6 +918,15 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         if (cycle->files == NULL) {
             return NGX_ERROR;
         }
+    }
+
+#else
+
+    if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+        ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                      "the \"timer_resolution\" directive is not supported "
+                      "with the configured event method, ignored");
+        ngx_timer_resolution = 0;
     }
 
 #endif
@@ -996,6 +1001,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+#if (NGX_HAVE_REUSEPORT)
+        if (ls[i].reuseport && ls[i].worker != ngx_worker) {
+            continue;
+        }
+#endif
+
         // 获取一个空闲连接
         c = ngx_get_connection(ls[i].fd, cycle->log);
 
@@ -1003,6 +1014,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
             return NGX_ERROR;
         }
 
+        c->type = ls[i].type;
         c->log = &ls[i].log;
 
         c->listening = &ls[i];
@@ -1082,27 +1094,27 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         // 监听端口上收到连接请求时的回调函数，即事件handler
         // 从cycle的连接池里获取连接
         // 关键操作 ls->handler(c);调用其他模块的业务handler
-        rev->handler = ngx_event_accept;
+        // 1.10使用ngx_event_recvmsg接收udp
+        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
+                                                : ngx_event_recvmsg;
 
         // 如果使用负载均衡，不向epoll添加事件，只有抢到锁才添加
-        if (ngx_use_accept_mutex) {
-
+        if (ngx_use_accept_mutex
+#if (NGX_HAVE_REUSEPORT)
+            && !ls[i].reuseport
+#endif
+           )
+        {
             // 对一个监听端口的处理结束，只设置了回调函数
             continue;
         }
 
         // nginx 1.9.x不再使用rtsig
-        if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
-            if (ngx_add_conn(c) == NGX_ERROR) {
-                return NGX_ERROR;
-            }
 
-        } else {
-            // 单进程、未明确指定负载均衡，不使用负载均衡
-            // 直接加入epoll事件，开始监听，可以接受请求
-            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
-                return NGX_ERROR;
-            }
+        // 单进程、未明确指定负载均衡，不使用负载均衡
+        // 直接加入epoll事件，开始监听，可以接受请求
+        if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+            return NGX_ERROR;
         }
 
 #endif
@@ -1176,14 +1188,7 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 得到所有的事件模块数量
     // 设置事件模块的ctx_index
-    ngx_event_max_module = 0;
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
-            continue;
-        }
-
-        ngx_modules[i]->ctx_index = ngx_event_max_module++;
-    }
+    ngx_event_max_module = ngx_count_modules(cf->cycle, NGX_EVENT_MODULE);
 
     // ctx是void***，也就是void** *，即指向二维数组的指针
     ctx = ngx_pcalloc(cf->pool, sizeof(void *));
@@ -1202,17 +1207,18 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 对每一个事件模块调用create_conf创建配置结构体
     // 事件模块的层次很简单，没有多级，所以二维数组就够了
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
+    for (i = 0; cf->cycle->modules[i]; i++) {
+        if (cf->cycle->modules[i]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
-        m = ngx_modules[i]->ctx;
+        m = cf->cycle->modules[i]->ctx;
 
         // 调用create_conf创建配置结构体
         if (m->create_conf) {
-            (*ctx)[ngx_modules[i]->ctx_index] = m->create_conf(cf->cycle);
-            if ((*ctx)[ngx_modules[i]->ctx_index] == NULL) {
+            (*ctx)[cf->cycle->modules[i]->ctx_index] =
+                                                     m->create_conf(cf->cycle);
+            if ((*ctx)[cf->cycle->modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
             }
         }
@@ -1232,19 +1238,21 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 恢复之前保存的解析上下文
     *cf = pcf;
 
-    if (rv != NGX_CONF_OK)
+    if (rv != NGX_CONF_OK) {
         return rv;
+    }
 
     // 解析完毕，需要初始化配置，即给默认值
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
+    for (i = 0; cf->cycle->modules[i]; i++) {
+        if (cf->cycle->modules[i]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
-        m = ngx_modules[i]->ctx;
+        m = cf->cycle->modules[i]->ctx;
 
         if (m->init_conf) {
-            rv = m->init_conf(cf->cycle, (*ctx)[ngx_modules[i]->ctx_index]);
+            rv = m->init_conf(cf->cycle,
+                              (*ctx)[cf->cycle->modules[i]->ctx_index]);
             if (rv != NGX_CONF_OK) {
                 return rv;
             }
@@ -1266,12 +1274,6 @@ ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (ecf->connections != NGX_CONF_UNSET_UINT) {
         return "is duplicate";
-    }
-
-    if (ngx_strcmp(cmd->name.data, "connections") == 0) {
-        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "the \"connections\" directive is deprecated, "
-                           "use the \"worker_connections\" directive instead");
     }
 
     // 取得指令字符串
@@ -1321,19 +1323,19 @@ ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     // 在模块数组里遍历，找事件模块
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_EVENT_MODULE) {
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_EVENT_MODULE) {
             continue;
         }
 
         // 取事件模块的函数表，里面有名字
-        module = ngx_modules[m]->ctx;
+        module = cf->cycle->modules[m]->ctx;
         if (module->name->len == value[1].len) {
             // 长度和名字都一样，即use这个事件模块
             if (ngx_strcmp(module->name->data, value[1].data) == 0) {
 
                 // 设置event_core配置结构体里的use成员为此模块的ctx_index
-                ecf->use = ngx_modules[m]->ctx_index;
+                ecf->use = cf->cycle->modules[m]->ctx_index;
 
                 // 设置event_core配置结构体里的name成员为此模块的name
                 ecf->name = module->name->data;
@@ -1516,11 +1518,9 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 #if (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
     int                  fd;
 #endif
+
     // rtsig在nginx 1.9.x已经删除
-#if (NGX_HAVE_RTSIG)
-    ngx_uint_t           rtsig;
-    ngx_core_conf_t     *ccf;
-#endif
+
     ngx_int_t            i;
     ngx_module_t        *module;
     ngx_event_module_t  *event_module;
@@ -1546,19 +1546,8 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 #endif
 
     // rtsig在nginx 1.9.x已经删除
-#if (NGX_HAVE_RTSIG)
 
-    if (module == NULL) {
-        module = &ngx_rtsig_module;
-        rtsig = 1;
-
-    } else {
-        rtsig = 0;
-    }
-
-#endif
-
-#if (NGX_HAVE_DEVPOLL)
+#if (NGX_HAVE_DEVPOLL) && !(NGX_TEST_BUILD_DEVPOLL)
 
     module = &ngx_devpoll_module;
 
@@ -1582,13 +1571,13 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     // 还没有决定默认的事件模型
     if (module == NULL) {
         // 遍历所有的事件模块
-        for (i = 0; ngx_modules[i]; i++) {
+        for (i = 0; cycle->modules[i]; i++) {
 
-            if (ngx_modules[i]->type != NGX_EVENT_MODULE) {
+            if (cycle->modules[i]->type != NGX_EVENT_MODULE) {
                 continue;
             }
 
-            event_module = ngx_modules[i]->ctx;
+            event_module = cycle->modules[i]->ctx;
 
             // 跳过event_core模块
             if (ngx_strcmp(event_module->name->data, event_core_name.data) == 0)
@@ -1597,7 +1586,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
             }
 
             // 使用数组里的第一个事件模块
-            module = ngx_modules[i];
+            module = cycle->modules[i];
             break;
         }
     }
@@ -1630,31 +1619,5 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     // 默认负载均衡锁的等待时间是500毫秒
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
 
-
-#if (NGX_HAVE_RTSIG)
-
-    if (!rtsig) {
-        return NGX_CONF_OK;
-    }
-
-    if (ecf->accept_mutex) {
-        return NGX_CONF_OK;
-    }
-
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
-
-    if (ccf->worker_processes == 0) {
-        return NGX_CONF_OK;
-    }
-
-    ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
-                  "the \"rtsig\" method requires \"accept_mutex\" to be on");
-
-    return NGX_CONF_ERROR;
-
-#else
-
     return NGX_CONF_OK;
-
-#endif
 }
