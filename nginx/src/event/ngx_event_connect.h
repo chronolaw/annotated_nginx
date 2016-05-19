@@ -83,6 +83,9 @@ struct ngx_peer_connection_s {
     // 本地地址
     ngx_addr_t                      *local;
 
+    // 标记tcp/udp
+    int                              type;
+
     // 接收缓冲区大小
     int                              rcvbuf;
 
