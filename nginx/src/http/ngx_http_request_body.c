@@ -77,21 +77,14 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     ssize_t                    size;
     ngx_int_t                  rc;
     ngx_buf_t                 *b;
-    ngx_chain_t                out, *cl;
+    ngx_chain_t                out;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
 
     // 引用计数器增加，表示此请求还有关联的操作，不能直接销毁
     r->main->count++;
 
-#if (NGX_HTTP_SPDY)
-    if (r->spdy_stream && r == r->main) {
-        r->request_body_no_buffering = 0;
-        rc = ngx_http_spdy_read_request_body(r, post_handler);
-        goto done;
-    }
-#endif
-
+    // 删除了原spdy的代码
     // 子请求不与客户端直接通信，不会有请求体的读取
     // 已经设置了discard_body标志，表示已经开始丢弃请求体
     // request_body指针不空，表示已经开始读取请求体
@@ -105,15 +98,22 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (ngx_http_test_expect(r) != NGX_OK) {
-        rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+#if (NGX_HTTP_V2)
+    if (r->stream) {
+        rc = ngx_http_v2_read_request_body(r, post_handler);
         goto done;
     }
+#endif
 
     // 如果要求不缓存请求体数据
     // 那么请求体就不会存在磁盘文件里
-    if (r->request_body_no_buffering) {
-        r->request_body_in_file_only = 0;
+    // if (r->request_body_no_buffering) {
+    //     r->request_body_in_file_only = 0;
+    // }
+
+    if (ngx_http_test_expect(r) != NGX_OK) {
+        rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+        goto done;
     }
 
     // 创建请求体数据结构体
@@ -260,42 +260,9 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     if (rb->rest == 0) {
         /* the whole request body was pre-read */
 
-        // 写文件暂不研究
-        if (r->request_body_in_file_only) {
-            if (ngx_http_write_request_body(r) != NGX_OK) {
-                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                goto done;
-            }
-
-            if (rb->temp_file->file.offset != 0) {
-
-                cl = ngx_chain_get_free_buf(r->pool, &rb->free);
-                if (cl == NULL) {
-                    rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                    goto done;
-                }
-
-                b = cl->buf;
-
-                ngx_memzero(b, sizeof(ngx_buf_t));
-
-                b->in_file = 1;
-                b->file_last = rb->temp_file->file.offset;
-                b->file = &rb->temp_file->file;
-
-                rb->bufs = cl;
-
-            } else {
-                rb->bufs = NULL;
-            }
-        }
-        // 写文件暂不研究
-
-        r->request_body_no_buffering = 0;
-
         // body已经读取完毕，可以调用post_handler继续处理流程
+        r->request_body_no_buffering = 0;
         post_handler(r);
-
         return NGX_OK;
     }
 
@@ -387,6 +354,18 @@ ngx_http_read_unbuffered_request_body(ngx_http_request_t *r)
 {
     ngx_int_t  rc;
 
+#if (NGX_HTTP_V2)
+    if (r->stream) {
+        rc = ngx_http_v2_read_unbuffered_request_body(r);
+
+        if (rc == NGX_OK) {
+            r->reading_body = 0;
+        }
+
+        return rc;
+    }
+#endif
+
     if (r->connection->read->timedout) {
         r->connection->timedout = 1;
         return NGX_HTTP_REQUEST_TIME_OUT;
@@ -437,8 +416,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     size_t                     size;
     ssize_t                    n;
     ngx_int_t                  rc;
-    ngx_buf_t                 *b;
-    ngx_chain_t               *cl, out;
+    ngx_chain_t                out;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
@@ -649,38 +627,6 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
         ngx_del_timer(c->read);
     }
 
-    // 请求体要写入文件，暂不研究
-    if (rb->temp_file || r->request_body_in_file_only) {
-
-        /* save the last part */
-
-        if (ngx_http_write_request_body(r) != NGX_OK) {
-            return NGX_HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        if (rb->temp_file->file.offset != 0) {
-
-            cl = ngx_chain_get_free_buf(r->pool, &rb->free);
-            if (cl == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            b = cl->buf;
-
-            ngx_memzero(b, sizeof(ngx_buf_t));
-
-            b->in_file = 1;
-            b->file_last = rb->temp_file->file.offset;
-            b->file = &rb->temp_file->file;
-
-            rb->bufs = cl;
-
-        } else {
-            rb->bufs = NULL;
-        }
-    }
-    // 请求体要写入文件，暂不研究
-
     // 要求缓存请求体
     if (!r->request_body_no_buffering) {
         r->read_event_handler = ngx_http_block_reading;
@@ -795,13 +741,6 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     ngx_int_t     rc;
     ngx_event_t  *rev;
 
-#if (NGX_HTTP_SPDY)
-    if (r->spdy_stream && r == r->main) {
-        r->spdy_stream->skip_data = NGX_SPDY_DATA_DISCARD;
-        return NGX_OK;
-    }
-#endif
-
     // 子请求不与客户端直接通信，不会有请求体的读取
     // 已经设置了discard_body标志，表示已经调用了此函数
     // request_body指针不空，表示已经调用了此函数
@@ -810,6 +749,13 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     if (r != r->main || r->discard_body || r->request_body) {
         return NGX_OK;
     }
+
+#if (NGX_HTTP_V2)
+    if (r->stream) {
+        r->stream->skip_data = 1;
+        return NGX_OK;
+    }
+#endif
 
     if (ngx_http_test_expect(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -1559,9 +1505,8 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 ngx_int_t
 ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
-#if (NGX_DEBUG)
+    ngx_buf_t                 *b;
     ngx_chain_t               *cl;
-#endif
     ngx_http_request_body_t   *rb;
 
     // 请求体数据的结构体
@@ -1602,13 +1547,46 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    if (r->request_body_no_buffering) {
+        return NGX_OK;
+    }
+
+    if (rb->rest > 0) {
+
+        if (rb->buf && rb->buf->last == rb->buf->end
+            && ngx_http_write_request_body(r) != NGX_OK)
+        {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        return NGX_OK;
+    }
+
+    /* rb->rest == 0 */
+
     // 如果要求写磁盘文件，那么调用ngx_http_write_request_body
-    if (rb->rest > 0
-        && rb->buf && rb->buf->last == rb->buf->end
-        && !r->request_body_no_buffering)
-    {
+    if (rb->temp_file || r->request_body_in_file_only) {
+
         if (ngx_http_write_request_body(r) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if (rb->temp_file->file.offset != 0) {
+
+            cl = ngx_chain_get_free_buf(r->pool, &rb->free);
+            if (cl == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b = cl->buf;
+
+            ngx_memzero(b, sizeof(ngx_buf_t));
+
+            b->in_file = 1;
+            b->file_last = rb->temp_file->file.offset;
+            b->file = &rb->temp_file->file;
+
+            rb->bufs = cl;
         }
     }
 
