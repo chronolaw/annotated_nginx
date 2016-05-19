@@ -681,6 +681,7 @@ extern ngx_module_t           ngx_event_core_module;
 void ngx_event_accept(ngx_event_t *ev);
 
 #if !(NGX_WIN32)
+// 1.10新增函数，接受udp连接的handler
 void ngx_event_recvmsg(ngx_event_t *ev);
 #endif
 
