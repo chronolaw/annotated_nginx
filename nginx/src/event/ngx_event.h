@@ -34,7 +34,7 @@ struct ngx_event_s {
 
     unsigned         accept:1;
 
-    /* used to detect the stale events in kqueue, rtsig, and epoll */
+    /* used to detect the stale events in kqueue and epoll */
     unsigned         instance:1;
 
     /*
@@ -67,6 +67,14 @@ struct ngx_event_s {
     unsigned         pending_eof:1;
 
     unsigned         posted:1;
+
+    unsigned         closed:1;
+
+    /* to test on worker exit */
+    unsigned         channel:1;
+    unsigned         resolver:1;
+
+    unsigned         cancelable:1;
 
 #if (NGX_WIN32)
     /* setsockopt(SO_UPDATE_ACCEPT_CONTEXT) was successful */
@@ -103,14 +111,8 @@ struct ngx_event_s {
     ngx_event_handler_pt  handler;
 
 
-#if (NGX_HAVE_AIO)
-
 #if (NGX_HAVE_IOCP)
     ngx_event_ovlp_t ovlp;
-#else
-    struct aiocb     aiocb;
-#endif
-
 #endif
 
     ngx_uint_t       index;
@@ -121,15 +123,6 @@ struct ngx_event_s {
 
     /* the posted queue */
     ngx_queue_t      queue;
-
-    unsigned         closed:1;
-
-    /* to test on worker exit */
-    unsigned         channel:1;
-    unsigned         resolver:1;
-
-    unsigned         cancelable:1;
-
 
 #if 0
 
@@ -195,7 +188,7 @@ typedef struct {
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
-                   ngx_uint_t flags);
+                                 ngx_uint_t flags);
 
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
@@ -236,7 +229,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_USE_LOWAT_EVENT      0x00000010
 
 /*
- * The event filter requires to do i/o operation until EAGAIN: epoll, rtsig.
+ * The event filter requires to do i/o operation until EAGAIN: epoll.
  */
 #define NGX_USE_GREEDY_EVENT     0x00000020
 
@@ -246,25 +239,23 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_USE_EPOLL_EVENT      0x00000040
 
 /*
- * No need to add or delete the event filters: rtsig.
+ * Obsolete.
  */
 #define NGX_USE_RTSIG_EVENT      0x00000080
 
 /*
- * No need to add or delete the event filters: overlapped, aio_read,
- * aioread, io_submit.
+ * Obsolete.
  */
 #define NGX_USE_AIO_EVENT        0x00000100
 
 /*
  * Need to add socket or handle only once: i/o completion port.
- * It also requires NGX_HAVE_AIO and NGX_USE_AIO_EVENT to be set.
  */
 #define NGX_USE_IOCP_EVENT       0x00000200
 
 /*
  * The event filter has no opaque data and requires file descriptors table:
- * poll, /dev/poll, rtsig.
+ * poll, /dev/poll.
  */
 #define NGX_USE_FD_EVENT         0x00000400
 
@@ -289,7 +280,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 /*
  * The event filter is deleted just before the closing file.
  * Has no meaning for select and poll.
- * kqueue, epoll, rtsig, eventport:  allows to avoid explicit delete,
+ * kqueue, epoll, eventport:         allows to avoid explicit delete,
  *                                   because filter automatically is deleted
  *                                   on file close,
  *
@@ -352,7 +343,8 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_DISABLE_EVENT  EV_DISABLE
 
 
-#elif (NGX_HAVE_DEVPOLL || NGX_HAVE_EVENTPORT)
+#elif (NGX_HAVE_DEVPOLL && !(NGX_TEST_BUILD_DEVPOLL)) \
+      || (NGX_HAVE_EVENTPORT && !(NGX_TEST_BUILD_EVENTPORT))
 
 #define NGX_READ_EVENT     POLLIN
 #define NGX_WRITE_EVENT    POLLOUT
@@ -361,7 +353,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_ONESHOT_EVENT  1
 
 
-#elif (NGX_HAVE_EPOLL)
+#elif (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
 
 #define NGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
 #define NGX_WRITE_EVENT    EPOLLOUT
@@ -427,6 +419,7 @@ extern ngx_os_io_t  ngx_io;
 #define ngx_udp_recv         ngx_io.udp_recv
 #define ngx_send             ngx_io.send
 #define ngx_send_chain       ngx_io.send_chain
+#define ngx_udp_send         ngx_io.udp_send
 
 
 #define NGX_EVENT_MODULE      0x544E5645  /* "EVNT" */
@@ -500,6 +493,9 @@ extern ngx_module_t           ngx_event_core_module;
 
 
 void ngx_event_accept(ngx_event_t *ev);
+#if !(NGX_WIN32)
+void ngx_event_recvmsg(ngx_event_t *ev);
+#endif
 ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
 u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
