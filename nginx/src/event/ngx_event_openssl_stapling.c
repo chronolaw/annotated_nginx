@@ -32,6 +32,7 @@ typedef struct {
     X509                        *issuer;
 
     time_t                       valid;
+    time_t                       refresh;
 
     unsigned                     verify:1;
     unsigned                     loading:1;
@@ -92,6 +93,8 @@ static int ngx_ssl_certificate_status_callback(ngx_ssl_conn_t *ssl_conn,
     void *data);
 static void ngx_ssl_stapling_update(ngx_ssl_stapling_t *staple);
 static void ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx);
+
+static time_t ngx_ssl_stapling_time(ASN1_GENERALIZEDTIME *asn1time);
 
 static void ngx_ssl_stapling_cleanup(void *data);
 
@@ -242,6 +245,7 @@ ngx_ssl_stapling_file(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file)
 
     staple->staple.data = buf;
     staple->staple.len = len;
+    staple->valid = NGX_MAX_TIME_T_VALUE;
 
     return NGX_OK;
 
@@ -281,7 +285,11 @@ ngx_ssl_stapling_issuer(ngx_conf_t *cf, ngx_ssl_t *ssl)
     for (i = 0; i < n; i++) {
         issuer = sk_X509_value(chain, i);
         if (X509_check_issued(issuer, cert) == X509_V_OK) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100001L
+            X509_up_ref(issuer);
+#else
             CRYPTO_add(&issuer->references, 1, CRYPTO_LOCK_X509);
+#endif
 
             ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ssl->log, 0,
                            "SSL get issuer: found %p in extra certs", issuer);
@@ -462,7 +470,9 @@ ngx_ssl_certificate_status_callback(ngx_ssl_conn_t *ssl_conn, void *data)
     staple = data;
     rc = SSL_TLSEXT_ERR_NOACK;
 
-    if (staple->staple.len) {
+    if (staple->staple.len
+        && staple->valid >= ngx_time())
+    {
         /* we have to copy ocsp response as OpenSSL will free it by itself */
 
         p = OPENSSL_malloc(staple->staple.len);
@@ -490,7 +500,7 @@ ngx_ssl_stapling_update(ngx_ssl_stapling_t *staple)
     ngx_ssl_ocsp_ctx_t  *ctx;
 
     if (staple->host.len == 0
-        || staple->loading || staple->valid >= ngx_time())
+        || staple->loading || staple->refresh >= ngx_time())
     {
         return;
     }
@@ -532,6 +542,7 @@ ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx)
     u_char                *p;
     int                    n;
     size_t                 len;
+    time_t                 now, valid;
     ngx_str_t              response;
     X509_STORE            *store;
     STACK_OF(X509)        *chain;
@@ -542,6 +553,7 @@ ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx)
     ASN1_GENERALIZEDTIME  *thisupdate, *nextupdate;
 
     staple = ctx->data;
+    now = ngx_time();
     ocsp = NULL;
     basic = NULL;
     id = NULL;
@@ -629,9 +641,25 @@ ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx)
         goto error;
     }
 
+    if (nextupdate) {
+        valid = ngx_ssl_stapling_time(nextupdate);
+        if (valid == (time_t) NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, ctx->log, 0,
+                          "invalid nextUpdate time in certificate status");
+            goto error;
+        }
+
+    } else {
+        valid = NGX_MAX_TIME_T_VALUE;
+    }
+
     OCSP_CERTID_free(id);
     OCSP_BASICRESP_free(basic);
     OCSP_RESPONSE_free(ocsp);
+
+    id = NULL;
+    basic = NULL;
+    ocsp = NULL;
 
     /* copy the response to memory not in ctx->pool */
 
@@ -639,7 +667,7 @@ ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx)
     response.data = ngx_alloc(response.len, ctx->log);
 
     if (response.data == NULL) {
-        goto done;
+        goto error;
     }
 
     ngx_memcpy(response.data, ctx->response->pos, response.len);
@@ -653,11 +681,15 @@ ngx_ssl_stapling_ocsp_handler(ngx_ssl_ocsp_ctx_t *ctx)
     }
 
     staple->staple = response;
+    staple->valid = valid;
 
-done:
+    /*
+     * refresh before the response expires,
+     * but not earlier than in 5 minutes, and at least in an hour
+     */
 
     staple->loading = 0;
-    staple->valid = ngx_time() + 3600; /* ssl_stapling_valid */
+    staple->refresh = ngx_max(ngx_min(valid - 300, now + 3600), now + 300);
 
     ngx_ssl_ocsp_done(ctx);
     return;
@@ -665,7 +697,7 @@ done:
 error:
 
     staple->loading = 0;
-    staple->valid = ngx_time() + 300; /* ssl_stapling_err_valid */
+    staple->refresh = now + 300;
 
     if (id) {
         OCSP_CERTID_free(id);
@@ -680,6 +712,40 @@ error:
     }
 
     ngx_ssl_ocsp_done(ctx);
+}
+
+
+static time_t
+ngx_ssl_stapling_time(ASN1_GENERALIZEDTIME *asn1time)
+{
+    u_char  *value;
+    size_t   len;
+    time_t   time;
+    BIO     *bio;
+
+    /*
+     * OpenSSL doesn't provide a way to convert ASN1_GENERALIZEDTIME
+     * into time_t.  To do this, we use ASN1_GENERALIZEDTIME_print(),
+     * which uses the "MMM DD HH:MM:SS YYYY [GMT]" format (e.g.,
+     * "Feb  3 00:55:52 2015 GMT"), and parse the result.
+     */
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        return NGX_ERROR;
+    }
+
+    /* fake weekday prepended to match C asctime() format */
+
+    BIO_write(bio, "Tue ", sizeof("Tue ") - 1);
+    ASN1_GENERALIZEDTIME_print(bio, asn1time);
+    len = BIO_get_mem_data(bio, &value);
+
+    time = ngx_parse_http_time(value, len);
+
+    BIO_free(bio);
+
+    return time;
 }
 
 
@@ -1157,7 +1223,7 @@ ngx_ssl_ocsp_create_request(ngx_ssl_ocsp_ctx_t *ctx)
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
                    "ssl ocsp request length %z, escape %d",
-                   base64.len, escape);
+                   base64.len, (int) escape);
 
     len = sizeof("GET ") - 1 + ctx->uri.len + sizeof("/") - 1
           + base64.len + 2 * escape + sizeof(" HTTP/1.0" CRLF) - 1
