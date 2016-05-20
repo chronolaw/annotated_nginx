@@ -18,9 +18,10 @@
 // 检查在ngx_http_core_post_rewrite_phase
 #define NGX_HTTP_MAX_URI_CHANGES           10
 
-// 最多只能产生200个子请求
+// 最多只能产生50个子请求
 // 避免过多子请求导致处理效率降低
-#define NGX_HTTP_MAX_SUBREQUESTS           200
+// 在1.8版是200,1.10减少到50
+#define NGX_HTTP_MAX_SUBREQUESTS           50
 
 /* must be 2^n */
 #define NGX_HTTP_LC_HEADER_LEN             32
@@ -32,10 +33,14 @@
 #define NGX_HTTP_LINGERING_BUFFER_SIZE     4096
 
 
-// HTTP协议版本号标记，nginx1.8还不支持HTTP2
+// HTTP协议版本号标记
+// nginx1.10支持HTTP2
 #define NGX_HTTP_VERSION_9                 9
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
+
+// 新的http2协议版本号
+#define NGX_HTTP_VERSION_20                2000
 
 // http请求方法代码，可以使用与或非来检查，存储在r->method
 // r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD)
@@ -317,6 +322,7 @@ typedef struct {
     // 通常需要指定content_length_n，表示body的长度
     off_t                             content_length_n;
 
+    off_t                             content_offset;
     time_t                            date_time;
     time_t                            last_modified_time;
 } ngx_http_headers_out_t;
@@ -340,6 +346,10 @@ typedef struct {
     // 对于确定长度（有content length）的就是r->headers_in.content_length_n
     // 在读取过程中会不断变化，最终为0
     off_t                             rest;
+
+#if (NGX_HTTP_V2)
+    off_t                             received;
+#endif
 
     // 空闲节点链表，优化用，避免再向内存池要节点
     ngx_chain_t                      *free;
@@ -578,8 +588,8 @@ struct ngx_http_request_s {
     ngx_uint_t                        err_status;
 
     ngx_http_connection_t            *http_connection;
-#if (NGX_HTTP_SPDY)
-    ngx_http_spdy_stream_t           *spdy_stream;
+#if (NGX_HTTP_V2)
+    ngx_http_v2_stream_t             *stream;
 #endif
 
     // 记录错误日志时可以调用的函数
@@ -590,13 +600,15 @@ struct ngx_http_request_s {
     // 与内存池的清理调用时机不同
     ngx_http_cleanup_t               *cleanup;
 
-    // 子请求数量，最多不能超过200个
-    unsigned                          subrequests:8;
 
     // 引用计数，丢弃/读取请求体/发起子请求都会增加
     // 表示当前请求有其他关联的操作，不能随意关闭
     // 在http_close里会检查count，如果大于1只减少，不会真正关闭
-    unsigned                          count:8;
+    // 1.8里是8位，1.10改为16位
+    unsigned                          count:16;
+
+    // 子请求数量，最多不能超过50个
+    unsigned                          subrequests:8;
 
     // 请求的阻塞数量，用于线程池，当发起一个多线程task时需要增加
     unsigned                          blocked:8;
@@ -715,6 +727,7 @@ struct ngx_http_request_s {
     unsigned                          filter_need_in_memory:1;
     unsigned                          filter_need_temporary:1;
     unsigned                          allow_ranges:1;
+    unsigned                          subrequest_ranges:1;
     unsigned                          single_range:1;
     unsigned                          disable_not_modified:1;
 
@@ -771,17 +784,6 @@ typedef struct {
 
 extern ngx_http_header_t       ngx_http_headers_in[];
 extern ngx_http_header_out_t   ngx_http_headers_out[];
-
-
-#define ngx_http_set_connection_log(c, l)                                     \
-                                                                              \
-    c->log->file = l->file;                                                   \
-    c->log->next = l->next;                                                   \
-    c->log->writer = l->writer;                                               \
-    c->log->wdata = l->wdata;                                                 \
-    if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {                    \
-        c->log->log_level = l->log_level;                                     \
-    }
 
 
 #define ngx_http_set_log_request(log, r)                                      \
