@@ -6,7 +6,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 
 当前使用的是1.10.0稳定版。
 
-Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得仔细研究。
+Nginx1.10的变动较大，增加了动态模块、http2、reuseport，值得仔细研究。
 
 请参考：
 * [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
@@ -14,8 +14,7 @@ Nginx1.10的变动较大，增加了动态模块，完善了多线程，值得�
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 
 # 当前状态
-开始迁移至nginx 1.10.0
-完成：os/unix、stream
+nginx 1.10.0
 
 # 已注解
 
