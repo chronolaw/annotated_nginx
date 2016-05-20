@@ -375,7 +375,14 @@ ngx_int_t ngx_init_modules(ngx_cycle_t *cycle);
 // 返回此类型模块的数量
 ngx_int_t ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type);
 
-
+// cycle->modules_n是模块计数器 如果超过最大数量则报错
+// 使用模块里的各种信息进行检查，只有正确的才能加载
+// 首先是版本号，必须一致，例如1.10的不能给1.9使用
+// 比较签名字符串，里面是二进制兼容信息
+// 看cycle里的模块数组里是否有重名的 也就是说每个模块的名字都不能相同
+// 模块还没有加载，那么就给一个全局序号，不是ctx_index
+// 把动态模块的指针加入cycle的模块数组
+// 最后完成了一个动态模块的加载，放到了cycle模块数组里的合适位置
 ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
     ngx_module_t *module, char **order);
 

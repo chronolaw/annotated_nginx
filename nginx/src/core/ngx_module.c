@@ -15,6 +15,9 @@
 #define NGX_MAX_DYNAMIC_MODULES  128
 
 
+// 从头开始查找所有模块
+// 最后找到了一个未使用的序号
+// 通常是数组里的最后一个位置
 static ngx_uint_t ngx_module_index(ngx_cycle_t *cycle);
 
 // 从头开始查找特定类型的模块
@@ -96,6 +99,7 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
 // main -> ngx_init_cycle里调用
 // 调用所有模块的init_module函数指针，初始化模块
 // 不使用全局的ngx_modules数组，而是使用cycle里的
+// 这时可能已经加载了一些动态模块
 ngx_int_t
 ngx_init_modules(ngx_cycle_t *cycle)
 {
@@ -116,6 +120,7 @@ ngx_init_modules(ngx_cycle_t *cycle)
 
 
 // 在ngx_event.c等调用，在解析配置块时
+// 这时应该已经加载了动态模块，在模块数组里与静态模块无区别
 // 得到cycle里所有的事件/http/stream模块数量
 // 设置某类型模块的ctx_index
 // type是模块的类型，例如NGX_EVENT_MODULE
@@ -212,6 +217,16 @@ ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
 }
 
 
+// cycle->modules_n是模块计数器 如果超过最大数量则报错
+// 使用模块里的各种信息进行检查，只有正确的才能加载
+// 首先是版本号，必须一致，例如1.10的不能给1.9使用
+// 比较签名字符串，里面是二进制兼容信息
+// 看cycle里的模块数组里是否有重名的 也就是说每个模块的名字都不能相同
+// 模块还没有加载，那么就给一个全局序号，不是ctx_index
+// 把动态模块的指针加入cycle的模块数组
+// 最后完成了一个动态模块的加载，放到了cycle模块数组里的合适位置
+//
+// file参数仅打错误日志使用
 ngx_int_t
 ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
     char **order)
@@ -220,12 +235,17 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
     ngx_uint_t          i, m, before;
     ngx_core_module_t  *core_module;
 
+    // cycle->modules_n是模块计数器
+    // 如果超过最大数量则报错
     if (cf->cycle->modules_n >= ngx_max_module) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "too many modules loaded");
         return NGX_ERROR;
     }
 
+    // 使用模块里的各种信息进行检查，只有正确的才能加载
+
+    // 首先是版本号，必须一致，例如1.10的不能给1.9使用
     if (module->version != nginx_version) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "module \"%V\" version %ui instead of %ui",
@@ -233,6 +253,7 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
         return NGX_ERROR;
     }
 
+    // 比较签名字符串，里面是二进制兼容信息
     if (ngx_strcmp(module->signature, NGX_MODULE_SIGNATURE) != 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "module \"%V\" is not binary compatible",
@@ -240,6 +261,8 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
         return NGX_ERROR;
     }
 
+    // 看cycle里的模块数组里是否有重名的
+    // 也就是说每个模块的名字都不能相同
     for (m = 0; cf->cycle->modules[m]; m++) {
         if (ngx_strcmp(cf->cycle->modules[m]->name, module->name) == 0) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -253,9 +276,15 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
      * if the module wasn't previously loaded, assign an index
      */
 
+    // 模块还没有加载，那么就给一个全局序号，不是ctx_index
     if (module->index == NGX_MODULE_UNSET_INDEX) {
+
+        // 从头开始查找所有模块
+        // 最后找到了一个未使用的序号
+        // 通常是数组里的最后一个位置
         module->index = ngx_module_index(cf->cycle);
 
+        // 如果超过最大数量则报错
         if (module->index >= ngx_max_module) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "too many modules loaded");
@@ -267,8 +296,12 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
      * put the module into the cycle->modules array
      */
 
+    // cycle->modules_n是模块计数器
+    // 是数组里的第一个空位置
     before = cf->cycle->modules_n;
 
+    // 模块顺序只对http filter模块有意义
+    // 其他模块不会走这里
     if (order) {
         for (i = 0; order[i]; i++) {
             if (ngx_strcmp(order[i], module->name) == 0) {
@@ -298,18 +331,25 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
             }
         }
     }
+    // order逻辑结束
 
     /* put the module before modules[before] */
 
+    // 如果位置不对就要调用memmove移动数组元素
     if (before != cf->cycle->modules_n) {
         ngx_memmove(&cf->cycle->modules[before + 1],
                     &cf->cycle->modules[before],
                     (cf->cycle->modules_n - before) * sizeof(ngx_module_t *));
     }
 
+    // 把动态模块的指针加入cycle的模块数组
     cf->cycle->modules[before] = module;
+
+    // cycle->modules_n模块计数器加1
     cf->cycle->modules_n++;
 
+    // 动态核心模块还有特殊的处理
+    // 要创建它的配置结构体
     if (module->type == NGX_CORE_MODULE) {
 
         /*
@@ -331,30 +371,41 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
         }
     }
 
+    // 最后完成了一个动态模块的加载，放到了cycle模块数组里的合适位置
+
     return NGX_OK;
 }
 
 
+// 从头开始查找所有模块
+// 最后找到了一个未使用的序号
+// 通常是数组里的最后一个位置
 static ngx_uint_t
 ngx_module_index(ngx_cycle_t *cycle)
 {
     ngx_uint_t     i, index;
     ngx_module_t  *module;
 
+    // 从0开始查找序号
     index = 0;
 
 again:
 
     /* find an unused index */
 
+    // 从头开始查找模块
     for (i = 0; cycle->modules[i]; i++) {
         module = cycle->modules[i];
 
+        // 如果序号被使用那么加1
         if (module->index == index) {
             index++;
             goto again;
         }
     }
+
+    // 最后找到了一个未使用的序号
+    // 通常是数组里的最后一个位置
 
     /* check previous cycle */
 

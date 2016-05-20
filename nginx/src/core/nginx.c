@@ -43,6 +43,20 @@ static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 // 1.10新的动态模块特性，调用dlopen
+// 加载动态模块的指令
+// 不能在http/event里使用，而且要在http/event之前
+// 否则会因为modules_used不允许加载动态模块
+//
+// 打开动态库文件
+// 设置内存池销毁时的清理动作，关闭动态库
+// 使用"ngx_modules"取动态库里的模块数组
+// 使用"ngx_module_names"取动态库里的模块名字数组
+// 使用"ngx_module_order"取动态库里的模块顺序数组
+// 模块顺序只对http filter模块有意义
+// 所以可以没有，不需要检查
+// 遍历动态库里的模块数组
+// 流程类似ngx_preinit_modules
+// 调用ngx_add_module添加模块
 static char *ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 // 调用dlclose关闭动态库
@@ -167,6 +181,8 @@ static ngx_command_t  ngx_core_commands[] = {
     // old threads 在1.9.x里已经被删除，不再使用
 
     // 加载动态模块的指令
+    // 不能在http/event里使用，而且要在http/event之前
+    // 否则会因为modules_used不允许加载动态模块
     { ngx_string("load_module"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_load_module,
@@ -1588,6 +1604,16 @@ ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 打开动态库文件
+// 设置内存池销毁时的清理动作，关闭动态库
+// 使用"ngx_modules"取动态库里的模块数组
+// 使用"ngx_module_names"取动态库里的模块名字数组
+// 使用"ngx_module_order"取动态库里的模块顺序数组
+// 模块顺序只对http filter模块有意义
+// 所以可以没有，不需要检查
+// 遍历动态库里的模块数组
+// 流程类似ngx_preinit_modules
+// 调用ngx_add_module添加模块
 static char *
 ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1614,11 +1640,13 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 当cycle内存池销毁时的清理动作
     cln = ngx_pool_cleanup_add(cf->cycle->pool, 0);
     if (cln == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 打开动态库文件
     handle = ngx_dlopen(file.data);
     if (handle == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -1627,9 +1655,11 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 设置内存池销毁时的清理动作，关闭动态库
     cln->handler = ngx_unload_module;
     cln->data = handle;
 
+    // 使用"ngx_modules"取动态库里的模块数组
     modules = ngx_dlsym(handle, "ngx_modules");
     if (modules == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -1638,6 +1668,7 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 使用"ngx_module_names"取动态库里的模块名字数组
     names = ngx_dlsym(handle, "ngx_module_names");
     if (names == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -1646,12 +1677,26 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 使用"ngx_module_order"取动态库里的模块顺序数组
+    // 模块顺序只对http filter模块有意义
+    // 所以可以没有，不需要检查
     order = ngx_dlsym(handle, "ngx_module_order");
 
+    // 遍历动态库里的模块数组
+    // 流程类似ngx_preinit_modules
+    // 调用ngx_add_module添加模块
     for (i = 0; modules[i]; i++) {
         module = modules[i];
         module->name = names[i];
 
+        // cycle->modules_n是模块计数器 如果超过最大数量则报错
+        // 使用模块里的各种信息进行检查，只有正确的才能加载
+        // 首先是版本号，必须一致，例如1.10的不能给1.9使用
+        // 比较签名字符串，里面是二进制兼容信息
+        // 看cycle里的模块数组里是否有重名的 也就是说每个模块的名字都不能相同
+        // 模块还没有加载，那么就给一个全局序号，不是ctx_index
+        // 把动态模块的指针加入cycle的模块数组
+        // 最后完成了一个动态模块的加载，放到了cycle模块数组里的合适位置
         if (ngx_add_module(cf, &file, module, order) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
