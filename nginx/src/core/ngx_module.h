@@ -348,9 +348,31 @@ typedef struct {
 } ngx_core_module_t;
 
 
+// main()里调用
+// 计算所有的静态模块数量
+// ngx_modules是nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
+// 这里赋值每个模块的index成员
+// ngx_modules_n保存了最后一个可用的序号
+// ngx_max_module是模块数量的上限
 ngx_int_t ngx_preinit_modules(void);
+
+// main -> ngx_init_cycle里调用
+// 内存池创建一个数组，可以容纳所有的模块，大小是ngx_max_module + 1
+// 拷贝脚本生成的静态模块数组到本cycle
+// 拷贝模块序号计数器到本cycle
+// 完成cycle的模块初始化
 ngx_int_t ngx_cycle_modules(ngx_cycle_t *cycle);
+
+// main -> ngx_init_cycle里调用
+// 调用所有模块的init_module函数指针，初始化模块
+// 不使用全局的ngx_modules数组，而是使用cycle里的
 ngx_int_t ngx_init_modules(ngx_cycle_t *cycle);
+
+// 在ngx_event.c等调用，在解析配置块时
+// 得到cycle里所有的事件/http/stream模块数量
+// 设置某类型模块的ctx_index
+// type是模块的类型，例如NGX_EVENT_MODULE
+// 返回此类型模块的数量
 ngx_int_t ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type);
 
 
@@ -361,10 +383,10 @@ ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
 // nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
 extern ngx_module_t  *ngx_modules[];
 
-// 声明nginx模块计数器变量，静态模块，ngx_module.c
+// 模块数量的上限， 所有模块不能超过这个数量，ngx_module.c
 extern ngx_uint_t     ngx_max_module;
 
-// 模块的名字数组
+// 模块的名字数组，由make生成在objs/ngx_modules.c
 extern char          *ngx_module_names[];
 
 

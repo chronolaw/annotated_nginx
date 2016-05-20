@@ -44,6 +44,9 @@ static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
 
 // 1.10新的动态模块特性，调用dlopen
 static char *ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+// 调用dlclose关闭动态库
+// #define ngx_dlclose(handle)        dlclose(handle)
 #if (NGX_HAVE_DLOPEN)
 static void ngx_unload_module(void *data);
 #endif
@@ -353,6 +356,8 @@ main(int argc, char *const *argv)
     // 开始计算所有的静态模块数量
     // ngx_modules是nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
     // 这里赋值每个模块的index成员
+    // ngx_modules_n保存了最后一个可用的序号
+    // ngx_max_module是模块数量的上限
     if (ngx_preinit_modules() != NGX_OK) {
         return 1;
     }
@@ -1594,12 +1599,15 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_module_t        *module, **modules;
     ngx_pool_cleanup_t  *cln;
 
+    // 标志位，cycle已经完成模块的初始化，不能再添加模块
     if (cf->cycle->modules_used) {
         return "is specified too late";
     }
 
+    // 取配置参数
     value = cf->args->elts;
 
+    // 第一个参数是动态库文件名
     file = value[1];
 
     if (ngx_conf_full_name(cf->cycle, &file, 0) != NGX_OK) {
@@ -1667,6 +1675,8 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #if (NGX_HAVE_DLOPEN)
 
+// 调用dlclose关闭动态库
+// #define ngx_dlclose(handle)        dlclose(handle)
 static void
 ngx_unload_module(void *data)
 {

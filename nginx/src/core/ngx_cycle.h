@@ -74,8 +74,16 @@ struct ngx_cycle_s {
     ngx_uint_t                free_connection_n;
 
     // 1.10，保存模块数组，可以加载动态模块
+    // 可以容纳所有的模块，大小是ngx_max_module + 1
+    // ngx_cycle_modules()初始化
     ngx_module_t            **modules;
+
+    // 拷贝模块序号计数器到本cycle
+    // ngx_cycle_modules()初始化
     ngx_uint_t                modules_n;
+
+    // 标志位，cycle已经完成模块的初始化，不能再添加模块
+    // 在ngx_load_module里检查，不允许加载动态模块
     ngx_uint_t                modules_used;    /* unsigned  modules_used:1; */
 
     // 复用连接对象队列

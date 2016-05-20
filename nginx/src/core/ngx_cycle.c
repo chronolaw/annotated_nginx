@@ -239,6 +239,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
 
 
+    // 内存池创建一个数组，可以容纳所有的模块，大小是ngx_max_module + 1
+    // 拷贝脚本生成的静态模块数组到本cycle
+    // 拷贝模块序号计数器到本cycle
+    // 完成cycle的模块初始化
     if (ngx_cycle_modules(cycle) != NGX_OK) {
         ngx_destroy_pool(pool);
         return NULL;

@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,35 +11,61 @@
 #include <ngx_core.h>
 
 
+// 动态模块最多加载128个
 #define NGX_MAX_DYNAMIC_MODULES  128
 
 
 static ngx_uint_t ngx_module_index(ngx_cycle_t *cycle);
+
+// 从头开始查找特定类型的模块
+// 如果这个序号被已有的模块使用
+// 那么序号加1，再重新查找
+// 例如，一开始所有模块的序号都是-1，那么返回0，之后就是1、2、3
+// 对于静态模块很简单，返回值就是index
 static ngx_uint_t ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type,
     ngx_uint_t index);
 
 
+// 在ngx_preinit_modules里统计得到静态模块的总数
+// 之后加上128，是模块数量的上限
 ngx_uint_t         ngx_max_module;
+
+// 模块计数器，模块数组的最后一个可用序号
 static ngx_uint_t  ngx_modules_n;
 
 
+// main()里调用
+// 计算所有的静态模块数量
+// ngx_modules是nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
+// 这里赋值每个模块的index成员
+// ngx_modules_n保存了最后一个可用的序号
+// ngx_max_module是模块数量的上限
 ngx_int_t
 ngx_preinit_modules(void)
 {
     ngx_uint_t  i;
 
+    // 从0开始，为所有静态模块设置序号和名字
     for (i = 0; ngx_modules[i]; i++) {
         ngx_modules[i]->index = i;
         ngx_modules[i]->name = ngx_module_names[i];
     }
 
+    // ngx_modules_n保存了最后一个可用的序号
     ngx_modules_n = i;
+
+    // ngx_max_module是模块数量的上限
     ngx_max_module = ngx_modules_n + NGX_MAX_DYNAMIC_MODULES;
 
     return NGX_OK;
 }
 
 
+// main -> ngx_init_cycle里调用
+// 内存池创建一个数组，可以容纳所有的模块，大小是ngx_max_module + 1
+// 拷贝脚本生成的静态模块数组到本cycle
+// 拷贝模块序号计数器到本cycle
+// 完成cycle的模块初始化
 ngx_int_t
 ngx_cycle_modules(ngx_cycle_t *cycle)
 {
@@ -47,27 +74,36 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
      * copy static modules to it
      */
 
+    // 内存池创建一个数组，可以容纳所有的模块，大小是ngx_max_module + 1
     cycle->modules = ngx_pcalloc(cycle->pool, (ngx_max_module + 1)
                                               * sizeof(ngx_module_t *));
     if (cycle->modules == NULL) {
         return NGX_ERROR;
     }
 
+    // 拷贝make生成的静态模块数组到本cycle
     ngx_memcpy(cycle->modules, ngx_modules,
                ngx_modules_n * sizeof(ngx_module_t *));
 
+    // 拷贝模块序号计数器到本cycle
     cycle->modules_n = ngx_modules_n;
 
+    // 完成cycle的模块初始化
     return NGX_OK;
 }
 
 
+// main -> ngx_init_cycle里调用
+// 调用所有模块的init_module函数指针，初始化模块
+// 不使用全局的ngx_modules数组，而是使用cycle里的
 ngx_int_t
 ngx_init_modules(ngx_cycle_t *cycle)
 {
     ngx_uint_t  i;
 
     for (i = 0; cycle->modules[i]; i++) {
+
+        // 调用所有模块的init_module函数指针，初始化模块
         if (cycle->modules[i]->init_module) {
             if (cycle->modules[i]->init_module(cycle) != NGX_OK) {
                 return NGX_ERROR;
@@ -79,32 +115,43 @@ ngx_init_modules(ngx_cycle_t *cycle)
 }
 
 
+// 在ngx_event.c等调用，在解析配置块时
+// 得到cycle里所有的事件/http/stream模块数量
+// 设置某类型模块的ctx_index
+// type是模块的类型，例如NGX_EVENT_MODULE
+// 返回此类型模块的数量
 ngx_int_t
 ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
 {
     ngx_uint_t     i, next, max;
     ngx_module_t  *module;
 
+    // 模块的序号，初始是0
     next = 0;
     max = 0;
 
     /* count appropriate modules, set up their indices */
 
+    // 遍历cycle里的模块数组，只关注特定类型的模块
     for (i = 0; cycle->modules[i]; i++) {
         module = cycle->modules[i];
 
+        // 不是特定类型的模块则跳过
         if (module->type != type) {
             continue;
         }
 
+        // 模块已经设置了序号
         if (module->ctx_index != NGX_MODULE_UNSET_INDEX) {
 
             /* if ctx_index was assigned, preserve it */
 
+            // 更新max
             if (module->ctx_index > max) {
                 max = module->ctx_index;
             }
 
+            // next也要更新
             if (module->ctx_index == next) {
                 next++;
             }
@@ -114,12 +161,23 @@ ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
 
         /* search for some free index */
 
+        // 通常情况下模块都是没有序号的（即-1）
+
+        // 调用ngx_module_ctx_index获取一个序号
+        //
+        // 从头开始查找特定类型的模块
+        // 如果这个序号被已有的模块使用
+        // 那么序号加1，再重新查找
+        // 例如，一开始所有模块的序号都是-1，那么返回0，之后就是1、2、3
+        // 对于静态模块很简单，返回值就是next
         module->ctx_index = ngx_module_ctx_index(cycle, type, next);
 
+        // 更新max
         if (module->ctx_index > max) {
             max = module->ctx_index;
         }
 
+        // 序号加1，准备给下一个模块
         next = module->ctx_index + 1;
     }
 
@@ -147,6 +205,7 @@ ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
 
     /* prevent loading of additional modules */
 
+    // 标志位，cycle已经完成模块的初始化，不能再添加模块
     cycle->modules_used = 1;
 
     return max + 1;
@@ -315,6 +374,11 @@ again:
 }
 
 
+// 从头开始查找特定类型的模块
+// 如果这个序号被已有的模块使用
+// 那么序号加1，再重新查找
+// 例如，一开始所有模块的序号都是-1，那么返回0，之后就是1、2、3
+// 对于静态模块很简单，返回值就是index
 static ngx_uint_t
 ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type, ngx_uint_t index)
 {
@@ -325,18 +389,24 @@ again:
 
     /* find an unused ctx_index */
 
+    // 从头开始查找特定类型的模块
     for (i = 0; cycle->modules[i]; i++) {
         module = cycle->modules[i];
 
+        // 不是特定类型的模块则跳过
         if (module->type != type) {
             continue;
         }
 
+        // 如果这个序号被已有的模块使用
+        // 那么序号加1，再重新查找
         if (module->ctx_index == index) {
             index++;
             goto again;
         }
     }
+
+    // 所有模块都遍历完毕，没有模块使用index序号
 
     /* check previous cycle */
 
@@ -356,5 +426,6 @@ again:
         }
     }
 
+    // 返回index
     return index;
 }
