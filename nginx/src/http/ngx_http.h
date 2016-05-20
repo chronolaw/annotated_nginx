@@ -29,8 +29,8 @@ typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 
-#if (NGX_HTTP_SPDY)
-typedef struct ngx_http_spdy_stream_s  ngx_http_spdy_stream_t;
+#if (NGX_HTTP_V2)
+typedef struct ngx_http_v2_stream_s   ngx_http_v2_stream_t;
 #endif
 
 typedef ngx_int_t (*ngx_http_header_handler_pt)(ngx_http_request_t *r,
@@ -47,8 +47,8 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_upstream_round_robin.h>
 #include <ngx_http_core_module.h>
 
-#if (NGX_HTTP_SPDY)
-#include <ngx_http_spdy.h>
+#if (NGX_HTTP_V2)
+#include <ngx_http_v2.h>
 #endif
 #if (NGX_HTTP_CACHE)
 #include <ngx_http_cache.h>
@@ -236,9 +236,9 @@ ngx_int_t ngx_http_filter_finalize_request(ngx_http_request_t *r,
 void ngx_http_clean_header(ngx_http_request_t *r);
 
 
-time_t ngx_http_parse_time(u_char *value, size_t len);
-size_t ngx_http_get_time(char *buf, time_t t);
-
+// 这两个函数在1.10已不存在
+// time_t ngx_http_parse_time(u_char *value, size_t len);
+// size_t ngx_http_get_time(char *buf, time_t t);
 
 
 // 丢弃http请求体，对于get等请求是必须的
