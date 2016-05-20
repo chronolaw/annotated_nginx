@@ -197,7 +197,7 @@ struct ngx_module_s {
     // 在ngx_master_process_exit(os/unix/ngx_process_cycle.c)里调用
     void                (*exit_master)(ngx_cycle_t *cycle);
 
-    // 下面7个成员通常用用NGX_MODULE_V1_PADDING填充
+    // 下面8个成员通常用用NGX_MODULE_V1_PADDING填充
     uintptr_t             spare_hook0;
     uintptr_t             spare_hook1;
     uintptr_t             spare_hook2;
