@@ -76,6 +76,7 @@ nginx 1.10.0
 * [ngx_list.h](/nginx/src/core/ngx_list.h)
 * [ngx_string.h](/nginx/src/core/ngx_string.h)
 * [ngx_buf.h](/nginx/src/core/ngx_buf.h)
+* [ngx_rbtree.h](/nginx/src/core/ngx_rbtree.h)
 
 ######进程机制
 * [nginx.c](/nginx/src/core/nginx.c)
