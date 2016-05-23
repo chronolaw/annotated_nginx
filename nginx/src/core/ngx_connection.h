@@ -109,12 +109,19 @@ struct ngx_listening_s {
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned            ipv6only:1;
 #endif
+
+    // 1.10新增reuseport支持，可以不再使用共享锁负载均衡，性能更高
 #if (NGX_HAVE_REUSEPORT)
+    // 是否使用reuseport
     unsigned            reuseport:1;
+
+    // 是否已经设置了reuseport socket选项
+    // ngx_open_listening_sockets
     unsigned            add_reuseport:1;
 #endif
     unsigned            keepalive:2;
 
+    // 延迟接受请求，只有真正收到数据内核才通知nginx，提高性能
 #if (NGX_HAVE_DEFERRED_ACCEPT)
     unsigned            deferred_accept:1;
     unsigned            delete_deferred:1;
@@ -123,6 +130,7 @@ struct ngx_listening_s {
     char               *accept_filter;
 #endif
 #endif
+
 #if (NGX_HAVE_SETFIB)
     int                 setfib;
 #endif
@@ -179,6 +187,7 @@ struct ngx_connection_s {
     ngx_event_t        *write;
 
     // 连接的socket描述符（句柄）
+    // 需使用此描述符才能收发数据
     ngx_socket_t        fd;
 
     // 接收数据的函数指针
@@ -219,6 +228,7 @@ struct ngx_connection_s {
     // 默认大小是256字节
     ngx_pool_t         *pool;
 
+    // socket的类型，SOCK_STREAM 表示TCP，
     int                 type;
 
     // 客户端的sockaddr
@@ -247,7 +257,7 @@ struct ngx_connection_s {
     // 复用连接对象
     ngx_queue_t         queue;
 
-    // 连接创建的计数器
+    // 连接创建的计数器，可以用来标记不同的连接
     // ngx_event_accept.c:ngx_event_accept()
     // c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
     ngx_atomic_uint_t   number;
@@ -284,6 +294,7 @@ struct ngx_connection_s {
     // tcp连接已经关闭
     // 可以回收复用
     unsigned            close:1;
+
     unsigned            shared:1;
 
     // 正在发送文件
@@ -351,6 +362,7 @@ void ngx_close_listening_sockets(ngx_cycle_t *cycle);
 void ngx_close_connection(ngx_connection_t *c);
 
 // 1.10新函数
+// 检查cycle里的连接数组，如果连接空闲则设置close标志位，关闭
 void ngx_close_idle_connections(ngx_cycle_t *cycle);
 
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,

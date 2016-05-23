@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_create_listening
+// * ngx_open_listening_sockets
 // * ngx_configure_listening_sockets
 // * ngx_get_connection
 // * ngx_close_connection
@@ -112,6 +113,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 
 
 // 1.10新函数，专为reuseport使用
+// 拷贝了worker数量个的监听结构体
 ngx_int_t
 ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 {
@@ -134,6 +136,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
                                            ngx_core_module);
 
     // ccf->worker_processes是nginx的worker进程数
+    // 拷贝了worker数量个的监听结构体
     for (n = 1; n < ccf->worker_processes; n++) {
 
         /* create a socket for each worker process */
@@ -443,6 +446,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
 
+            // 检查是否已经设置的标志位
             if (ls[i].add_reuseport) {
 
                 /*
@@ -462,6 +466,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                                   &ls[i].addr_text);
                 }
 
+                // 标志位清零
                 ls[i].add_reuseport = 0;
             }
 #endif
@@ -1371,6 +1376,7 @@ ngx_drain_connections(void)
 }
 
 
+// 检查cycle里的连接数组，如果连接空闲则设置close标志位，关闭
 void
 ngx_close_idle_connections(ngx_cycle_t *cycle)
 {
@@ -1379,10 +1385,12 @@ ngx_close_idle_connections(ngx_cycle_t *cycle)
 
     c = cycle->connections;
 
+    // 检查cycle里的连接数组
     for (i = 0; i < cycle->connection_n; i++) {
 
         /* THREAD: lock */
 
+        // 如果连接空闲则设置close标志位，关闭
         if (c[i].fd != (ngx_socket_t) -1 && c[i].idle) {
             c[i].close = 1;
             c[i].read->handler(c[i].read);
