@@ -388,12 +388,14 @@ ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
 
 
 // nginx模块数组，存储所有的模块指针，由make生成在objs/ngx_modules.c
+// ngx_cycle_modules拷贝后就不再使用
 extern ngx_module_t  *ngx_modules[];
 
 // 模块数量的上限， 所有模块不能超过这个数量，ngx_module.c
 extern ngx_uint_t     ngx_max_module;
 
 // 模块的名字数组，由make生成在objs/ngx_modules.c
+// 仅在ngx_preinit_modules里使用
 extern char          *ngx_module_names[];
 
 

@@ -78,6 +78,7 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
      */
 
     // 内存池创建一个数组，可以容纳所有的模块，大小是ngx_max_module + 1
+    // 注意使用的是ngx_pcalloc，内容全是0，即以null表示数组结束
     cycle->modules = ngx_pcalloc(cycle->pool, (ngx_max_module + 1)
                                               * sizeof(ngx_module_t *));
     if (cycle->modules == NULL) {
@@ -96,7 +97,7 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
 }
 
 
-// main -> ngx_init_cycle里调用
+// main -> ngx_init_cycle里调用，仅调用一次
 // 调用所有模块的init_module函数指针，初始化模块
 // 不使用全局的ngx_modules数组，而是使用cycle里的
 // 这时可能已经加载了一些动态模块
@@ -213,6 +214,7 @@ ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
     // 标志位，cycle已经完成模块的初始化，不能再添加模块
     cycle->modules_used = 1;
 
+    // +1是为了最后一个元素放null表示数组结束
     return max + 1;
 }
 
