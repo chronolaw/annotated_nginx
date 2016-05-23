@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_event_del_timer
+// * ngx_event_add_timer
 
 /*
  * Copyright (C) Igor Sysoev
@@ -15,6 +18,7 @@
 #include <ngx_event.h>
 
 
+// 无限制时间，也是-1
 #define NGX_TIMER_INFINITE  (ngx_msec_t) -1
 
 // 允许有300毫秒的误差
@@ -23,6 +27,7 @@
 
 // 初始化定时器
 // 实际上就是初始化一个红黑树结构
+// 注意树的插入函数是ngx_rbtree_insert_timer_value
 ngx_int_t ngx_event_timer_init(ngx_log_t *log);
 
 // 在红黑树里查找最小值，即最左边的节点，得到超时的时间差值

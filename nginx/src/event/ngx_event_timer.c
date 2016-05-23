@@ -30,6 +30,7 @@ static ngx_rbtree_node_t  ngx_event_timer_sentinel;
 
 // 初始化定时器
 // 实际上就是初始化一个红黑树结构
+// 注意树的插入函数是ngx_rbtree_insert_timer_value
 ngx_int_t
 ngx_event_timer_init(ngx_log_t *log)
 {
