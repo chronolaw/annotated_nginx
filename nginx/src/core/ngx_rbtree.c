@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -21,6 +22,7 @@ static ngx_inline void ngx_rbtree_right_rotate(ngx_rbtree_node_t **root,
     ngx_rbtree_node_t *sentinel, ngx_rbtree_node_t *node);
 
 
+// 向红黑树插入一个节点
 void
 ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 {
@@ -28,20 +30,27 @@ ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 
     /* a binary tree insert */
 
+    // 最初root和sentinel实际上是同一个指针
     root = (ngx_rbtree_node_t **) &tree->root;
     sentinel = tree->sentinel;
 
+    // 两者相同，空树
     if (*root == sentinel) {
         node->parent = NULL;
         node->left = sentinel;
         node->right = sentinel;
         ngx_rbt_black(node);
+
+        // root指向插入的节点，结束
         *root = node;
 
         return;
     }
 
+    // 树不空，调用插入函数指针
     tree->insert(*root, node, sentinel);
+
+    // 旋转红黑树，保持平衡
 
     /* re-balance tree */
 
@@ -93,6 +102,7 @@ ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 }
 
 
+// 普通红黑树插入函数
 void
 ngx_rbtree_insert_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
     ngx_rbtree_node_t *sentinel)
@@ -101,8 +111,10 @@ ngx_rbtree_insert_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
 
     for ( ;; ) {
 
+        // 比较当前节点与插入节点，决定走左边还是右边
         p = (node->key < temp->key) ? &temp->left : &temp->right;
 
+        // 直到遇到哨兵节点结束
         if (*p == sentinel) {
             break;
         }
@@ -118,6 +130,7 @@ ngx_rbtree_insert_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
 }
 
 
+// 定时器红黑树专用插入函数
 void
 ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
     ngx_rbtree_node_t *sentinel)
@@ -135,9 +148,11 @@ ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
 
         /*  node->key < temp->key */
 
+        // 比较当前节点与插入节点，决定走左边还是右边
         p = ((ngx_rbtree_key_int_t) (node->key - temp->key) < 0)
             ? &temp->left : &temp->right;
 
+        // 直到遇到哨兵节点结束
         if (*p == sentinel) {
             break;
         }

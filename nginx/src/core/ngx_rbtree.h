@@ -72,7 +72,7 @@ struct ngx_rbtree_s {
 };
 
 
-// 初始化红黑树，根节点就是哨兵节点
+// 初始化红黑树，最初根节点就是哨兵节点
 #define ngx_rbtree_init(tree, s, i)                                           \
     ngx_rbtree_sentinel_init(s);                                              \
     (tree)->root = s;                                                         \
