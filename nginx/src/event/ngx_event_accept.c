@@ -20,15 +20,15 @@ static ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle);
 // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
 static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all);
 
+// 发生了错误，关闭一个连接
 static void ngx_close_accepted_connection(ngx_connection_t *c);
+
 #if (NGX_DEBUG)
 static void ngx_debug_accepted_connection(ngx_event_conf_t *ecf,
     ngx_connection_t *c);
 #endif
 
-// 发生了错误，关闭一个连接
-static void ngx_close_accepted_connection(ngx_connection_t *c);
-
+// 仅接受tcp连接
 // ngx_event_process_init里设置接受连接的回调函数为ngx_event_accept，可以接受连接
 // 监听端口上收到连接请求时的回调函数，即事件handler
 // 从cycle的连接池里获取连接
@@ -192,6 +192,7 @@ ngx_event_accept(ngx_event_t *ev)
             return;
         }
 
+        // 1.10连接对象里新的字段，表示连接类型是tcp
         c->type = SOCK_STREAM;
 
 #if (NGX_STAT_STUB)
@@ -292,6 +293,7 @@ ngx_event_accept(ngx_event_t *ev)
         }
 
         // 如果listen使用了deferred，那么建立连接时就已经有数据可读了
+        // 否则需要自己再加读事件，当有数据来时才能读取
         if (ev->deferred_accept) {
             rev->ready = 1;
 #if (NGX_HAVE_KQUEUE)
@@ -384,6 +386,7 @@ ngx_event_accept(ngx_event_t *ev)
 #if !(NGX_WIN32)
 
 // 1.10新增函数，接受udp连接的handler
+// 流程类似ngx_event_accept
 void
 ngx_event_recvmsg(ngx_event_t *ev)
 {
