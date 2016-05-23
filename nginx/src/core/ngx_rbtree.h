@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// * ngx_rbtree_node_s
+// * ngx_rbtree_s
+// * ngx_rbtree_min
 
 /*
  * Copyright (C) Igor Sysoev
@@ -13,34 +18,61 @@
 #include <ngx_core.h>
 
 
+// 红黑树的key类型，无符号整数
+// 通常我们使用这个key类型
 typedef ngx_uint_t  ngx_rbtree_key_t;
+
+// 红黑树的key类型，有符号整数
 typedef ngx_int_t   ngx_rbtree_key_int_t;
 
 
+// 红黑树节点
 typedef struct ngx_rbtree_node_s  ngx_rbtree_node_t;
 
+// 红黑树节点
+// 通常需要以侵入式的方式使用，即作为结构体的一个成员
 struct ngx_rbtree_node_s {
+    // 节点的key，用于二分查找
     ngx_rbtree_key_t       key;
+
+    // 左子节点
     ngx_rbtree_node_t     *left;
+
+    // 右子节点
     ngx_rbtree_node_t     *right;
+
+    // 父节点
     ngx_rbtree_node_t     *parent;
+
+    // 节点的颜色
     u_char                 color;
+
+    // 节点数据，只有一个字节，通常无意义
     u_char                 data;
 };
 
 
+// 定义红黑树结构
 typedef struct ngx_rbtree_s  ngx_rbtree_t;
 
+// 插入红黑树的函数指针
 typedef void (*ngx_rbtree_insert_pt) (ngx_rbtree_node_t *root,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
+// 定义红黑树结构
 struct ngx_rbtree_s {
+    // 必须的根节点
     ngx_rbtree_node_t     *root;
+
+    // 哨兵节点，通常就是root，用于标记查找结束
     ngx_rbtree_node_t     *sentinel;
+
+    // 节点的插入方法
     ngx_rbtree_insert_pt   insert;
 };
 
 
+// 初始化红黑树，根节点就是哨兵节点
 #define ngx_rbtree_init(tree, s, i)                                           \
     ngx_rbtree_sentinel_init(s);                                              \
     (tree)->root = s;                                                         \
@@ -56,6 +88,7 @@ void ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *root,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
 
+// 简单的函数宏，检查颜色
 #define ngx_rbt_red(node)               ((node)->color = 1)
 #define ngx_rbt_black(node)             ((node)->color = 0)
 #define ngx_rbt_is_red(node)            ((node)->color)
@@ -65,9 +98,12 @@ void ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *root,
 
 /* a sentinel must be black */
 
+// 哨兵节点颜色是黑的
 #define ngx_rbtree_sentinel_init(node)  ngx_rbt_black(node)
 
 
+// 在红黑树里查找最小值
+// 二叉树，必定是最左边的节点
 static ngx_inline ngx_rbtree_node_t *
 ngx_rbtree_min(ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel)
 {
