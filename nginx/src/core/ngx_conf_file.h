@@ -62,6 +62,7 @@
 
 
 // nginx自己的nil/none，表示无效值，在C语言里需要做强制类型转换，C++可以用模板
+// 除了这些-1，还有其他的类型转换，如pid、ngx_chain_t等等
 #define NGX_CONF_UNSET       -1
 #define NGX_CONF_UNSET_UINT  (ngx_uint_t) -1
 #define NGX_CONF_UNSET_PTR   (void *) -1
@@ -412,19 +413,27 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
     }
 
 
+// 解析-g传递的命令行参数
 char *ngx_conf_param(ngx_conf_t *cf);
+
+// 解析配置，参数filename可以是空
 char *ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename);
+
 char *ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
+// 决定使用conf_prefix还是prefix得到完整文件名
+// 如果不是以“\”开始的绝对路径，就加上前缀/usr/local/nginx/conf
 ngx_int_t ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name,
     ngx_uint_t conf_prefix);
+
 ngx_open_file_t *ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name);
 void ngx_cdecl ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf,
     ngx_err_t err, const char *fmt, ...);
 
 
 // 预设的解析指令函数，可以解析bool/字符串/数字/秒等
+// 命名格式是ngx_conf_set_xxx_slot
 char *ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd,
