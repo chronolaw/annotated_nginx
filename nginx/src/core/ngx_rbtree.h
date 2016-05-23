@@ -68,6 +68,7 @@ struct ngx_rbtree_s {
     ngx_rbtree_node_t     *sentinel;
 
     // 节点的插入方法
+    // 常用的是ngx_rbtree_insert_value、ngx_rbtree_insert_timer_value
     ngx_rbtree_insert_pt   insert;
 };
 
@@ -80,10 +81,17 @@ struct ngx_rbtree_s {
     (tree)->insert = i
 
 
+// 向红黑树插入一个节点
+// 插入后旋转红黑树，保持平衡
 void ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node);
+
 void ngx_rbtree_delete(ngx_rbtree_t *tree, ngx_rbtree_node_t *node);
+
+// 普通红黑树插入函数
 void ngx_rbtree_insert_value(ngx_rbtree_node_t *root, ngx_rbtree_node_t *node,
     ngx_rbtree_node_t *sentinel);
+
+// 定时器红黑树专用插入函数
 void ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *root,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 

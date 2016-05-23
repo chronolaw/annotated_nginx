@@ -23,6 +23,7 @@ static ngx_inline void ngx_rbtree_right_rotate(ngx_rbtree_node_t **root,
 
 
 // 向红黑树插入一个节点
+// 插入后旋转红黑树，保持平衡
 void
 ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 {
