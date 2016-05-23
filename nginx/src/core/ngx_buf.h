@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_buf_s
+// * ngx_chain_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -137,6 +140,8 @@ typedef struct {
 } ngx_chain_writer_ctx_t;
 
 
+// 强制转换-1，作为发送chain失败的返回错误值
+// 注意，nullptr不是错误
 #define NGX_CHAIN_ERROR     (ngx_chain_t *) NGX_ERROR
 
 
