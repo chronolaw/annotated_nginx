@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -14,6 +15,8 @@ static ngx_int_t ngx_parse_inet_url(ngx_pool_t *pool, ngx_url_t *u);
 static ngx_int_t ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u);
 
 
+// 把形如127.0.0.1的字符串转换为in_addr_t
+// 调用的是htonl，转换为网络字节序的无符号整数
 in_addr_t
 ngx_inet_addr(u_char *text, size_t len)
 {
@@ -177,6 +180,7 @@ ngx_inet6_addr(u_char *p, size_t len, u_char *addr)
 #endif
 
 
+// socket地址转换为字符串
 size_t
 ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
     ngx_uint_t port)
@@ -256,6 +260,7 @@ ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
 }
 
 
+// 使用family socket地址转换为字符串
 size_t
 ngx_inet_ntop(int family, void *addr, u_char *text, size_t len)
 {
@@ -465,6 +470,7 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
 }
 
 
+// 把形如127.0.0.1的字符串转换为ngx_addr_t
 ngx_int_t
 ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
 {
@@ -482,8 +488,11 @@ ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
     ngx_memzero(&inaddr6, sizeof(struct in6_addr));
 #endif
 
+    // 把形如127.0.0.1的字符串转换为in_addr_t
+    // 调用的是htonl，转换为网络字节序的无符号整数
     inaddr = ngx_inet_addr(text, len);
 
+    // 如果是正确的ip地址，默认family是AF_INET
     if (inaddr != INADDR_NONE) {
         family = AF_INET;
         len = sizeof(struct sockaddr_in);
@@ -495,9 +504,11 @@ ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
 
 #endif
     } else {
+        // 地址字符串不对，返回错误
         return NGX_DECLINED;
     }
 
+    // 为addr里的指针分配内存
     addr->sockaddr = ngx_pcalloc(pool, len);
     if (addr->sockaddr == NULL) {
         return NGX_ERROR;
