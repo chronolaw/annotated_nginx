@@ -536,6 +536,10 @@ ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
 }
 
 
+// 根据字符串的不同，调用不同的函数解析url，得到ip地址等信息
+// 以unix:开头的是unix domain socket
+// 以[开头的是ipv6
+// 其他的是ipv4
 ngx_int_t
 ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u)
 {
@@ -553,6 +557,7 @@ ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u)
         return ngx_parse_inet6_url(pool, u);
     }
 
+    // ipv4
     return ngx_parse_inet_url(pool, u);
 }
 
