@@ -393,6 +393,7 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
     *tp->queue.last = task;
     tp->queue.last = &task->next;
 
+    // 等待处理的任务数增加
     tp->waiting++;
 
     // 操作完waiting、queue、ngx_thread_pool_task_id后解锁
@@ -505,9 +506,12 @@ ngx_thread_pool_cycle(void *data)
         ngx_thread_pool_done.last = &task->next;
 
         // 1.10新增
+        // 确保内存操作按照正确的顺序工作的非阻塞的同步
+        // 迫使处理器来完成位于barrier前面的任何加载和存储操作
+        // 才允许它执行位于barrier之后的加载和存储操作
         ngx_memory_barrier();
 
-        // 自旋锁
+        // 自旋锁解锁
         ngx_unlock(&ngx_thread_pool_done_lock);
 
         // 重要，使用event模块的通知函数
@@ -541,8 +545,13 @@ ngx_thread_pool_handler(ngx_event_t *ev)
     ngx_thread_pool_done.first = NULL;
     ngx_thread_pool_done.last = &ngx_thread_pool_done.first;
 
+    // 1.10新增
+    // 确保内存操作按照正确的顺序工作的非阻塞的同步
+    // 迫使处理器来完成位于barrier前面的任何加载和存储操作
+    // 才允许它执行位于barrier之后的加载和存储操作
     ngx_memory_barrier();
 
+    // 自旋锁解锁
     ngx_unlock(&ngx_thread_pool_done_lock);
 
     // 遍历所有已经完成的任务
