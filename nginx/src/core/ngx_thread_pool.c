@@ -176,9 +176,11 @@ static ngx_str_t  ngx_thread_pool_default = ngx_string("default");
 // 全局计数器,生成task的id
 static ngx_uint_t               ngx_thread_pool_task_id;
 
+// 自旋锁保护完成队列ngx_thread_pool_done
 static ngx_atomic_t             ngx_thread_pool_done_lock;
 
 // 处理完毕（handler(ctx)）的任务都放到这里
+// 使用ngx_thread_pool_done_lock保护
 static ngx_thread_pool_queue_t  ngx_thread_pool_done;
 
 
