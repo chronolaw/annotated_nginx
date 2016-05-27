@@ -34,6 +34,8 @@ nginx 1.10.0
 ######core目录
 * [nginx.c](/nginx/src/core/nginx.c)
 * [ngx_conf_file.h](nginx/src/core/ngx_conf_file.h)
+* [ngx_module.h](nginx/src/core/ngx_module.h)
+* [ngx_module.c](nginx/src/core/ngx_module.c)
 * [ngx_connection.h](/nginx/src/core/ngx_connection.h)
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 * [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
@@ -81,6 +83,8 @@ nginx 1.10.0
 ######进程机制
 * [nginx.c](/nginx/src/core/nginx.c)
 * [ngx_conf_file.h](nginx/src/core/ngx_conf_file.h)
+* [ngx_module.h](nginx/src/core/ngx_module.h)
+* [ngx_module.c](nginx/src/core/ngx_module.c)
 * [ngx_process.c](nginx/src/os/unix/ngx_process.c)
 * [ngx_process_cycle.c](nginx/src/os/unix/ngx_process_cycle.c)
 
