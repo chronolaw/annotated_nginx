@@ -17,6 +17,7 @@
 // 重命名pid_t
 typedef pid_t       ngx_pid_t;
 
+// 使用-1表示无效的pid
 #define NGX_INVALID_PID  -1
 
 // 进程的执行函数，在ngx_spawn_process()里调用

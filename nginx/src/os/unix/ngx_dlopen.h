@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Maxim Dounin
@@ -13,12 +14,15 @@
 #include <ngx_core.h>
 
 
+// 简化打开动态库的调用
 #define ngx_dlopen(path)           dlopen((char *) path, RTLD_NOW | RTLD_GLOBAL)
 #define ngx_dlopen_n               "dlopen()"
 
+// 重定义加载动态符号函数
 #define ngx_dlsym(handle, symbol)  dlsym(handle, symbol)
 #define ngx_dlsym_n                "dlsym()"
 
+// 重定义关闭动态库
 #define ngx_dlclose(handle)        dlclose(handle)
 #define ngx_dlclose_n              "dlclose()"
 
