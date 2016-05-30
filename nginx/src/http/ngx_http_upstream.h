@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -68,6 +69,7 @@ typedef struct {
 } ngx_http_upstream_state_t;
 
 
+// upstream模块的主配置，存储所有的upstream{}配置
 typedef struct {
     ngx_hash_t                       headers_in_hash;
     ngx_array_t                      upstreams;
@@ -76,12 +78,14 @@ typedef struct {
 
 typedef struct ngx_http_upstream_srv_conf_s  ngx_http_upstream_srv_conf_t;
 
+// 给load balance模块用初始化函数指针
 typedef ngx_int_t (*ngx_http_upstream_init_pt)(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
 typedef ngx_int_t (*ngx_http_upstream_init_peer_pt)(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us);
 
 
+// 给load balance模块用初始化结构体
 typedef struct {
     ngx_http_upstream_init_pt        init_upstream;
     ngx_http_upstream_init_peer_pt   init;
@@ -89,6 +93,8 @@ typedef struct {
 } ngx_http_upstream_peer_t;
 
 
+// 在upstream{}里的每个server指令相关的信息
+// 包括地址/权重/超时等等
 typedef struct {
     ngx_str_t                        name;
     ngx_addr_t                      *addrs;
@@ -110,16 +116,21 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
 
 
+// 每个upstream{}块的配置结构体，存储server信息
 struct ngx_http_upstream_srv_conf_s {
     ngx_http_upstream_peer_t         peer;
     void                           **srv_conf;
 
+    // 存储ngx_http_upstream_server_t的数组
     ngx_array_t                     *servers;  /* ngx_http_upstream_server_t */
 
     ngx_uint_t                       flags;
     ngx_str_t                        host;
+
+    // 在配置文件里的位置
     u_char                          *file_name;
     ngx_uint_t                       line;
+
     in_port_t                        port;
     in_port_t                        default_port;
     ngx_uint_t                       no_port;  /* unsigned no_port:1 */
