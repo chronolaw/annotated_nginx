@@ -14,6 +14,11 @@
 
 // 提取了部分ngx_conf_file.h里的模块数据结构代码
 // 加上了新的动态模块代码
+//
+// 不需要我们为模块增加特别的代码
+// nginx使用脚本处理动态模块相关的数据
+// 会自动为动态模块生成一个用于编译的c源码文件
+// 编译使用make modules
 
 #include <ngx_config.h>
 #include <ngx_core.h>
@@ -277,6 +282,8 @@ struct ngx_module_s {
     ngx_uint_t            index;
 
     // 1.10，模块的名字，标识字符串，默认是空指针
+    // 由脚本生成ngx_module_names数组，然后在ngx_preinit_modules里填充
+    // 动态模块在ngx_load_module里设置名字
     char                 *name;
 
     // 两个保留字段，1.9之前有4个

@@ -1687,6 +1687,8 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 调用ngx_add_module添加模块
     for (i = 0; modules[i]; i++) {
         module = modules[i];
+
+        // 在这里为动态模块设置名字
         module->name = names[i];
 
         // cycle->modules_n是模块计数器 如果超过最大数量则报错
