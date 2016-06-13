@@ -37,7 +37,7 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
 
 #endif
 
-    // for循环貌似完全没有意义？
+    // 如果send被信号中断NGX_EINTR ，到循环开始继续尝试
     for ( ;; ) {
         // 使用系统调用send发送数据
         n = send(c->fd, buf, size, 0);
@@ -73,7 +73,7 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
 
         // NGX_EAGAIN socket未准备好
         // NGX_EINTR 被信号中断
-        // 都不算真正的错误，下次就可以读取到数据
+        // 都不算真正的错误，下次就可以继续发送数据
         if (err == NGX_EAGAIN || err == NGX_EINTR) {
             // 置ready标志，写事件暂时不可用，即不可写
             wev->ready = 0;
@@ -81,6 +81,7 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
                            "send() not ready");
 
+            // NGX_EAGAIN socket未准备好，直接返回，等待下一次调用
             if (err == NGX_EAGAIN) {
                 return NGX_AGAIN;
             }
@@ -91,5 +92,7 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
             (void) ngx_connection_error(c, err, "send() failed");
             return NGX_ERROR;
         }
+
+        // NGX_EINTR 被信号中断，到循环开始继续尝试
     }
 }
