@@ -562,6 +562,8 @@ ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u)
 }
 
 
+// 解析unix domain socket字符串
+// 格式是unix:/xxxx，例如unix:/tmp/xxx.sock
 static ngx_int_t
 ngx_parse_unix_domain_url(ngx_pool_t *pool, ngx_url_t *u)
 {
@@ -573,6 +575,7 @@ ngx_parse_unix_domain_url(ngx_pool_t *pool, ngx_url_t *u)
     len = u->url.len;
     path = u->url.data;
 
+    // 跳过unix:五个字符
     path += 5;
     len -= 5;
 
@@ -589,11 +592,14 @@ ngx_parse_unix_domain_url(ngx_pool_t *pool, ngx_url_t *u)
         }
     }
 
+    // unix:后无字符串则错误
     if (len == 0) {
         u->err = "no path in the unix domain socket";
         return NGX_ERROR;
     }
 
+    // 直接使用unix:后的字符串作为host
+    // 注意是后置式++
     u->host.len = len++;
     u->host.data = path;
 
