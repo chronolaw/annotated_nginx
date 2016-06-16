@@ -193,10 +193,13 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     // 对整个日志链表执行写入操作
     while (log) {
 
+        // log消息级别低，不需要记录日志，直接退出循环
         if (log->log_level < level && !debug_connection) {
             break;
         }
 
+        // log对象有专用的写函数指针，例如syslog
+        // 那么就不写文件，调用函数写日志
         if (log->writer) {
             log->writer(log, level, errstr, p - errstr);
             goto next;
@@ -212,6 +215,8 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
             goto next;
         }
+
+        // 没有专用的写函数指针，写入磁盘文件
 
         // 写错误日志消息到关联的文件
         // 实际上就是系统调用write，见ngx_files.h
