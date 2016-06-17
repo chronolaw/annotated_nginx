@@ -574,9 +574,12 @@ struct ngx_http_request_s {
 #endif
 
     // 限速用
+    // 可以用$limit_rate来随时改变
     size_t                            limit_rate;
 
     // 多少字节之后开始限速
+    // 未提高$limit_rate，但可以参考$limit_rate添加
+    // 在ngx_http_variables.c
     size_t                            limit_rate_after;
 
     /* used to learn the Apache compatible response length without a header */
