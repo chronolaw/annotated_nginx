@@ -28,7 +28,11 @@ static ngx_event_t     ngx_cleaner_event;
 
 // 用于main，检测配置文件的标识量
 ngx_uint_t             ngx_test_config;
+
+// 1.10, dump整个配置文件
 ngx_uint_t             ngx_dump_config;
+
+// 安静模式，不输出测试信息, in ngx_cycle.c
 ngx_uint_t             ngx_quiet_mode;
 
 

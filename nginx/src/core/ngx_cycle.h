@@ -214,8 +214,14 @@ extern volatile ngx_cycle_t  *ngx_cycle;
 
 extern ngx_array_t            ngx_old_cycles;
 extern ngx_module_t           ngx_core_module;
+
+// -t参数，检查配置文件, in ngx_cycle.c
 extern ngx_uint_t             ngx_test_config;
+
+// 1.10, dump整个配置文件, in ngx_cycle.c
 extern ngx_uint_t             ngx_dump_config;
+
+// 安静模式，不输出测试信息, in ngx_cycle.c
 extern ngx_uint_t             ngx_quiet_mode;
 
 
