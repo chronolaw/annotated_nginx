@@ -52,35 +52,47 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 
 
 // 必须的nginx头文件
+
+// os/unix下，各种操作系统相关头文件
 #include <ngx_errno.h>
 #include <ngx_atomic.h>
 #include <ngx_thread.h>
 #include <ngx_rbtree.h>
 #include <ngx_time.h>
 #include <ngx_socket.h>
+
 #include <ngx_string.h>
 #include <ngx_files.h>
 #include <ngx_shmem.h>
 #include <ngx_process.h>
 #include <ngx_user.h>
 #include <ngx_dlopen.h>
+
 #include <ngx_parse.h>
 #include <ngx_parse_time.h>
+
 #include <ngx_log.h>
 #include <ngx_alloc.h>
 #include <ngx_palloc.h>
+
+// 核心数据结构头文件
 #include <ngx_buf.h>
 #include <ngx_queue.h>
 #include <ngx_array.h>
 #include <ngx_list.h>
 #include <ngx_hash.h>
 #include <ngx_file.h>
+
+// crc和摘要算法，未包含md5/sha1
 #include <ngx_crc.h>
 #include <ngx_crc32.h>
 #include <ngx_murmurhash.h>
+
+// pcre，正则表达式
 #if (NGX_PCRE)
 #include <ngx_regex.h>
 #endif
+
 #include <ngx_radix_tree.h>
 #include <ngx_times.h>
 #include <ngx_rwlock.h>
@@ -89,9 +101,11 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_inet.h>
 #include <ngx_cycle.h>
 #include <ngx_resolver.h>
+
 #if (NGX_OPENSSL)
 #include <ngx_event_openssl.h>
 #endif
+
 #include <ngx_process_cycle.h>
 #include <ngx_conf_file.h>
 #include <ngx_module.h>
