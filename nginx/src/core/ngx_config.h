@@ -50,6 +50,7 @@
 #endif
 
 
+// 非win32，即unix
 #if !(NGX_WIN32)
 
 #define ngx_signal_helper(n)     SIG##n
