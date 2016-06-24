@@ -240,6 +240,12 @@
 // 最后得到一个很长的字符串，每个位置都标记了一个系统特性
 // 模块使用这个签名字符串比对，只有一致才能加载
 // 1-epoll, 10-reuseport, ...
+
+// 可以使用boost.preprocesser库简化，例如
+//
+// #define helper(z, n, d)  d##n
+// #define DEF_NGX_SIGNATURE(n, name) BOOST_PP_REPEAT(n, helper, name)
+// #define NGX_MODULE_SIGNATURE DEF_NGX_SIGNATURE(34, NGX_MODULE_SIGNATURE_)
 #define NGX_MODULE_SIGNATURE                                                  \
     NGX_MODULE_SIGNATURE_0 NGX_MODULE_SIGNATURE_1 NGX_MODULE_SIGNATURE_2      \
     NGX_MODULE_SIGNATURE_3 NGX_MODULE_SIGNATURE_4 NGX_MODULE_SIGNATURE_5      \
@@ -275,6 +281,7 @@ struct ngx_module_s {
     // 下面的几个成员通常使用宏NGX_MODULE_V1填充
 
     // 每类(http/event)模块各自的index
+    // 初始化为-1
     ngx_uint_t            ctx_index;
 
     // 在ngx_modules数组里的唯一索引，main()里赋值
@@ -335,6 +342,7 @@ struct ngx_module_s {
     void                (*exit_master)(ngx_cycle_t *cycle);
 
     // 下面8个成员通常用用NGX_MODULE_V1_PADDING填充
+    // 暂时无任何用处
     uintptr_t             spare_hook0;
     uintptr_t             spare_hook1;
     uintptr_t             spare_hook2;
