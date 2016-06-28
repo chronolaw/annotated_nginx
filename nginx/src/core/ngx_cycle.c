@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_init_cycle
+// * ngx_signal_process
 
 /*
  * Copyright (C) Igor Sysoev
@@ -11,7 +14,9 @@
 #include <ngx_event.h>
 
 
+// 出错时销毁cycle里的内存池
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
+
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
     ngx_shm_zone_t *shm_zone);
 static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
@@ -94,6 +99,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
     // 设置cycle的三个基本成员
+    // 注意cycle->pool就是自身所在的内存池
     cycle->pool = pool;
     cycle->log = log;
     cycle->old_cycle = old_cycle;
@@ -175,6 +181,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
 
     // 共享内存
+    // 如果不是reload直接启动那么就没有元素
     if (old_cycle->shared_memory.part.nelts) {
         n = old_cycle->shared_memory.part.nelts;
         for (part = old_cycle->shared_memory.part.next; part; part = part->next)
@@ -194,6 +201,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
     // 监听的端口列表
+    // 如果不是reload直接启动那么就没有元素
+    // 默认数组长度是10
     n = old_cycle->listening.nelts ? old_cycle->listening.nelts : 10;
 
     cycle->listening.elts = ngx_pcalloc(pool, n * sizeof(ngx_listening_t));
@@ -212,6 +221,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
 
     // 创建配置结构体数组，大小是总模块数量
+    // 1.10之后ngx_max_module是模块数量的上限
     cycle->conf_ctx = ngx_pcalloc(pool, ngx_max_module * sizeof(void *));
     if (cycle->conf_ctx == NULL) {
         ngx_destroy_pool(pool);
@@ -938,6 +948,7 @@ failed:
 }
 
 
+// 出错时销毁cycle里的内存池
 static void
 ngx_destroy_cycle_pools(ngx_conf_t *conf)
 {
