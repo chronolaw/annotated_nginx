@@ -24,6 +24,7 @@ static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
 // nginx自己实现的命令行参数解析
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
 
+// 设置cycle->prefix/cycle->conf_prefix等成员
 static ngx_int_t ngx_process_options(ngx_cycle_t *cycle);
 
 // 保存命令行参数到全局变量ngx_argc/ngx_argv
@@ -304,6 +305,8 @@ main(int argc, char *const *argv)
     ngx_pid = ngx_getpid();
 
     // 初始化log
+    // ngx_prefix是-p后的参数，即nginx的工作目录
+    // 默认是NGX_CONF_PREFIX，即/usr/local/nginx
     log = ngx_log_init(ngx_prefix);
     if (log == NULL) {
         return 1;
@@ -1019,6 +1022,7 @@ ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 }
 
 
+// 设置cycle->prefix/cycle->conf_prefix等成员
 static ngx_int_t
 ngx_process_options(ngx_cycle_t *cycle)
 {
@@ -1120,7 +1124,7 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
 {
     ngx_core_conf_t  *ccf;
 
-    // 分配内存，注意三pcalloc，内存全为0
+    // 分配内存，注意是pcalloc，内存全为0
     ccf = ngx_pcalloc(cycle->pool, sizeof(ngx_core_conf_t));
     if (ccf == NULL) {
         return NULL;
