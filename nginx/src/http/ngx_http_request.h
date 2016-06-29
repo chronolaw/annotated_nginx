@@ -578,10 +578,12 @@ struct ngx_http_request_s {
     size_t                            limit_rate;
 
     // 多少字节之后开始限速
-    // 未提高$limit_rate，但可以参考$limit_rate添加
+    // 未提供$limit_rate，但可以参考$limit_rate添加
     // 在ngx_http_variables.c
     size_t                            limit_rate_after;
 
+    // 用处不大，仅用于计算body_bytes_sent变量
+    // sent = r->connection->sent - r->header_size;
     /* used to learn the Apache compatible response length without a header */
     size_t                            header_size;
 
