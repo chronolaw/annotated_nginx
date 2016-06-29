@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_master_process_cycle
+// * ngx_single_process_cycle
+// * ngx_worker_process_cycle
+// * ngx_signal_worker_processes
 
 /*
  * Copyright (C) Igor Sysoev
@@ -21,6 +26,7 @@ static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
 // cache相关的暂不研究
 static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
     ngx_uint_t respawn);
+
 static void ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch);
 
 // master进程调用，遍历ngx_processes数组，用kill发送信号
@@ -318,6 +324,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // ngx_cycle指针指向新的cycle
             ngx_cycle = cycle;
             ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                    ngx_core_module);
@@ -447,6 +454,7 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // ngx_cycle指针指向新的cycle
             ngx_cycle = cycle;
         }
 
