@@ -164,6 +164,7 @@ typedef struct {
                             (b->file_last - b->file_pos))
 
 // 从内存池里分配一块size大小的缓冲区
+// 并使用buf管理，注意temporary是1，可以修改
 ngx_buf_t *ngx_create_temp_buf(ngx_pool_t *pool, size_t size);
 
 // 一次创建多个缓冲区，返回一个连接好的链表
@@ -175,7 +176,12 @@ ngx_chain_t *ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs);
 #define ngx_calloc_buf(pool) ngx_pcalloc(pool, sizeof(ngx_buf_t))
 
 // 从内存池里获取释放chain
+// 从内存池的空闲链表里取一个对象
+// 如果空闲链表是空才真正创建对象
+// 这是对象池模式，提高运行效率
 ngx_chain_t *ngx_alloc_chain_link(ngx_pool_t *pool);
+
+// 释放链表节点，挂在空闲链表里
 #define ngx_free_chain(pool, cl)                                             \
     cl->next = pool->chain;                                                  \
     pool->chain = cl
@@ -185,9 +191,23 @@ ngx_chain_t *ngx_alloc_chain_link(ngx_pool_t *pool);
 ngx_int_t ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in);
 ngx_int_t ngx_chain_writer(void *ctx, ngx_chain_t *in);
 
+// 从内存池里分配节点
+// 拷贝in链表里的buf到chain里，不是直接连接
+// 同样是指针操作，没有内存拷贝
 ngx_int_t ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain,
     ngx_chain_t *in);
+
+// 先看free里是否有空闲节点，有则直接使用
+// 如果没有，就从内存池的空闲链表里获取
 ngx_chain_t *ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free);
+
+// 用于处理请求体数据，更新free/busy几个链表指针
+// 先把out链表挂到busy指针上
+// 遍历busy链表
+// 缓冲区为空，说明可以复用，应该挂到free链表里
+// 把缓冲区复位，都指向start，即完全可用
+// 此节点不应该在busy里，从busy链表摘除
+// 加入到free链表里，供以后复用
 void ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free,
     ngx_chain_t **busy, ngx_chain_t **out, ngx_buf_tag_t tag);
 

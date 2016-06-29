@@ -12,6 +12,8 @@
 #include <ngx_core.h>
 
 
+// 从内存池里分配一块size大小的内存
+// 并使用buf管理，注意temporary是1，可以修改
 ngx_buf_t *
 ngx_create_temp_buf(ngx_pool_t *pool, size_t size)
 {
