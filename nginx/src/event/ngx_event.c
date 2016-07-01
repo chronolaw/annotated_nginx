@@ -98,6 +98,10 @@ ngx_event_actions_t   ngx_event_actions;
 
 // 连接计数器，使用共享内存，所有worker公用
 static ngx_atomic_t   connection_counter = 1;
+
+// ngx_connection_counter初始指向静态变量connection_counter
+// 如果是单进程，那么就使用这个静态变量
+// 如果是多进程，那么就改指向共享内存里的地址
 ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
 // 1.9.x如果使用了reuseport，那么就会禁用负载均衡锁
@@ -873,6 +877,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 // unix代码, 发送定时信号，更新时间用
 #if !(NGX_WIN32)
 
+    // NGX_USE_TIMER_EVENT标志量只有eventport/kqueue,epoll无此标志位
+    // ngx_timer_resolution = ccf->timer_resolution;默认值是0
+    // 所以只有使用了timer_resolution指令才会发信号
     if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
         struct sigaction  sa;
         struct itimerval  itv;
