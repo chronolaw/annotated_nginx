@@ -59,6 +59,7 @@ ngx_os_init(ngx_log_t *log)
     ngx_pagesize = getpagesize();
 
     // 宏定义为64
+    // 然后由ngx_cpuinfo（ngx_cpuinfo.c）来探测
     ngx_cacheline_size = NGX_CPU_CACHE_LINE;
 
     for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
@@ -75,6 +76,7 @@ ngx_os_init(ngx_log_t *log)
 
     ngx_cpuinfo();
 
+    // 最多描述符数量，ngx_max_sockets
     if (getrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, errno,
                       "getrlimit(RLIMIT_NOFILE) failed");

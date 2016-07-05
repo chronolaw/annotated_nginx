@@ -294,6 +294,9 @@ main(int argc, char *const *argv)
         }
     }
 
+    // 在ngx_os_init函数里设置（os/unix/ngx_posix_init.c）
+    // 使用系统调用getrlimit(RLIMIT_NOFILE, &rlmt)
+    // 是nginx能够打开的最多描述数量，但似乎并没有使用
     /* TODO */ ngx_max_sockets = -1;
 
     // ngx_times.c,初始化各个cache时间变量
@@ -358,6 +361,7 @@ main(int argc, char *const *argv)
     // os/unix/ngx_posix_init.c
     // 初始化ngx_os_io结构体，设置基本的收发函数
     // 基本的页大小,ngx_pagesize = getpagesize()
+    // 最多描述符数量，ngx_max_sockets
     // 初始化随机数
     // ngx_os_io = ngx_linux_io;重要的操作,设置为linux的接口函数
     if (ngx_os_init(log) != NGX_OK) {

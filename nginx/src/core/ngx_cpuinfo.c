@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -9,12 +10,15 @@
 #include <ngx_core.h>
 
 
+// 只对intel x86系列芯片和gcc/intel编译器做优化
+// 其他的芯片和编译器（如vc、clang）则是空函数
 #if (( __i386__ || __amd64__ ) && ( __GNUC__ || __INTEL_COMPILER ))
 
 
 static ngx_inline void ngx_cpuid(uint32_t i, uint32_t *buf);
 
 
+// 32位cpu
 #if ( __i386__ )
 
 static ngx_inline void
@@ -43,6 +47,7 @@ ngx_cpuid(uint32_t i, uint32_t *buf)
 }
 
 
+// 64位cpu
 #else /* __amd64__ */
 
 
@@ -69,6 +74,7 @@ ngx_cpuid(uint32_t i, uint32_t *buf)
 
 /* auto detect the L2 cache line size of modern and widespread CPUs */
 
+// 在os/unix/ngx_posix_init.c里调用，确定ngx_cacheline_size的值
 void
 ngx_cpuinfo(void)
 {
@@ -129,6 +135,8 @@ ngx_cpuinfo(void)
 
 #else
 
+// 只对intel x86系列芯片和gcc/intel编译器做优化
+// 其他的芯片和编译器（如vc、clang）则是空函数
 
 void
 ngx_cpuinfo(void)
