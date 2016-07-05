@@ -95,6 +95,8 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, master),
       NULL },
 
+    // nginx更新缓存时间的精度，如果设置了会定时发送sigalarm信号更新时间
+    // ngx_timer_resolution = ccf->timer_resolution;默认值是0
     { ngx_string("timer_resolution"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -102,6 +104,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, timer_resolution),
       NULL },
 
+    // pid文件的存放位置
     { ngx_string("pid"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -116,6 +119,9 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, lock_file),
       NULL },
 
+    // 启动worker进程，数量由配置决定，即worker_processes指令
+    // ngx_start_worker_processes(cycle, ccf->worker_processes,
+    //                           NGX_PROCESS_RESPAWN);
     { ngx_string("worker_processes"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_set_worker_processes,
