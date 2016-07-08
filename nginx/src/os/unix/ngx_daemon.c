@@ -24,15 +24,18 @@ ngx_daemon(ngx_log_t *log)
         return NGX_ERROR;
 
     // 子进程，继续后面的程序
+    // 也就是真正的master进程
     case 0:
         break;
 
     // 父进程，直接结束进程
+    // 也就是最开始启动的进程
     default:
         exit(0);
     }
 
     // 子进程是新进程，需要重新获取pid
+    // 也就是真正的master进程
     ngx_pid = ngx_getpid();
 
     if (setsid() == -1) {
