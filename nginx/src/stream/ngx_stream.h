@@ -238,7 +238,8 @@ struct ngx_stream_session_s {
 // 流模块的函数表，用于解析配置时调用
 // 与http模块相比没有location相关函数
 typedef struct {
-    // nginx 1.11.x new
+    // nginx 1.11.x新增的函数接口，1.10没有
+    // 所以要使用NGX_MODULE_NULL(4)
     //ngx_int_t                    (*preconfiguration)(ngx_conf_t *cf);
 
     // 解析配置完成之后调用
