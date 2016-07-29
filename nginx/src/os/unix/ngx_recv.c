@@ -59,6 +59,9 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
 #endif
 
+    // 1.11.x增加了对rev->available的检查
+    // 如果!rev->available则不接受数据，直接返回NGX_AGAIN
+
     do {
         // 使用系统调用recv读数据
         // <0 出错， =0 连接关闭， >0 接收到数据大小
