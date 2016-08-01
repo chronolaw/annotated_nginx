@@ -32,13 +32,14 @@ static ngx_command_t  ngx_stream_upstream_least_conn_commands[] = {
 
 
 static ngx_stream_module_t  ngx_stream_upstream_least_conn_module_ctx = {
+    NULL,                                    /* preconfiguration */
     NULL,                                    /* postconfiguration */
 
     NULL,                                    /* create main configuration */
     NULL,                                    /* init main configuration */
 
     NULL,                                    /* create server configuration */
-    NULL,                                    /* merge server configuration */
+    NULL                                     /* merge server configuration */
 };
 
 

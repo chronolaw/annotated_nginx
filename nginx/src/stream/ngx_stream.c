@@ -143,10 +143,25 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 
-    /* parse inside the stream{} block */
-
     pcf = *cf;
     cf->ctx = ctx;
+
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
+            continue;
+        }
+
+        module = cf->cycle->modules[m]->ctx;
+
+        if (module->preconfiguration) {
+            if (module->preconfiguration(cf) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+
+    /* parse inside the stream{} block */
 
     cf->module_type = NGX_STREAM_MODULE;
     cf->cmd_type = NGX_STREAM_MAIN_CONF;
@@ -215,6 +230,10 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (ngx_stream_variables_init_vars(cf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     *cf = pcf;
 
 
@@ -243,35 +262,11 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     in_port_t                p;
     ngx_uint_t               i;
     struct sockaddr         *sa;
-    struct sockaddr_in      *sin;
     ngx_stream_conf_port_t  *port;
     ngx_stream_conf_addr_t  *addr;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6     *sin6;
-#endif
 
-    sa = &listen->u.sockaddr;
-
-    switch (sa->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = &listen->u.sockaddr_in6;
-        p = sin6->sin6_port;
-        break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-        p = 0;
-        break;
-#endif
-
-    default: /* AF_INET */
-        sin = &listen->u.sockaddr_in;
-        p = sin->sin_port;
-        break;
-    }
+    sa = &listen->sockaddr.sockaddr;
+    p = ngx_inet_get_port(sa);
 
     port = ports->elts;
     for (i = 0; i < ports->nelts; i++) {
@@ -359,7 +354,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
                 continue;
             }
 
-            ls = ngx_create_listening(cf, &addr[i].opt.u.sockaddr,
+            ls = ngx_create_listening(cf, &addr[i].opt.sockaddr.sockaddr,
                                       addr[i].opt.socklen);
             if (ls == NULL) {
                 return NGX_CONF_ERROR;
@@ -453,7 +448,7 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
 
     for (i = 0; i < stport->naddrs; i++) {
 
-        sin = &addr[i].opt.u.sockaddr_in;
+        sin = &addr[i].opt.sockaddr.sockaddr_in;
         addrs[i].addr = sin->sin_addr.s_addr;
 
         addrs[i].conf.ctx = addr[i].opt.ctx;
@@ -461,8 +456,8 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
 
-        len = ngx_sock_ntop(&addr[i].opt.u.sockaddr, addr[i].opt.socklen, buf,
-                            NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
@@ -502,7 +497,7 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
 
     for (i = 0; i < stport->naddrs; i++) {
 
-        sin6 = &addr[i].opt.u.sockaddr_in6;
+        sin6 = &addr[i].opt.sockaddr.sockaddr_in6;
         addrs6[i].addr6 = sin6->sin6_addr;
 
         addrs6[i].conf.ctx = addr[i].opt.ctx;
@@ -510,8 +505,8 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs6[i].conf.ssl = addr[i].opt.ssl;
 #endif
 
-        len = ngx_sock_ntop(&addr[i].opt.u.sockaddr, addr[i].opt.socklen, buf,
-                            NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
