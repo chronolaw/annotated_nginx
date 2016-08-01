@@ -149,6 +149,7 @@ struct ngx_connection_s {
     ngx_str_t           addr_text;
 
     ngx_str_t           proxy_protocol_addr;
+    in_port_t           proxy_protocol_port;
 
 #if (NGX_SSL)
     ngx_ssl_connection_t  *ssl;
@@ -169,7 +170,6 @@ struct ngx_connection_s {
 
     unsigned            log_error:3;     /* ngx_connection_log_error_e */
 
-    unsigned            unexpected_eof:1;
     unsigned            timedout:1;
     unsigned            error:1;
     unsigned            destroyed:1;
@@ -185,10 +185,6 @@ struct ngx_connection_s {
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
 
     unsigned            need_last_buf:1;
-
-#if (NGX_HAVE_IOCP)
-    unsigned            accept_context_updated:1;
-#endif
 
 #if (NGX_HAVE_AIO_SENDFILE)
     unsigned            busy_count:2;
@@ -211,7 +207,7 @@ struct ngx_connection_s {
     }
 
 
-ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
+ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
     socklen_t socklen);
 ngx_int_t ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls);
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
