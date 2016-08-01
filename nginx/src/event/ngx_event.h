@@ -76,11 +76,6 @@ struct ngx_event_s {
 
     unsigned         cancelable:1;
 
-#if (NGX_WIN32)
-    /* setsockopt(SO_UPDATE_ACCEPT_CONTEXT) was successful */
-    unsigned         accept_context_updated:1;
-#endif
-
 #if (NGX_HAVE_KQUEUE)
     unsigned         kq_vnode:1;
 
@@ -95,6 +90,10 @@ struct ngx_event_s {
      *               or lowat when event is set with NGX_LOWAT_EVENT flag
      *   write:      available space in buffer when event is ready
      *               or lowat when event is set with NGX_LOWAT_EVENT flag
+     *
+     * epoll with EPOLLRDHUP:
+     *   accept:     1 if accept many, 0 otherwise
+     *   read:       1 if there can be data to read, 0 otherwise
      *
      * iocp: TODO
      *
@@ -196,6 +195,9 @@ typedef struct {
 
 
 extern ngx_event_actions_t   ngx_event_actions;
+#if (NGX_HAVE_EPOLLRDHUP)
+extern ngx_uint_t            ngx_use_epoll_rdhup;
+#endif
 
 
 /*
@@ -365,6 +367,9 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_ONESHOT_EVENT  EPOLLONESHOT
 #endif
 
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+#define NGX_EXCLUSIVE_EVENT  EPOLLEXCLUSIVE
+#endif
 
 #elif (NGX_HAVE_POLL)
 
@@ -390,6 +395,11 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define NGX_IOCP_ACCEPT      0
 #define NGX_IOCP_IO          1
 #define NGX_IOCP_CONNECT     2
+#endif
+
+
+#if (NGX_TEST_BUILD_EPOLL)
+#define NGX_EXCLUSIVE_EVENT  0
 #endif
 
 
