@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
-// 目前stream还缺少变量和log功能，今后也许能够完善
+// 1.10.x版本里的stream缺少变量和log功能
+// 1.11.x添加了变量功能，但还没有log，也许今后能够完善
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
@@ -50,6 +51,7 @@ typedef struct {
 
     // socket地址，使用union适应各种情形
     // 主要使用的是u.sockaddr
+    // 1.11.x改为在ngx_inet.h里定义的ngx_sockaddr_t，简化了代码
     union {
         struct sockaddr     sockaddr;
         struct sockaddr_in  sockaddr_in;
