@@ -151,6 +151,7 @@ struct ngx_event_s {
 #else
     // 是否尽可能多地接受请求建立连接，即multi_accept
     // 1.11.x后增加新用途，在接收数据时标记是否可用
+    // 注意这里使用了bit field，只能存储0/1，节约内存
     unsigned         available:1;
 #endif
 

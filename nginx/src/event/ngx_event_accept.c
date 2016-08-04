@@ -61,11 +61,13 @@ ngx_event_accept(ngx_event_t *ev)
         ev->timedout = 0;
     }
 
+    // 得到event core模块的配置，检查是否接受多个连接
     ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
 
     // rtsig在nginx 1.9.x已经删除
     if (!(ngx_event_flags & NGX_USE_KQUEUE_EVENT)) {
         // epoll是否允许尽可能接受多个请求
+        // 这里的ev->available仅使用1个bit的内存空间
         ev->available = ecf->multi_accept;
     }
 
@@ -85,6 +87,7 @@ ngx_event_accept(ngx_event_t *ev)
         socklen = NGX_SOCKADDRLEN;
 
         // 调用accept接受连接，返回socket对象
+        // accept4是linux的扩展功能，可以直接把连接的socket设置为非阻塞
 #if (NGX_HAVE_ACCEPT4)
         if (use_accept4) {
             s = accept4(lc->fd, (struct sockaddr *) sa, &socklen,
@@ -226,7 +229,13 @@ ngx_event_accept(ngx_event_t *ev)
         /* set a blocking mode for iocp and non-blocking mode for others */
 
         // 设置socket为非阻塞
+        // ngx_inherited_nonblocking => os/unix/ngx_posix_init.c
+        // 如果linux支持accept4，那么ngx_inherited_nonblocking = true
         if (ngx_inherited_nonblocking) {
+
+            // NGX_USE_IOCP_EVENT是win32的标志
+            // 这段代码在linux里不会执行，也就是说无动作
+            // 因为accept4已经设置了socket非阻塞
             if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
                 if (ngx_blocking(s) == -1) {
                     ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
@@ -237,6 +246,7 @@ ngx_event_accept(ngx_event_t *ev)
             }
 
         } else {
+            // 如果linux不支持accept4，需要设置为非阻塞
             if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
                 if (ngx_nonblocking(s) == -1) {
                     ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
@@ -288,6 +298,7 @@ ngx_event_accept(ngx_event_t *ev)
         wev->ready = 1;
 
         // rtsig在nginx 1.9.x已经删除
+        // linux里这段代码不执行
         if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
             rev->ready = 1;
         }
@@ -714,6 +725,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 // 如未获取则不监听端口
 // 锁标志ngx_accept_mutex_held
 // 内部调用ngx_enable_accept_events/ngx_disable_accept_events
+// 在ngx_event.c:ngx_process_events_and_timers里被调用
 ngx_int_t
 ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 {
