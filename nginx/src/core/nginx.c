@@ -136,9 +136,10 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, debug_points),
       &ngx_debug_points },
 
+    //设置user
     { ngx_string("user"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE12,
-      ngx_set_user,                             //设置user
+      ngx_set_user,
       0,
       0,
       NULL },

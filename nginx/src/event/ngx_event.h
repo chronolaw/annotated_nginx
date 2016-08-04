@@ -77,6 +77,7 @@ struct ngx_event_s {
     unsigned         oneshot:1;
 
     /* aio operation is complete */
+    // 异步操作的完成标志，用于aio和多线程
     unsigned         complete:1;
 
     // 当前的字节流已经结束即eof，不会再有数据可读
