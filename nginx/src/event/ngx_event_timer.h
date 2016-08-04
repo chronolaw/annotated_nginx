@@ -41,12 +41,13 @@ void ngx_event_expire_timers(void);
 void ngx_event_cancel_timers(void);
 
 
-// 定时器红黑树，键值是超时事件（毫秒时间戳）
+// 定时器红黑树，键值是超时时间（毫秒时间戳）
 // 里面使用ngx_event_t.timer成员组织为红黑树
 // timedout表示已经超时，timer_set表示已经加入定时器红黑树
 extern ngx_rbtree_t  ngx_event_timer_rbtree;
 
 
+// 在头文件里声明静态函数，是为了加快调用的速度？？
 // 从定时器红黑树里删除事件
 // #define ngx_del_timer        ngx_event_del_timer
 static ngx_inline void
@@ -70,6 +71,7 @@ ngx_event_del_timer(ngx_event_t *ev)
 }
 
 
+// 在头文件里声明静态函数，是为了加快调用的速度？？
 // 向定时器红黑树里添加事件，ngx_event_expire_timers()超时后会调用ev->handler
 // #define ngx_add_timer        ngx_event_add_timer
 static ngx_inline void
@@ -97,6 +99,7 @@ ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
 
         // #define NGX_TIMER_LAZY_DELAY  300
         // 允许有300毫秒的误差
+        // 减少对红黑树的操作，加快速度提高性能
         if (ngx_abs(diff) < NGX_TIMER_LAZY_DELAY) {
             ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                            "event timer: %d, old: %M, new: %M",
