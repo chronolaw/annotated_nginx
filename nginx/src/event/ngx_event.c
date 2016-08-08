@@ -230,6 +230,8 @@ static ngx_command_t  ngx_event_core_commands[] = {
 
     // 默认使用负载均衡锁
     // accept_mutex off也是可以的，这样连接快但可能负载不均衡
+    // 1.10后支持reuseport，可以不使用此指令
+    // 1.11.3后负载均衡锁默认是关闭的
     { ngx_string("accept_mutex"),
       NGX_EVENT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -955,6 +957,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // 读事件对象初始化
     rev = cycle->read_events;
     for (i = 0; i < cycle->connection_n; i++) {
         rev[i].closed = 1;
@@ -968,11 +971,13 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    // 写事件对象初始化
     wev = cycle->write_events;
     for (i = 0; i < cycle->connection_n; i++) {
         wev[i].closed = 1;
     }
 
+    // i是数组的末尾
     i = cycle->connection_n;
     next = NULL;
 
