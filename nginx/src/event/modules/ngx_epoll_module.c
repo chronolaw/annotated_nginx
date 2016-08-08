@@ -187,6 +187,8 @@ static void *ngx_epoll_create_conf(ngx_cycle_t *cycle);
 // 初始化配置结构体
 static char *ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf);
 
+// 以下是epoll使用的变量
+
 // epoll系统调用使用的句柄，由epoll_create()创建
 static int                  ep = -1;
 
@@ -195,9 +197,10 @@ static int                  ep = -1;
 // 相当于std::vector<epoll_event> event_list;
 static struct epoll_event  *event_list;
 
-// 数组的大小
+// event_list数组的大小
 static ngx_uint_t           nevents;
 
+// notify使用的变量
 #if (NGX_HAVE_EVENTFD)
 // 用于多线程通知用的描述符，并不关联实际的socket或者文件
 static int                  notify_fd = -1;
@@ -210,6 +213,7 @@ static ngx_connection_t     notify_conn;
 #endif
 
 // aio暂不研究
+// 方式与notify类似，也使用一个静态的event和conn
 #if (NGX_HAVE_FILE_AIO)
 
 int                         ngx_eventfd = -1;
@@ -443,6 +447,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
     // 获取epoll模块的配置
     epcf = ngx_event_get_conf(cycle->conf_ctx, ngx_epoll_module);
 
+    // ep == -1表示还没有创建epoll句柄，需要初始化
     if (ep == -1) {
         // 创建epoll句柄
         // 参数size=cycle->connection_n / 2，但并无实际意义
