@@ -60,7 +60,7 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 #endif
 
     // 1.11.x增加了对rev->available的检查
-    // 如果!rev->available则不接受数据，直接返回NGX_AGAIN
+    // 如果!rev->available则不接收数据，直接返回NGX_AGAIN
 
     do {
         // 使用系统调用recv读数据
@@ -150,6 +150,7 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
                            "recv() not ready");
 
             // 返回again，外部函数可以再次尝试读取
+            // 或者再次进入循环开始的代码，再调用recv接收数据
             n = NGX_AGAIN;
 
         } else {

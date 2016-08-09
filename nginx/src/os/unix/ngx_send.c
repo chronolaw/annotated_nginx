@@ -68,6 +68,8 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
 
             // 置ready标志，写事件暂时不可用，即不可写
             wev->ready = 0;
+
+            // 发送了0个字节
             return n;
         }
 
@@ -94,5 +96,5 @@ ngx_unix_send(ngx_connection_t *c, u_char *buf, size_t size)
         }
 
         // NGX_EINTR 被信号中断，到循环开始继续尝试
-    }
+    }   // for循环结束
 }
