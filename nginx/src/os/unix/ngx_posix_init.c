@@ -13,7 +13,10 @@
 
 ngx_int_t   ngx_ncpu;
 ngx_int_t   ngx_max_sockets;
+
+// 在接受连接时使用accept4调用
 ngx_uint_t  ngx_inherited_nonblocking;
+
 ngx_uint_t  ngx_tcp_nodelay_and_tcp_nopush;
 
 
@@ -46,6 +49,7 @@ ngx_os_init(ngx_log_t *log)
 
 #if (NGX_HAVE_OS_SPECIFIC_INIT)
     // in ngx_linux_init.c
+    // 初始化ngx_os_io结构体，设置为linux的收发函数
     if (ngx_os_specific_init(log) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -85,6 +89,7 @@ ngx_os_init(ngx_log_t *log)
 
     ngx_max_sockets = (ngx_int_t) rlmt.rlim_cur;
 
+    // 在接受连接时使用accept4调用
 #if (NGX_HAVE_INHERITED_NONBLOCK || NGX_HAVE_ACCEPT4)
     ngx_inherited_nonblocking = 1;
 #else
