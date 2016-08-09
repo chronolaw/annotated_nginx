@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_spawn_process
+// * ngx_signal_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -234,9 +237,10 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     // 0是子进程，开始执行worker进程的核心函数
     // ngx_worker_process_cycle，即无限循环处理事件
     case 0:
+        // worker进程重新获取进程id
         ngx_pid = ngx_getpid();
 
-        // 这里是子进程的真正工作
+        // 这里是子进程的真正工作，无限循环
         // proc = ngx_worker_process_cycle
         // data = (void *) (intptr_t) i，即worker id
         proc(cycle, data);
@@ -375,6 +379,7 @@ ngx_signal_handler(int signo)
 
     err = ngx_errno;
 
+    // 遍历信号数组，因为数量少，所以不太影响效率
     for (sig = signals; sig->signo != 0; sig++) {
         if (sig->signo == signo) {
             break;
