@@ -137,12 +137,17 @@ struct ngx_cycle_s {
     // 否则两者是不同的，见ngx_process_options
 
     // #define NGX_CONF_PREFIX  "conf/"
+    // 即-c选项指定的配置文件目录
     ngx_str_t                 conf_prefix;
 
     // #define NGX_PREFIX  "/usr/local/nginx/"
+    // 即-p选项指定的工作目录
     ngx_str_t                 prefix;
 
     ngx_str_t                 lock_file;
+
+    // 当前主机的hostname
+    // ngx_init_cycle()里初始化，全小写
     ngx_str_t                 hostname;
 };
 
