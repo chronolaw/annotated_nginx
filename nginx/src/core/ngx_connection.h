@@ -135,6 +135,8 @@ struct ngx_listening_s {
     int                 setfib;
 #endif
 
+// 是否支持tcp fast open
+// 可以优化tcp三次握手的延迟，提高响应速度
 #if (NGX_HAVE_TCP_FASTOPEN)
     int                 fastopen;
 #endif

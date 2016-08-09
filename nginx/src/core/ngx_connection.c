@@ -813,6 +813,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         }
 #endif
 
+// tcp fast open， 可以优化tcp三次握手的延迟，提高响应速度
 #if (NGX_HAVE_TCP_FASTOPEN)
         if (ls[i].fastopen != -1) {
             if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_FASTOPEN,
