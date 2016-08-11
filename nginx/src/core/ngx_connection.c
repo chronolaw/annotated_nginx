@@ -19,6 +19,19 @@
 #include <ngx_event.h>
 
 
+// os/unix/ngx_os.h
+// 操作系统提供的底层数据收发接口
+// ngx_posix_init.c里初始化为linux的底层接口
+// 在epoll模块的ngx_epoll_init里设置
+//
+// typedef struct {
+//     ngx_recv_pt        recv;
+//     ngx_recv_chain_pt  recv_chain;
+//     ngx_recv_pt        udp_recv;
+//     ngx_send_pt        send;
+//     ngx_send_chain_pt  send_chain;
+//     ngx_uint_t         flags;
+// } ngx_os_io_t;
 ngx_os_io_t  ngx_io;
 
 

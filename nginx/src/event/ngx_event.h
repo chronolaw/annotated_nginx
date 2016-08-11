@@ -566,6 +566,8 @@ extern ngx_event_actions_t   ngx_event_actions;
 //     ngx_send_chain_pt  send_chain;
 //     ngx_uint_t         flags;
 // } ngx_os_io_t;
+//
+// in ngx_connection.c
 extern ngx_os_io_t  ngx_io;
 
 // 宏定义简化调用
