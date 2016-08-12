@@ -60,6 +60,7 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
         return NULL;
     }
 
+    // 内存清零，这样ls->worker就是0
     ngx_memzero(ls, sizeof(ngx_listening_t));
 
     // 根据socklen分配sockaddr的内存空间
@@ -143,6 +144,8 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
         return NGX_OK;
     }
 
+    // ls在之前已经正确设置了若干参数
+    // 例如type/handler/backlog等等
     ols = *ls;
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
@@ -150,6 +153,9 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 
     // ccf->worker_processes是nginx的worker进程数
     // 拷贝了worker数量个的监听结构体
+    //
+    // 注意从1开始，这样拷贝后总数就是worker数量个
+    // 最开始的一个就是被克隆的ls监听结构体
     for (n = 1; n < ccf->worker_processes; n++) {
 
         /* create a socket for each worker process */
@@ -162,6 +168,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
         *ls = ols;
 
         // 设置worker的序号
+        // 被克隆的对象的worker是0
         ls->worker = n;
     }
 
@@ -642,7 +649,11 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
             // 检查是否是tcp，即SOCK_STREAM
             if (ls[i].type != SOCK_STREAM) {
+
+                // 如果不是tcp，即udp，那么无需监听
                 ls[i].fd = s;
+
+                // 继续处理下一个监听结构体
                 continue;
             }
 
@@ -860,6 +871,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 
             /* change backlog via listen() */
 
+            // 修改了tcp选项，重新监听
             if (listen(ls[i].fd, ls[i].backlog) == -1) {
                 ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
                               "listen() to %V, backlog %d failed, ignored",

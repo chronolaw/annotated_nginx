@@ -194,7 +194,9 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        // module是流模块的函数表，用于解析配置时调用
         module = cf->cycle->modules[m]->ctx;
+
         mi = cf->cycle->modules[m]->ctx_index;
 
         // 创建每个模块的main_conf
