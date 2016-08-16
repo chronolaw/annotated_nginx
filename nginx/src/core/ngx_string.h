@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_str_t
+// * ngx_cpymem
+// * ngx_sprintf
+// * ngx_atoi
 
 /*
  * Copyright (C) Igor Sysoev
