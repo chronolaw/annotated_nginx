@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// * ngx_stream_core_listen
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -434,6 +436,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
     for (i = 2; i < cf->args->nelts; i++) {
 
+        // 是否是udp协议，如果是udp那么type就是DGRAM，否则是STREAM
 #if !(NGX_WIN32)
         if (ngx_strcmp(value[i].data, "udp") == 0) {
             ls->type = SOCK_DGRAM;
@@ -446,6 +449,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        // tcp协议支持backlog选项
         if (ngx_strncmp(value[i].data, "backlog=", 8) == 0) {
             ls->backlog = ngx_atoi(value[i].data + 8, value[i].len - 8);
             ls->bind = 1;
@@ -502,6 +506,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
         }
 
+        // reuseport选项，可以不用accept_mutex负载均衡
         if (ngx_strcmp(value[i].data, "reuseport") == 0) {
 #if (NGX_HAVE_REUSEPORT)
             ls->reuseport = 1;
@@ -526,6 +531,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
         }
 
+        // tcp的keepalive
         if (ngx_strncmp(value[i].data, "so_keepalive=", 13) == 0) {
 
             if (ngx_strcmp(&value[i].data[13], "on") == 0) {
@@ -621,6 +627,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // udp协议做检查，有的选项不可用: backlog/ssl/so_keepalive
     if (ls->type == SOCK_DGRAM) {
         if (backlog) {
             return "\"backlog\" parameter is incompatible with \"udp\"";
