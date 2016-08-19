@@ -665,21 +665,32 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     // 获取核心配置的时间精度，用在epoll里更新缓存时间
     ngx_timer_resolution = ccf->timer_resolution;
 
-    // unix专用代码, core dump相关
+    // unix专用代码, 可打开的最多文件描述符
 #if !(NGX_WIN32)
     {
     ngx_int_t      limit;
     struct rlimit  rlmt;
 
+    // 系统调用getrlimit，Linux内核对进程的限制
+    // RLIMIT_NOFILE,进程可打开的最大文件描述符数量，超出将产生EMFILE错误
     if (getrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
+
+        // 系统调用失败则记录alert级别日志
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "getrlimit(RLIMIT_NOFILE) failed, ignored");
 
     } else {
+        // 成功获取内核参数
+        //
+        // rlmt.rlim_cur是系统的软限制
+        // event里配置的连接数不能超过系统内核限制
+        // 或者是配置的rlimit_nofile限制
         if (ecf->connections > (ngx_uint_t) rlmt.rlim_cur
             && (ccf->rlimit_nofile == NGX_CONF_UNSET
                 || ecf->connections > (ngx_uint_t) ccf->rlimit_nofile))
         {
+            // 如果超过了报警告级别日志
+            // limit就是上限
             limit = (ccf->rlimit_nofile == NGX_CONF_UNSET) ?
                          (ngx_int_t) rlmt.rlim_cur : ccf->rlimit_nofile;
 
