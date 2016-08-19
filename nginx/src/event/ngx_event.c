@@ -369,8 +369,12 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
             // 如未获取则不监听端口
             // 内部调用ngx_enable_accept_events/ngx_disable_accept_events
             if (ngx_trylock_accept_mutex(cycle) == NGX_ERROR) {
+                // 如果监听失败，那么直接结束函数，不处理epoll事件
                 return;
             }
+
+            // ngx_trylock_accept_mutex执行成功
+            // 使用变量ngx_accept_mutex_held检查是否成功获取了锁
 
             // 确实已经获得了锁，接下来的epoll的事件需要加入延后队列处理
             // 这样可以尽快释放锁给其他进程，提高运行效率
@@ -427,6 +431,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // in ngx_event_posted.c
     // 实际上调用的就是ngx_event_accept
     // 在http模块里是http.c:ngx_http_init_connection
+    //
+    // 如果不使用负载均衡（accept_mutex off）或者reuseport
+    // 那么此处就是空操作，因为队列为空
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
 
     // 释放锁，其他进程可以获取，再监听端口
@@ -450,6 +457,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 这里因为要处理大量的事件，而且是简单的顺序调用，所以可能会阻塞
     // nginx大部分的工作量都在这里
     // 注意与accept的函数是相同的，但队列不同，即里面的事件不同
+    //
+    // 如果不使用负载均衡（accept_mutex off）或者reuseport
+    // 那么此处就是空操作，因为队列为空
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 
