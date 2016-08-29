@@ -245,6 +245,7 @@ typedef struct {
     //ngx_int_t                    (*preconfiguration)(ngx_conf_t *cf);
 
     // 解析配置完成之后调用
+    // 在这里可以修改stream_core模块的配置，设置handler
     ngx_int_t             (*postconfiguration)(ngx_conf_t *cf);
 
     // 创建main配置结构体
@@ -278,16 +279,20 @@ typedef struct {
 
 
 // 获取模块的ctx数据
+// 使用模块的ctx_index在ctx数组里索引得到
 #define ngx_stream_get_module_ctx(s, module)   (s)->ctx[module.ctx_index]
 
 // 设置模块的ctx数据
+// 使用模块的ctx_index在ctx数组里索引得到
 #define ngx_stream_set_ctx(s, c, module)       s->ctx[module.ctx_index] = c;
 
 // 删除模块的ctx数据
+// 使用模块的ctx_index在ctx数组里索引得到
 #define ngx_stream_delete_ctx(s, module)       s->ctx[module.ctx_index] = NULL;
 
 
 // 从会话对象里得到配置结构体
+// 使用模块的ctx_index在ctx数组里索引得到
 #define ngx_stream_get_module_main_conf(s, module)                             \
     (s)->main_conf[module.ctx_index]
 #define ngx_stream_get_module_srv_conf(s, module)                              \
@@ -295,6 +300,7 @@ typedef struct {
 
 // 从conf里得到配置结构体
 // cf->ctx实际上是ngx_stream_conf_ctx_t，所以要先转换
+// 使用模块的ctx_index在ctx数组里索引得到
 #define ngx_stream_conf_get_module_main_conf(cf, module)                       \
     ((ngx_stream_conf_ctx_t *) cf->ctx)->main_conf[module.ctx_index]
 #define ngx_stream_conf_get_module_srv_conf(cf, module)                        \

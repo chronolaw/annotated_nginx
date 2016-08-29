@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_init_modules
+// * ngx_count_modules
 
 /*
  * Copyright (C) Igor Sysoev
