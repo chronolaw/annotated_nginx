@@ -244,6 +244,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return rv;
     }
 
+    // 此时stream{}配置已经全部解析完毕
+    // 其中包含了server定义cmcf->servers、监听的端口信息cmcf->listen
 
     /* init stream{} main_conf's, merge the server{}s' srv_conf's */
 
