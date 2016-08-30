@@ -188,6 +188,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_core_srv_conf_t   **cscfp;
     ngx_http_core_main_conf_t   *cmcf;
 
+    // http处理的配置结构体，里面有main_conf/srv_conf/loc_conf三个数组
+    // 不允许重复配置
     if (*(ngx_http_conf_ctx_t **) conf) {
         return "is duplicate";
     }
@@ -196,12 +198,21 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // ngx_http_conf_ctx_t里有三个void*数组，存储三个层次的模块配置
     // in ngx_http_config.h
+    //
+    // typedef struct {
+    //     void        **main_conf;
+    //     void        **srv_conf;
+    //     void        **loc_conf;
+    // } ngx_http_conf_ctx_t;
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
     // 结构体放入cycle->conf_ctx数组
+    //
+    // conf里存储的是ngx_http_conf_ctx_t *
+    // 注意指针的转型,可以理解为(ngx_http_conf_ctx_t*)*
     *(ngx_http_conf_ctx_t **) conf = ctx;
 
 
@@ -290,6 +301,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 初始的解析环境已经准备好，下面开始解析http{}配置
 
     // 暂存当前的解析上下文
+    // cf是函数入口传递来的上下文
     pcf = *cf;
 
     // 设置事件模块的新解析上下文
@@ -314,6 +326,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* parse inside the http{} block */
 
     // 设置解析的类型等信息
+    // NGX_HTTP_MODULE用来检查是否是http模块，防止用错了指令
     cf->module_type = NGX_HTTP_MODULE;
     cf->cmd_type = NGX_HTTP_MAIN_CONF;
 
@@ -380,6 +393,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     // 初始化http处理引擎的阶段数组，调用ngx_array_init
     // 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
+    // cmcf只有唯一的一个
     if (ngx_http_init_phases(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -389,6 +403,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 
+    // 执行每个http模块的postconfiguration函数指针
+    // 通常是向phase数组里添加handler
     for (m = 0; cf->cycle->modules[m]; m++) {
         if (cf->cycle->modules[m]->type != NGX_HTTP_MODULE) {
             continue;
@@ -419,6 +435,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     // 整理所有的http handler模块，填入引擎数组
+    // 之前已经在模块的postconfiguration里添加过了
     if (ngx_http_init_phase_handlers(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
