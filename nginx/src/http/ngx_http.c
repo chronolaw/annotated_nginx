@@ -571,6 +571,9 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     ngx_http_phase_handler_t   *ph;
     ngx_http_phase_handler_pt   checker;
 
+    // 初始化两个rewrite模块的索引地址为-1，即未赋值
+    // 这两个索引用来在处理请求时快速跳转
+    // 两个分别是sever和location rewrite
     cmcf->phase_engine.server_rewrite_index = (ngx_uint_t) -1;
     cmcf->phase_engine.location_rewrite_index = (ngx_uint_t) -1;
     find_config_index = 0;
@@ -609,6 +612,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
         // 地址改写阶段
         case NGX_HTTP_SERVER_REWRITE_PHASE:
+            // 如果rewrite索引未初始化，那么设置为第一个rewrite模块
             if (cmcf->phase_engine.server_rewrite_index == (ngx_uint_t) -1) {
                 cmcf->phase_engine.server_rewrite_index = n;
             }
@@ -632,6 +636,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
         // 地址改写阶段
         case NGX_HTTP_REWRITE_PHASE:
+            // 如果rewrite索引未初始化，那么设置为第一个rewrite模块
             if (cmcf->phase_engine.location_rewrite_index == (ngx_uint_t) -1) {
                 cmcf->phase_engine.location_rewrite_index = n;
             }
@@ -694,8 +699,10 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
             checker = ngx_http_core_generic_phase;
         }
 
+        // n增加该阶段的handler数量
         n += cmcf->phases[i].handlers.nelts;
 
+        // 倒着遍历handler数组
         for (j = cmcf->phases[i].handlers.nelts - 1; j >=0; j--) {
             ph->checker = checker;
             ph->handler = h[j];
@@ -1971,6 +1978,7 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
     ls->accept_filter = addr->opt.accept_filter;
 #endif
 
+// deferred accept
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
     ls->deferred_accept = addr->opt.deferred_accept;
 #endif
@@ -1983,10 +1991,12 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
     ls->setfib = addr->opt.setfib;
 #endif
 
+// fastopen
 #if (NGX_HAVE_TCP_FASTOPEN)
     ls->fastopen = addr->opt.fastopen;
 #endif
 
+// reuseport
 #if (NGX_HAVE_REUSEPORT)
     ls->reuseport = addr->opt.reuseport;
 #endif
