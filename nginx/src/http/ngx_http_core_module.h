@@ -69,6 +69,10 @@ typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
 
 // http用的监听端口结构体
 typedef struct {
+
+    // socket地址，使用union适应各种情形
+    // 主要使用的是u.sockaddr
+    // 1.11.x改为在ngx_inet.h里定义的ngx_sockaddr_t，简化了代码
     union {
         struct sockaddr        sockaddr;
         struct sockaddr_in     sockaddr_in;
@@ -81,6 +85,7 @@ typedef struct {
         u_char                 sockaddr_data[NGX_SOCKADDRLEN];
     } u;
 
+    // socket地址长度
     socklen_t                  socklen;
 
     unsigned                   set:1;
