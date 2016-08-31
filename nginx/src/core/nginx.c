@@ -112,6 +112,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, pid),
       NULL },
 
+    // 用于实现共享锁，linux下无意义
     { ngx_string("lock_file"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
