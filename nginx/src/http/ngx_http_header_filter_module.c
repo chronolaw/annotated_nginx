@@ -62,9 +62,11 @@ ngx_module_t  ngx_http_header_filter_module = {
 
 
 // 输出响应头里的server信息，短字符串，不含版本号
+// server_tokens off使用此字符串
 static char ngx_http_server_string[] = "Server: nginx" CRLF;
 
 // 输出响应头里的server信息，长字符串，含版本号
+// server_tokens on使用此字符串
 static char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
 
 
@@ -214,6 +216,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
     r->header_sent = 1;
 
     // 子请求不会发送头
+    // 也就是说不会走socket，可以加入父请求的数据链里发送
     if (r != r->main) {
         return NGX_OK;
     }
