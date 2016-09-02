@@ -176,12 +176,18 @@ typedef enum {
     // 请求头解析完毕，准备处理请求
     NGX_HTTP_PROCESS_REQUEST_STATE,
 
+    // 连接后端upstream的状态
     NGX_HTTP_CONNECT_UPSTREAM_STATE,
     NGX_HTTP_WRITING_UPSTREAM_STATE,
     NGX_HTTP_READING_UPSTREAM_STATE,
 
+    // 响应请求
     NGX_HTTP_WRITING_REQUEST_STATE,
+
+    // 延迟关闭
     NGX_HTTP_LINGERING_CLOSE_STATE,
+
+    // 长连接keepalive
     NGX_HTTP_KEEPALIVE_STATE
 } ngx_http_state_e;
 
@@ -435,13 +441,17 @@ struct ngx_http_postponed_request_s {
 
 typedef struct ngx_http_posted_request_s  ngx_http_posted_request_t;
 
+// 主请求发起的子请求存储链表
 struct ngx_http_posted_request_s {
     ngx_http_request_t               *request;
     ngx_http_posted_request_t        *next;
 };
 
 
+// 请求处理函数
 typedef ngx_int_t (*ngx_http_handler_pt)(ngx_http_request_t *r);
+
+// 读写事件的处理函数，注意参数不是event
 typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 
 
@@ -471,12 +481,14 @@ struct ngx_http_request_s {
     // 写最开始是ngx_http_empty_handler
     // 然后是ngx_http_core_run_phases
     // 当进入content阶段调用location handler后变成ngx_http_request_empty_handler
+    // 最后是ngx_http_set_write_handler
     ngx_http_event_handler_pt         write_event_handler;
 
 #if (NGX_HTTP_CACHE)
     ngx_http_cache_t                 *cache;
 #endif
 
+    // 连接后端upstream的数据结构
     ngx_http_upstream_t              *upstream;
     ngx_array_t                      *upstream_states;
                                          /* of ngx_http_upstream_state_t */
@@ -560,8 +572,10 @@ struct ngx_http_request_s {
 
     // 重要！！
     // 本location专门的内容处理函数，产生响应内容
+    // 在ngx_http_update_location_config里设置
     ngx_http_handler_pt               content_handler;
 
+    // access阶段里设置的是否允许访问
     ngx_uint_t                        access_code;
 
     // 变量值数组，每个请求都不同
@@ -590,6 +604,8 @@ struct ngx_http_request_s {
     // 收到的请求数据总长度，即header+body
     off_t                             request_length;
 
+    // 出错的状态码，如果设置了会代替headers_out.status
+    // 见ngx_http_send_header()
     ngx_uint_t                        err_status;
 
     ngx_http_connection_t            *http_connection;
@@ -639,7 +655,13 @@ struct ngx_http_request_s {
     unsigned                          add_uri_to_alias:1;
     unsigned                          valid_location:1;
     unsigned                          valid_unparsed_uri:1;
+
+    // uri是否被改写的标志位
+    // 在ngx_http_core_post_rewrite_phase里检查
     unsigned                          uri_changed:1;
+
+    // uri改写的次数
+    // 在ngx_http_core_post_rewrite_phase里检查
     unsigned                          uri_changes:4;
 
     unsigned                          request_body_in_single_buf:1;
