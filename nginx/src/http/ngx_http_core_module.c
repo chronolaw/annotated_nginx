@@ -1160,6 +1160,9 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 这里检查location的internal标志
+    // 如果设置了internal但请求不是internal
+    // 那么直接调用ngx_http_finalize_request返回404
     if (!r->internal && clcf->internal) {
         ngx_http_finalize_request(r, NGX_HTTP_NOT_FOUND);
         return NGX_OK;
@@ -1648,6 +1651,7 @@ ngx_http_core_content_phase(ngx_http_request_t *r,
     if (r->content_handler) {
         // 设置写事件为ngx_http_request_empty_handler
         // 即暂时不再进入ngx_http_core_run_phases
+        // 这是因为内容产生阶段已经是“最后”一个阶段了，不需要再走其他阶段
         // 之后发送数据时会改为ngx_http_set_write_handler
         // 但我们也可以修改，让写事件触发我们自己的回调
         r->write_event_handler = ngx_http_request_empty_handler;
@@ -1798,6 +1802,7 @@ ngx_http_update_location_config(ngx_http_request_t *r)
         r->limit_rate = clcf->limit_rate;
     }
 
+    // 注意这里，设置了请求在location里的专用处理handler
     if (clcf->handler) {
         r->content_handler = clcf->handler;
     }
@@ -2067,6 +2072,8 @@ ngx_http_set_content_type(ngx_http_request_t *r)
 }
 
 
+// 从uri里解析出扩展名（extern）
+// 设置r->exten成员
 void
 ngx_http_set_exten(ngx_http_request_t *r)
 {
@@ -2074,9 +2081,11 @@ ngx_http_set_exten(ngx_http_request_t *r)
 
     ngx_str_null(&r->exten);
 
+    // 从uri末尾倒着查找
     for (i = r->uri.len - 1; i > 1; i--) {
         if (r->uri.data[i] == '.' && r->uri.data[i - 1] != '/') {
 
+            // 设置r->exten成员
             r->exten.len = r->uri.len - i - 1;
             r->exten.data = &r->uri.data[i + 1];
 
@@ -2168,6 +2177,7 @@ ngx_http_weak_etag(ngx_http_request_t *r)
 }
 
 
+// 指定content type发送某个变量值作为响应数据
 ngx_int_t
 ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     ngx_str_t *ct, ngx_http_complex_value_t *cv)
@@ -2177,16 +2187,20 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     ngx_buf_t    *b;
     ngx_chain_t   out;
 
+    // 这时已经不需要body了，所以丢弃
     if (ngx_http_discard_request_body(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 设置响应头里的状态码
     r->headers_out.status = status;
 
+    // 计算得到变量（脚本）值
     if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 如果状态码是特殊的4个就不发送数据，直接返回头
     if (status == NGX_HTTP_MOVED_PERMANENTLY
         || status == NGX_HTTP_MOVED_TEMPORARILY
         || status == NGX_HTTP_SEE_OTHER
@@ -2206,8 +2220,10 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
         return status;
     }
 
+    // 设置输出数据的长度，在头里
     r->headers_out.content_length_n = val.len;
 
+    // content type，在函数参数里传递
     if (ct) {
         r->headers_out.content_type_len = ct->len;
         r->headers_out.content_type = *ct;
@@ -2218,10 +2234,12 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
         }
     }
 
+    // 如果是HEAD请求，那么不发送body，只发送头
     if (r->method == NGX_HTTP_HEAD || (r != r->main && val.len == 0)) {
         return ngx_http_send_header(r);
     }
 
+    // 分配buffer供发送用
     b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -2233,15 +2251,18 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     b->last_buf = (r == r->main) ? 1 : 0;
     b->last_in_chain = 1;
 
+    // buffer放进chain里
     out.buf = b;
     out.next = NULL;
 
+    // 先发送头
     rc = ngx_http_send_header(r);
 
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
         return rc;
     }
 
+    // 发送body数据，走过滤链表
     return ngx_http_output_filter(r, &out);
 }
 
