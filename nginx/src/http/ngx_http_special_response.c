@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// 定义一些常用错误码的返回数据，html代码
+// 如果不需要显示页面可以做定制，减少网络传输消耗
 
 /*
  * Copyright (C) Igor Sysoev
@@ -359,6 +363,7 @@ static ngx_str_t ngx_http_error_pages[] = {
 };
 
 
+// 发生错误时返回合适的响应内容
 ngx_int_t
 ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
 {
@@ -370,8 +375,10 @@ ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
                    "http special response: %i, \"%V?%V\"",
                    error, &r->uri, &r->args);
 
+    // 设置请求的错误码
     r->err_status = error;
 
+    // 如果请求要求是长连接，但发生了致命的错误，则无法保持
     if (r->keepalive) {
         switch (error) {
             case NGX_HTTP_BAD_REQUEST:
@@ -386,6 +393,7 @@ ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
         }
     }
 
+    // 如果请求要求是延迟关闭，但发生了致命的错误，则无法延迟关闭
     if (r->lingering_close) {
         switch (error) {
             case NGX_HTTP_BAD_REQUEST:
@@ -408,6 +416,7 @@ ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
 
         err_page = clcf->error_pages->elts;
 
+        // 在错误信息数组里查找，顺序查找，效率较低
         for (i = 0; i < clcf->error_pages->nelts; i++) {
             if (err_page[i].status == error) {
                 return ngx_http_send_error_page(r, &err_page[i]);
