@@ -1,7 +1,8 @@
 // annotated by chrono since 2016
 //
 // 1.10.x版本里的stream缺少变量和log功能
-// 1.11.x添加了变量功能，但还没有log，也许今后能够完善
+// 1.11.x添加了变量、log
+//
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
@@ -28,11 +29,19 @@
 // 存储有tcp处理里需要的数据，例如connection、ctx等
 typedef struct ngx_stream_session_s  ngx_stream_session_t;
 
+// nginx 1.11.3新增变量支持
 
 // 连接上游服务器（后端）的功能
 #include <ngx_stream_upstream.h>
 #include <ngx_stream_upstream_round_robin.h>
 
+// nginx 1.11.4新增的响应码定义
+//#define NGX_STREAM_OK                        200
+//#define NGX_STREAM_BAD_REQUEST               400
+//#define NGX_STREAM_FORBIDDEN                 403
+//#define NGX_STREAM_INTERNAL_SERVER_ERROR     500
+//#define NGX_STREAM_BAD_GATEWAY               502
+//#define NGX_STREAM_SERVICE_UNAVAILABLE       503
 
 // tcp流处理的配置结构体
 // 与http不同的是没有location，只有两级
@@ -164,6 +173,9 @@ typedef struct {
     // 存储server{}里定义的监听端口
     ngx_array_t             listen;      /* ngx_stream_listen_t */
 
+    // nginx 1.11.4新增
+    //ngx_stream_access_pt           realip_handler;
+
     // 这两个回调相当于http模块里的phases数组
     // 自定义模块可以设置自己的函数
     // 在ngx_stream_init_connection里会被调用
@@ -172,6 +184,12 @@ typedef struct {
 
     // 相当于http里的NGX_HTTP_ACCESS_PHASE
     ngx_stream_access_pt    access_handler;
+
+    // nginx 1.11.4新增
+    //ngx_stream_access_pt           access_log_handler;
+
+    // nginx 1.11.3新增变量支持
+
 } ngx_stream_core_main_conf_t;
 
 
