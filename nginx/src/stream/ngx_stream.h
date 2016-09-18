@@ -324,7 +324,14 @@ typedef struct {
 // 调用handler，处理tcp数据，收发等等
 void ngx_stream_init_connection(ngx_connection_t *c);
 
+// nginx 1.11.4新增
+// 内部调用access_log_handler记录访问日志
+// 之后调用ngx_stream_close_connection关闭连接
+void ngx_stream_finalize_session(ngx_stream_session_t *s, ngx_uint_t rc);
+
 // 关闭stream连接，销毁线程池
+// nginx 1.11.4改为静态函数，外部不可见
+// 使用stream_lua模块需要修改源码，加入声明，并改为非static
 void ngx_stream_close_connection(ngx_connection_t *c);
 
 
