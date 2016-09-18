@@ -1,4 +1,33 @@
 
+Изменения в nginx 1.11.4                                          13.09.2016
+
+    *) Добавление: переменная $upstream_bytes_received.
+
+    *) Добавление: переменные $bytes_received, $session_time, $protocol,
+       $status, $upstream_addr, $upstream_bytes_sent,
+       $upstream_bytes_received, $upstream_connect_time,
+       $upstream_first_byte_time и $upstream_session_time в модуле stream.
+
+    *) Добавление: модуль ngx_stream_log_module.
+
+    *) Добавление: параметр proxy_protocol в директиве listen, переменные
+       $proxy_protocol_addr и $proxy_protocol_port в модуле stream.
+
+    *) Добавление: модуль ngx_stream_realip_module.
+
+    *) Исправление: nginx не собирался с модулем stream и модулем
+       ngx_http_ssl_module, но без модуля ngx_stream_ssl_module; ошибка
+       появилась в 1.11.3.
+
+    *) Добавление: опция сокета IP_BIND_ADDRESS_NO_PORT не использовалась;
+       ошибка появилась в 1.11.2.
+
+    *) Исправление: в параметре ranges директивы geo.
+
+    *) Исправление: при использовании директив "aio threads" и sendfile мог
+       возвращаться некорректный ответ; ошибка появилась в 1.9.13.
+
+
 Изменения в nginx 1.11.3                                          26.07.2016
 
     *) Изменение: теперь accept_mutex по умолчанию выключен.

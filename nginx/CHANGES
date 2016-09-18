@@ -1,4 +1,34 @@
 
+Changes with nginx 1.11.4                                        13 Sep 2016
+
+    *) Feature: the $upstream_bytes_received variable.
+
+    *) Feature: the $bytes_received, $session_time, $protocol, $status,
+       $upstream_addr, $upstream_bytes_sent, $upstream_bytes_received,
+       $upstream_connect_time, $upstream_first_byte_time, and
+       $upstream_session_time variables in the stream module.
+
+    *) Feature: the ngx_stream_log_module.
+
+    *) Feature: the "proxy_protocol" parameter of the "listen" directive,
+       the $proxy_protocol_addr and $proxy_protocol_port variables in the
+       stream module.
+
+    *) Feature: the ngx_stream_realip_module.
+
+    *) Bugfix: nginx could not be built with the stream module and the
+       ngx_http_ssl_module, but without ngx_stream_ssl_module; the bug had
+       appeared in 1.11.3.
+
+    *) Feature: the IP_BIND_ADDRESS_NO_PORT socket option was not used; the
+       bug had appeared in 1.11.2.
+
+    *) Bugfix: in the "ranges" parameter of the "geo" directive.
+
+    *) Bugfix: an incorrect response might be returned when using the "aio
+       threads" and "sendfile" directives; the bug had appeared in 1.9.13.
+
+
 Changes with nginx 1.11.3                                        26 Jul 2016
 
     *) Change: now the "accept_mutex" directive is turned off by default.
