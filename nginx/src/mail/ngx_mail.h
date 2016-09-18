@@ -117,13 +117,15 @@ typedef struct {
     ngx_str_t               server_name;
 
     u_char                 *file_name;
-    ngx_int_t               line;
+    ngx_uint_t              line;
 
     ngx_resolver_t         *resolver;
     ngx_log_t              *error_log;
 
     /* server ctx */
     ngx_mail_conf_ctx_t    *ctx;
+
+    ngx_uint_t              listen;  /* unsigned  listen:1; */
 } ngx_mail_core_srv_conf_t;
 
 
