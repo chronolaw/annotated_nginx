@@ -77,6 +77,13 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       offsetof(ngx_stream_core_srv_conf_t, resolver_timeout),
       NULL },
 
+    { ngx_string("proxy_protocol_timeout"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_core_srv_conf_t, proxy_protocol_timeout),
+      NULL },
+
     { ngx_string("tcp_nodelay"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -192,6 +199,7 @@ ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
     cscf->file_name = cf->conf_file->file.name.data;
     cscf->line = cf->conf_file->line;
     cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
+    cscf->proxy_protocol_timeout = NGX_CONF_UNSET_MSEC;
     cscf->tcp_nodelay = NGX_CONF_UNSET;
 
     return cscf;
@@ -239,6 +247,9 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
             conf->error_log = &cf->cycle->new_log;
         }
     }
+
+    ngx_conf_merge_msec_value(conf->proxy_protocol_timeout,
+                              prev->proxy_protocol_timeout, 30000);
 
     ngx_conf_merge_value(conf->tcp_nodelay, prev->tcp_nodelay, 1);
 
@@ -325,6 +336,13 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     *cf = pcf;
 
+    if (rv == NGX_CONF_OK && !cscf->listen) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "no \"listen\" is defined for server in %s:%ui",
+                      cscf->file_name, cscf->line);
+        return NGX_CONF_ERROR;
+    }
+
     return rv;
 }
 
@@ -332,11 +350,15 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    ngx_stream_core_srv_conf_t  *cscf = conf;
+
     ngx_str_t                    *value;
     ngx_url_t                     u;
     ngx_uint_t                    i, backlog;
     ngx_stream_listen_t          *ls, *als;
     ngx_stream_core_main_conf_t  *cmcf;
+
+    cscf->listen = 1;
 
     value = cf->args->elts;
 
@@ -561,6 +583,11 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
         }
 
+        if (ngx_strcmp(value[i].data, "proxy_protocol") == 0) {
+            ls->proxy_protocol = 1;
+            continue;
+        }
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the invalid \"%V\" parameter", &value[i]);
         return NGX_CONF_ERROR;
@@ -579,6 +606,10 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (ls->so_keepalive) {
             return "\"so_keepalive\" parameter is incompatible with \"udp\"";
+        }
+
+        if (ls->proxy_protocol) {
+            return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
         }
     }
 

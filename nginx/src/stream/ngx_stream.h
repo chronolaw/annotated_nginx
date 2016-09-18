@@ -26,6 +26,14 @@ typedef struct ngx_stream_session_s  ngx_stream_session_t;
 #include <ngx_stream_upstream_round_robin.h>
 
 
+#define NGX_STREAM_OK                        200
+#define NGX_STREAM_BAD_REQUEST               400
+#define NGX_STREAM_FORBIDDEN                 403
+#define NGX_STREAM_INTERNAL_SERVER_ERROR     500
+#define NGX_STREAM_BAD_GATEWAY               502
+#define NGX_STREAM_SERVICE_UNAVAILABLE       503
+
+
 typedef struct {
     void                         **main_conf;
     void                         **srv_conf;
@@ -51,6 +59,7 @@ typedef struct {
     unsigned                       reuseport:1;
 #endif
     unsigned                       so_keepalive:2;
+    unsigned                       proxy_protocol:1;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                            tcp_keepidle;
     int                            tcp_keepintvl;
@@ -65,8 +74,9 @@ typedef struct {
     ngx_stream_conf_ctx_t         *ctx;
     ngx_str_t                      addr_text;
 #if (NGX_STREAM_SSL)
-    ngx_uint_t                     ssl;    /* unsigned   ssl:1; */
+    unsigned                       ssl:1;
 #endif
+    unsigned                       proxy_protocol:1;
 } ngx_stream_addr_conf_t;
 
 typedef struct {
@@ -112,8 +122,10 @@ typedef struct {
     ngx_array_t                    servers;     /* ngx_stream_core_srv_conf_t */
     ngx_array_t                    listen;      /* ngx_stream_listen_t */
 
+    ngx_stream_access_pt           realip_handler;
     ngx_stream_access_pt           limit_conn_handler;
     ngx_stream_access_pt           access_handler;
+    ngx_stream_access_pt           access_log_handler;
 
     ngx_hash_t                     variables_hash;
 
@@ -136,7 +148,7 @@ typedef struct {
     ngx_stream_conf_ctx_t         *ctx;
 
     u_char                        *file_name;
-    ngx_int_t                      line;
+    ngx_uint_t                     line;
 
     ngx_flag_t                     tcp_nodelay;
 
@@ -144,6 +156,10 @@ typedef struct {
 
     ngx_msec_t                     resolver_timeout;
     ngx_resolver_t                *resolver;
+
+    ngx_msec_t                     proxy_protocol_timeout;
+
+    ngx_uint_t                     listen;  /* unsigned  listen:1; */
 } ngx_stream_core_srv_conf_t;
 
 
@@ -153,6 +169,8 @@ struct ngx_stream_session_s {
     ngx_connection_t              *connection;
 
     off_t                          received;
+    time_t                         start_sec;
+    ngx_msec_t                     start_msec;
 
     ngx_log_handler_pt             log_handler;
 
@@ -161,13 +179,20 @@ struct ngx_stream_session_s {
     void                         **srv_conf;
 
     ngx_stream_upstream_t         *upstream;
-
+    ngx_array_t                   *upstream_states;
+                                           /* of ngx_stream_upstream_state_t */
     ngx_stream_variable_value_t   *variables;
 
 #if (NGX_PCRE)
     ngx_uint_t                     ncaptures;
     int                           *captures;
     u_char                        *captures_data;
+#endif
+
+    ngx_uint_t                     status;
+
+#if (NGX_STREAM_SSL)
+    ngx_uint_t                     ssl;  /* unsigned  ssl:1; */
 #endif
 };
 
@@ -219,7 +244,7 @@ typedef struct {
 
 
 void ngx_stream_init_connection(ngx_connection_t *c);
-void ngx_stream_close_connection(ngx_connection_t *c);
+void ngx_stream_finalize_session(ngx_stream_session_t *s, ngx_uint_t rc);
 
 
 extern ngx_module_t  ngx_stream_module;
