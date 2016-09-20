@@ -256,6 +256,7 @@ typedef struct {
 
 
 typedef struct {
+    // 在ngx_http_core_server_name()里存储ngx_http_server_name_t
     /* array of the ngx_http_server_name_t, "server_name" directive */
     ngx_array_t                 server_names;
 
@@ -289,11 +290,16 @@ typedef struct {
 /* list of structures to find core_srv_conf quickly at run time */
 
 
+// 保存server{}块里的server_name信息
 typedef struct {
+    // 正则表达式对象指针
 #if (NGX_PCRE)
     ngx_http_regex_t          *regex;
 #endif
+    // 指向本server{}块的配置信息
     ngx_http_core_srv_conf_t  *server;   /* virtual name server conf */
+
+    // 配置文件里的的server名字，如果没有默认取本机的hostname
     ngx_str_t                  name;
 } ngx_http_server_name_t;
 

@@ -90,8 +90,11 @@ static char *ngx_http_core_types(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_core_type(ngx_conf_t *cf, ngx_command_t *dummy,
     void *conf);
 
+// 解析listen指令，以及后面的fastopen、reuseport等
 static char *ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 解析server_name指令
 static char *ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -353,6 +356,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+    // 解析server_name指令
     { ngx_string("server_name"),
       NGX_HTTP_SRV_CONF|NGX_CONF_1MORE,
       ngx_http_core_server_name,
@@ -4426,6 +4430,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 // 监听端口指令
+// 解析listen指令，以及后面的fastopen、reuseport等
 static char *
 ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -4793,6 +4798,8 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 解析server_name指令
+// 支持'*'通配符
 static char *
 ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -4803,10 +4810,14 @@ ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t               i;
     ngx_http_server_name_t  *sn;
 
+    // 获得指令字符串数组，注意value[0]是"server_name"
     value = cf->args->elts;
 
+    // 检查后面的参数，即配置的server名字
+    // 逐个加入本server{}配置里的server名字数组
     for (i = 1; i < cf->args->nelts; i++) {
 
+        // 检查第一个字符是否是'*'/'.'
         ch = value[i].data[0];
 
         if ((ch == '*' && (value[i].len < 3 || value[i].data[1] != '.'))
@@ -4823,6 +4834,7 @@ ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                &value[i]);
         }
 
+        // 加入本server{}配置里的server名字数组
         sn = ngx_array_push(&cscf->server_names);
         if (sn == NULL) {
             return NGX_CONF_ERROR;
@@ -4831,32 +4843,39 @@ ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #if (NGX_PCRE)
         sn->regex = NULL;
 #endif
+        // 指向本server{}块的配置信息
         sn->server = cscf;
 
+        // 配置文件里的的server名字，$hostname即取本机的hostname
         if (ngx_strcasecmp(value[i].data, (u_char *) "$hostname") == 0) {
             sn->name = cf->cycle->hostname;
 
         } else {
+            // 配置文件里的的server名字
             sn->name = value[i];
         }
 
+        // 开头不是'~'表示不用正则匹配，普通的字符串名字
         if (value[i].data[0] != '~') {
             ngx_strlow(sn->name.data, sn->name.data, sn->name.len);
             continue;
         }
 
+        // '~'表示使用正则匹配，后面必须紧接字符串，不能有空格
 #if (NGX_PCRE)
         {
         u_char               *p;
         ngx_regex_compile_t   rc;
         u_char                errstr[NGX_MAX_CONF_ERRSTR];
 
+        // 后面必须紧接字符串，不能有空格
         if (value[i].len == 1) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "empty regex in server name \"%V\"", &value[i]);
             return NGX_CONF_ERROR;
         }
 
+        // 去掉'~'，后面的是正则表达式
         value[i].len--;
         value[i].data++;
 
