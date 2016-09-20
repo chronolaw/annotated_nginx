@@ -85,6 +85,7 @@ static ngx_int_t ngx_http_init_listening(ngx_conf_t *cf,
 // 设置有连接发生时的回调函数ngx_http_init_connection
 static ngx_listening_t *ngx_http_add_listening(ngx_conf_t *cf,
     ngx_http_conf_addr_t *addr);
+
 static ngx_int_t ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
     ngx_http_conf_addr_t *addr);
 #if (NGX_HAVE_INET6)

@@ -1,8 +1,10 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_init_connection
+// * ngx_http_create_request
 // * ngx_http_wait_request_handler
 // * ngx_http_process_request_line
+// * ngx_http_find_virtual_server
 // * ngx_http_process_request_headers
 // * ngx_http_request_handler
 // * ngx_http_run_posted_requests
@@ -70,8 +72,10 @@ static ngx_int_t ngx_http_process_unique_header_line(ngx_http_request_t *r,
 static ngx_int_t ngx_http_process_multi_header_lines(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
+// 处理请求头里的host
 static ngx_int_t ngx_http_process_host(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+
 static ngx_int_t ngx_http_process_connection(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
@@ -79,10 +83,18 @@ static ngx_int_t ngx_http_process_connection(ngx_http_request_t *r,
 static ngx_int_t ngx_http_process_user_agent(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
+// 简单验证host字符串的合法性
 static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool,
     ngx_uint_t alloc);
+
+// 由请求行或请求头里的host定位server{}块位置，决定进入哪个server
+// 核心是ngx_http_find_virtual_server
 static ngx_int_t ngx_http_set_virtual_server(ngx_http_request_t *r,
     ngx_str_t *host);
+
+// 查找匹配的server{}块
+// 先在hash表里找完全匹配
+// hash找不到用正则匹配
 static ngx_int_t ngx_http_find_virtual_server(ngx_connection_t *c,
     ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
     ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
@@ -342,6 +354,7 @@ ngx_http_init_connection(ngx_connection_t *c)
         return;
     }
 
+    // 之后在create_request里使用
     c->data = hc;
 
     /* find the server configuration for the address:port */
@@ -760,7 +773,11 @@ ngx_http_create_request(ngx_connection_t *c)
     r->connection = c;
 
     // 请求对应的配置数组
+    // 此时只是default server的配置信息
+    // main_conf所有server都只有一个，所以这个不需要再设置
     r->main_conf = hc->conf_ctx->main_conf;
+
+    // 在读取完请求头后，会在ngx_http_find_virtual_server()里再设置正确的
     r->srv_conf = hc->conf_ctx->srv_conf;
     r->loc_conf = hc->conf_ctx->loc_conf;
 
@@ -1250,12 +1267,13 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 return;
             }
 
-            // 解析出host
+            // 请求行里解析出host
             if (r->host_start && r->host_end) {
 
                 host.len = r->host_end - r->host_start;
                 host.data = r->host_start;
 
+                // 简单验证host字符串的合法性
                 rc = ngx_http_validate_host(&host, r->pool, 0);
 
                 if (rc == NGX_DECLINED) {
@@ -1270,10 +1288,12 @@ ngx_http_process_request_line(ngx_event_t *rev)
                     return;
                 }
 
+                // 定位server{}块位置
                 if (ngx_http_set_virtual_server(r, &host) == NGX_ERROR) {
                     return;
                 }
 
+                // 设置请求头结构体里的server成员
                 r->headers_in.server = host;
             }
 
@@ -1975,6 +1995,7 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
 
     host = h->value;
 
+    // 简单验证host字符串的合法性
     rc = ngx_http_validate_host(&host, r->pool, 0);
 
     if (rc == NGX_DECLINED) {
@@ -1993,6 +2014,7 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
         return NGX_OK;
     }
 
+    // 定位server{}块位置
     if (ngx_http_set_virtual_server(r, &host) == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -2311,6 +2333,7 @@ ngx_http_process_request(ngx_http_request_t *r)
 }
 
 
+// 简单验证host字符串的合法性
 static ngx_int_t
 ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 {
@@ -2402,6 +2425,8 @@ ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 }
 
 
+// 由请求行或请求头里的host定位server{}块位置，决定进入哪个server
+// 核心是ngx_http_find_virtual_server
 static ngx_int_t
 ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
 {
@@ -2438,6 +2463,9 @@ ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
 
 #endif
 
+    // 查找匹配的server{}块
+    // 先在hash表里找完全匹配
+    // 找不到用正则匹配
     rc = ngx_http_find_virtual_server(r->connection,
                                       hc->addr_conf->virtual_names,
                                       host, r, &cscf);
@@ -2474,6 +2502,9 @@ ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
         return NGX_OK;
     }
 
+    // cscf是找到的server{}配置结构体
+    // 里面的ctx是配置数组
+    // 这里正确设置了请求所在server{}块的配置信息
     r->srv_conf = cscf->ctx->srv_conf;
     r->loc_conf = cscf->ctx->loc_conf;
 
@@ -2485,6 +2516,9 @@ ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
 }
 
 
+// 查找匹配的server{}块
+// 先在hash表里找完全匹配
+// 找不到用正则匹配
 static ngx_int_t
 ngx_http_find_virtual_server(ngx_connection_t *c,
     ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
@@ -2496,6 +2530,7 @@ ngx_http_find_virtual_server(ngx_connection_t *c,
         return NGX_DECLINED;
     }
 
+    // 先在hash表里找完全匹配
     cscf = ngx_hash_find_combined(&virtual_names->names,
                                   ngx_hash_key(host->data, host->len),
                                   host->data, host->len);
@@ -2505,6 +2540,7 @@ ngx_http_find_virtual_server(ngx_connection_t *c,
         return NGX_OK;
     }
 
+    // hash找不到用正则匹配
 #if (NGX_PCRE)
 
     if (host->len && virtual_names->nregex) {

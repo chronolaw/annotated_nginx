@@ -291,6 +291,8 @@ typedef struct {
 
 
 // 保存server{}块里的server_name信息
+// 在解析http请求头时调用ngx_http_process_request_line()
+// 最后在ngx_http_set_virtual_server()里定位server{}块位置
 typedef struct {
     // 正则表达式对象指针
 #if (NGX_PCRE)
