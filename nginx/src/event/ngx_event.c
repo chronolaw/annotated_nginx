@@ -354,6 +354,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // 负载均衡锁标志量， accept_mutex on
     // 1.9.x，如果使用了reuseport，那么ngx_use_accept_mutex==0
+    //
+    // 1.11.3开始，默认不使用负载均衡锁，提高性能，下面的代码直接跳过
     if (ngx_use_accept_mutex) {
         // ngx_accept_disabled = ngx_cycle->connection_n / 8
         //                      - ngx_cycle->free_connection_n;
@@ -403,6 +405,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // 如果不使用负载均衡，那么就不会使用延后处理队列，即没有NGX_POST_EVENTS标志
 
+    // 1.11.3开始，默认不使用负载均衡锁，提高性能
+    // 省去了锁操作和队列操作
+
     // 不管是否获得了负载均衡锁，都要处理事件和定时器
     // 如果获得了负载均衡锁,事件就会多出一个accept事件
     // 否则只有普通的读写事件和定时器事件
@@ -418,6 +423,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // timer是无事件发生时最多等待的时间，即超时时间
     // 如果ngx_event_find_timer返回timer==0，那么epoll不会等待，立即返回
     // 函数可以分为两部分，一是用epoll获得事件，二是处理事件，加入延后队列
+    //
+    // 如果不使用负载均衡（accept_mutex off）
+    // 那么所有IO事件均在此函数里处理，即搜集事件并调用handler
     (void) ngx_process_events(cycle, timer, flags);
 
     // 在ngx_process_events里缓存的时间肯定已经更新
