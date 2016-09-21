@@ -144,6 +144,7 @@ struct ngx_cycle_s {
     // 即-p选项指定的工作目录
     ngx_str_t                 prefix;
 
+    // 在linux里直接用共享内存实现锁，此成员无用
     ngx_str_t                 lock_file;
 
     // 当前主机的hostname
