@@ -56,6 +56,7 @@ typedef struct {
 
 
 // tcp流处理的监听端口结构体
+// ngx_stream_listen_t
 typedef struct {
 
     // socket地址，使用union适应各种情形
@@ -85,15 +86,19 @@ typedef struct {
 
     // 使用通配符标志位
     unsigned                wildcard:1;
+
 #if (NGX_STREAM_SSL)
     unsigned                ssl:1;
 #endif
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned                ipv6only:1;
 #endif
+
+    // 在linux上提高性能的reuseport功能
 #if (NGX_HAVE_REUSEPORT)
     unsigned                reuseport:1;
 #endif
+
     unsigned                so_keepalive:2;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
@@ -164,6 +169,7 @@ typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 // stream core模块的main配置
 // 主要存储server和监听端口
 // 在stream{}里只有一个
+// ngx_stream_core_main_conf_t
 typedef struct {
     // 存储stream{}里定义的server
     // 实际上存储的是每个server{}配置数组里的stream_core模块的srv配置
@@ -203,6 +209,7 @@ typedef void (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 // 成员ctx就是server{}块自己的配置信息存储数组
 // 存储在ngx_stream_core_main_conf_t.servers
 // 见ngx_stream_core_server()
+// ngx_stream_core_srv_conf_t
 typedef struct {
     // 收到tcp连接后的处理函数
     // 相当于http location里的content handler
@@ -241,11 +248,11 @@ struct ngx_stream_session_s {
     // 数组，存储每个stream模块的ctx
     void                  **ctx;
 
-    // 数组，存储每个stream模块的main配置
+    // 数组指针，存储每个stream模块的main配置
     // s->main_conf = addr_conf->ctx->main_conf;
     void                  **main_conf;
 
-    // 数组，存储每个stream模块的srv配置
+    // 数组指针，存储每个stream模块的srv配置
     // s->srv_conf = addr_conf->ctx->srv_conf;
     void                  **srv_conf;
 
