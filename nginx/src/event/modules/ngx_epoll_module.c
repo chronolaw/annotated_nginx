@@ -970,6 +970,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     // 使用event_list和nevents获取内核返回的事件
     // 返回值events是实际获得的事件数量
     // epoll_wait等待最多timer时间后返回
+    // 如果epoll有事件发生，那么等待时间timer无意义，epoll_wait立即返回
     // 如果ngx_event_find_timer返回timer==0，那么epoll不会等待，立即返回
     events = epoll_wait(ep, event_list, (int) nevents, timer);
 

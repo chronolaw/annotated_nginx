@@ -391,6 +391,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
                 // 未获取到锁
                 // 要求epoll无限等待，或者等待时间超过配置的ngx_accept_mutex_delay
                 // 也就是说nginx的epoll不会等待超过ngx_accept_mutex_delay的500毫秒
+                // 如果epoll有事件发生，那么此等待时间无意义，epoll_wait立即返回
                 if (timer == NGX_TIMER_INFINITE
                     || timer > ngx_accept_mutex_delay)
                 {
@@ -449,7 +450,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 这里只处理accept事件，工作量小，可以尽快释放锁，供其他进程使用
     if (ngx_accept_mutex_held) {
         // 释放负载均衡锁
-        // 其他进程等待ngx_accept_mutex_delay毫秒后
+        // 其他进程最多等待ngx_accept_mutex_delay毫秒后
         // 再走ngx_trylock_accept_mutex决定端口的监听权
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
