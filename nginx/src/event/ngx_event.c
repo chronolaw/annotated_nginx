@@ -403,7 +403,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }   //ngx_use_accept_mutex
 
-    // 如果不使用负载均衡，那么就不会使用延后处理队列，即没有NGX_POST_EVENTS标志
+    // 如果不使用负载均衡，或者没有抢到锁
+    // 那么就不会使用延后处理队列，即没有NGX_POST_EVENTS标志
 
     // 1.11.3开始，默认不使用负载均衡锁，提高性能
     // 省去了锁操作和队列操作

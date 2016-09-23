@@ -73,6 +73,7 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       NULL },
 
     // 可以在stream_main里出现，用于合并配置
+    // 默认开启(=1)
     { ngx_string("tcp_nodelay"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,

@@ -963,7 +963,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "epoll timer: %M", timer);
 
-    // 如果使用负载均衡，那么flags里有NGX_POST_EVENTS标志
+    // 如果使用负载均衡且抢到了accept锁，那么flags里有NGX_POST_EVENTS标志
     // 如果没有设置更新缓存时间的精度，那么flags里有NGX_UPDATE_TIME
 
     // 调用epoll_wait处理发生的事件
@@ -1106,7 +1106,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             rev->ready = 1;
 
             // 检查此事件是否要延后处理
-            // 如果使用负载均衡，那么flags里有NGX_POST_EVENTS标志
+            // 如果使用负载均衡且抢到accept锁，那么flags里有NGX_POST_EVENTS标志
             // 1.9.x使用reuseport，那么就不延后处理
             if (flags & NGX_POST_EVENTS) {
                 // 是否是接受请求的事件，两个延后处理队列
@@ -1119,6 +1119,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                 ngx_post_event(rev, queue);
 
             } else {
+                // 不accept的进程不需要入队，直接处理
                 // 不延后，立即调用读事件的handler回调函数处理事件
                 // 1.9.x reuseport直接处理，省去了入队列出队列的成本，更快
                 rev->handler(rev);
@@ -1163,6 +1164,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                 ngx_post_event(wev, &ngx_posted_events);
 
             } else {
+                // 不accept的进程不需要入队，直接处理
                 // 不延后，立即调用写事件的handler回调函数处理事件
                 // 1.9.x reuseport直接处理，省去了入队列出队列的成本，更快
                 wev->handler(wev);
