@@ -165,6 +165,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
             return NGX_ERROR;
         }
 
+        // 完全拷贝结构体
         *ls = ols;
 
         // 设置worker的序号
@@ -457,6 +458,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
         /* for each listening socket */
 
         // 遍历监听端口链表
+        // 如果设置了reuseport，那么一个端口会有worker个克隆的结构体
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
 
