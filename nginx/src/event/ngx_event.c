@@ -22,10 +22,14 @@
 
 // 各内置事件模块
 // rtsig在1.9.x里已经删除
+
 extern ngx_module_t ngx_kqueue_module;
 extern ngx_module_t ngx_eventport_module;
 extern ngx_module_t ngx_devpoll_module;
+
+// 通常我们在Linux上只使用epoll
 extern ngx_module_t ngx_epoll_module;
+
 extern ngx_module_t ngx_select_module;
 
 
@@ -106,6 +110,7 @@ ngx_atomic_t         *ngx_connection_counter = &connection_counter;
 
 // 1.9.x如果使用了reuseport，那么就会禁用负载均衡锁
 // 由linux系统内核来实现负载均衡，选择恰当的进程接受连接
+// 由于锁会影响性能，所以1.11.3开始nginx默认不使用锁
 
 // 负载均衡锁指针，初始为空指针
 ngx_atomic_t         *ngx_accept_mutex_ptr;
@@ -133,6 +138,7 @@ ngx_msec_t            ngx_accept_mutex_delay;
 ngx_int_t             ngx_accept_disabled;
 
 
+// 统计用的共享内存变量指针
 #if (NGX_STAT_STUB)
 
 ngx_atomic_t   ngx_stat_accepted0;
@@ -228,7 +234,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, multi_accept),
       NULL },
 
-    // 默认使用负载均衡锁
+    // 是否使用负载均衡锁
     // accept_mutex off也是可以的，这样连接快但可能负载不均衡
     // 1.10后支持reuseport，可以不使用此指令
     // 1.11.3后负载均衡锁默认是关闭的
@@ -240,6 +246,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       NULL },
 
     // 默认负载均衡锁的等待时间是500毫秒
+    // 不持有锁的其他进程最多等待500毫秒再尝试抢锁
     { ngx_string("accept_mutex_delay"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,

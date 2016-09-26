@@ -159,6 +159,8 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       NULL },
 
+    // RLIMIT_NOFILE,进程可打开的最大文件描述符数量，超出将产生EMFILE错误
+    // 在ngx_event_module_init里检查
     { ngx_string("worker_rlimit_nofile"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -166,6 +168,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, rlimit_nofile),
       NULL },
 
+    // coredump文件最大长度
     { ngx_string("worker_rlimit_core"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_off_slot,
