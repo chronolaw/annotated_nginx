@@ -17,9 +17,11 @@ Nginx1.10的变动较大，增加了动态模块、http2、reuseport，值得仔
 nginx 1.10.1
 
 # Git分支
-* master : nginx稳定版，有注释
-* upgrade: nginx稳定版，无注释
-* mainline: nginx开发版，无注释
+分支    |说明   |注释
+--------------------
+master  | nginx稳定版1.10.1|有
+upgrade | nginx稳定版1.10.1|无
+mainline| nginx开发版1.11.4|无
 
 # 已注解
 
