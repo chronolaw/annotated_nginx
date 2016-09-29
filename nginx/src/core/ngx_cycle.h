@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_cycle_s
+// * ngx_core_conf_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -164,7 +167,10 @@ typedef struct {
     ngx_int_t                 worker_processes;     //worker进程的数量
     ngx_int_t                 debug_points;         //是否使用debug point
 
+    // 可打开的最大文件数量，超过则报ENOFILE错误
     ngx_int_t                 rlimit_nofile;
+
+    // coredump文件大小
     off_t                     rlimit_core;
 
     int                       priority;
@@ -178,6 +184,8 @@ typedef struct {
     ngx_gid_t                 group;
 
     ngx_str_t                 working_directory;
+
+    // 用于实现共享锁，linux下无意义
     ngx_str_t                 lock_file;
 
     // 旧的线程实现，1.9.x已经删除，不应该使用
