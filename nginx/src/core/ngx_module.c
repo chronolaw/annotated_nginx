@@ -89,10 +89,12 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
     }
 
     // 拷贝make生成的静态模块数组到本cycle
+    // 之后ngx_modules数组不再使用
     ngx_memcpy(cycle->modules, ngx_modules,
                ngx_modules_n * sizeof(ngx_module_t *));
 
     // 拷贝模块序号计数器到本cycle
+    // 同样之后ngx_modules_n不再使用
     cycle->modules_n = ngx_modules_n;
 
     // 完成cycle的模块初始化
@@ -109,6 +111,7 @@ ngx_init_modules(ngx_cycle_t *cycle)
 {
     ngx_uint_t  i;
 
+    // 注意不使用全局的ngx_modules数组，而是使用cycle里的
     for (i = 0; cycle->modules[i]; i++) {
 
         // 调用所有模块的init_module函数指针，初始化模块
