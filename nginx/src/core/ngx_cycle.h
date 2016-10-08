@@ -41,10 +41,12 @@ struct ngx_shm_zone_s {
 
 
 // nginx核心数据结构，表示nginx的生命周期，含有许多重要参数
+//
 // conf_ctx, 存储所有模块的配置结构体，是个二维数组
 // free_connections,空闲连接，使用指针串成单向链表
 // listening,监听的端口数组
 // connections/read_events/write_events,连接池,大小是connection_n
+//
 // 启动nginx时的环境参数，配置文件，工作路径等
 // 每个进程都有这个结构
 struct ngx_cycle_s {
@@ -67,6 +69,7 @@ struct ngx_cycle_s {
 
     ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */
 
+    // 文件也当做连接来处理，也是读写操作
     ngx_connection_t        **files;
 
     // 空闲连接，使用指针串成单向链表
