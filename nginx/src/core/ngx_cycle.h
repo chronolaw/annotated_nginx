@@ -161,8 +161,8 @@ struct ngx_cycle_s {
 
 // ngx_core_module的配置结构体，在nginx.c里设置
 typedef struct {
-    ngx_flag_t                daemon;       //守护进程
-    ngx_flag_t                master;       //启动master/worker进程机制
+    ngx_flag_t                daemon;       //守护进程是否启用
+    ngx_flag_t                master;       //master/worker进程机制是否启用
 
      //调用time_update的时间分辨率，毫秒，在event模块里使用
     ngx_msec_t                timer_resolution;
@@ -182,7 +182,10 @@ typedef struct {
     ngx_uint_t                cpu_affinity_n;
     ngx_cpuset_t             *cpu_affinity;
 
+    // nginx运行使用的用户名，默认是nobody
+    // objs/ngx_auto_config.h:#define NGX_USER  "nobody"
     char                     *username;
+
     ngx_uid_t                 user;
     ngx_gid_t                 group;
 
@@ -193,7 +196,10 @@ typedef struct {
 
     // 旧的线程实现，1.9.x已经删除，不应该使用
 
-    ngx_str_t                 pid;                  //master进程的pid文件名
+    // master进程的pid文件名
+    ngx_str_t                 pid;
+
+    // new binary时老nginx的pid文件名
     ngx_str_t                 oldpid;
 
     ngx_array_t               env;
