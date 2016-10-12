@@ -35,6 +35,7 @@ struct ngx_queue_s {
     (h == (h)->prev)
 
 
+// 向队列的头插入数据节点
 #define ngx_queue_insert_head(h, x)                                           \
     (x)->next = (h)->next;                                                    \
     (x)->next->prev = x;                                                      \
@@ -45,6 +46,7 @@ struct ngx_queue_s {
 #define ngx_queue_insert_after   ngx_queue_insert_head
 
 
+// 向队列的尾插入数据节点
 #define ngx_queue_insert_tail(h, x)                                           \
     (x)->prev = (h)->prev;                                                    \
     (x)->prev->next = x;                                                      \
@@ -52,14 +54,19 @@ struct ngx_queue_s {
     (h)->prev = x
 
 
+// 获取队列的头尾指针，可以用它们来实现队列的正向或反向遍历
+// 直到遇到头节点（ngx_queue_sentinel）停止
 #define ngx_queue_head(h)                                                     \
     (h)->next
 
 
+// 获取队列的头尾指针，可以用它们来实现队列的正向或反向遍历
+// 直到遇到头节点（ngx_queue_sentinel）停止
 #define ngx_queue_last(h)                                                     \
     (h)->prev
 
 
+// 返回节点自身，对于头节点来说就相当于“哨兵”的作用
 #define ngx_queue_sentinel(h)                                                 \
     (h)
 
@@ -89,6 +96,7 @@ struct ngx_queue_s {
 #endif
 
 
+// 拆分队列
 #define ngx_queue_split(h, q, n)                                              \
     (n)->prev = (h)->prev;                                                    \
     (n)->prev->next = n;                                                      \
@@ -98,6 +106,7 @@ struct ngx_queue_s {
     (q)->prev = n;
 
 
+// 合并两个队列
 #define ngx_queue_add(h, n)                                                   \
     (h)->prev->next = (n)->next;                                              \
     (n)->next->prev = (h)->prev;                                              \
@@ -110,6 +119,8 @@ struct ngx_queue_s {
 
 
 ngx_queue_t *ngx_queue_middle(ngx_queue_t *queue);
+
+// 使用一个比较函数指针对队列元素排序，但效率不是很高
 void ngx_queue_sort(ngx_queue_t *queue,
     ngx_int_t (*cmp)(const ngx_queue_t *, const ngx_queue_t *));
 
