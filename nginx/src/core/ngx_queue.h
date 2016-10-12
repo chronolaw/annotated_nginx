@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_queue_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -21,11 +24,13 @@ struct ngx_queue_s {
 };
 
 
+// 初始化头节点，把两个指针都指向自身
 #define ngx_queue_init(q)                                                     \
     (q)->prev = q;                                                            \
     (q)->next = q
 
 
+// 检查头节点的前驱指针，判断是否是空队列
 #define ngx_queue_empty(h)                                                    \
     (h == (h)->prev)
 
