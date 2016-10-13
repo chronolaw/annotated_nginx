@@ -43,10 +43,12 @@ struct ngx_queue_s {
     (h)->next = x
 
 
+// 在节点的后面插入数据
 #define ngx_queue_insert_after   ngx_queue_insert_head
 
 
 // 向队列的尾插入数据节点
+// 在节点前插入数据
 #define ngx_queue_insert_tail(h, x)                                           \
     (x)->prev = (h)->prev;                                                    \
     (x)->prev->next = x;                                                      \
@@ -71,14 +73,18 @@ struct ngx_queue_s {
     (h)
 
 
+// 节点的后继指针
 #define ngx_queue_next(q)                                                     \
     (q)->next
 
 
+// 节点的前驱指针
 #define ngx_queue_prev(q)                                                     \
     (q)->prev
 
 
+// “删除”当前节点，实际上它只是调整了节点的指针
+// 把节点从队列里摘除，并没有真正从内存里删除数据
 #if (NGX_DEBUG)
 
 #define ngx_queue_remove(x)                                                   \
@@ -114,6 +120,7 @@ struct ngx_queue_s {
     (h)->prev->next = h;
 
 
+// 从作为数据成员的ngx_queue_t结构访问到完整的数据节点
 #define ngx_queue_data(q, type, link)                                         \
     (type *) ((u_char *) q - offsetof(type, link))
 

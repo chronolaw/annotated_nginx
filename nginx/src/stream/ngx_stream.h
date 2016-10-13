@@ -6,6 +6,7 @@
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
+// * ngx_stream_module_t
 
 /*
  * Copyright (C) Roman Arutyunyan
