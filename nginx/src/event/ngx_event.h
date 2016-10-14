@@ -152,7 +152,7 @@ struct ngx_event_aio_s {
     ngx_event_handler_pt       handler;
     ngx_file_t                *file;
 
-#if (NGX_HAVE_AIO_SENDFILE)
+#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
     ssize_t                  (*preload_handler)(ngx_buf_t *file);
 #endif
 
@@ -430,6 +430,7 @@ extern ngx_os_io_t  ngx_io;
 #define ngx_send             ngx_io.send
 #define ngx_send_chain       ngx_io.send_chain
 #define ngx_udp_send         ngx_io.udp_send
+#define ngx_udp_send_chain   ngx_io.udp_send_chain
 
 
 #define NGX_EVENT_MODULE      0x544E5645  /* "EVNT" */
