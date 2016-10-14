@@ -95,11 +95,16 @@ typedef struct {
     ngx_addr_t                      *addrs;
     ngx_uint_t                       naddrs;
     ngx_uint_t                       weight;
+    ngx_uint_t                       max_conns;
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
+    ngx_msec_t                       slow_start;
 
     unsigned                         down:1;
     unsigned                         backup:1;
+
+    NGX_COMPAT_BEGIN(6)
+    NGX_COMPAT_END
 } ngx_http_upstream_server_t;
 
 
@@ -109,6 +114,7 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_FAIL_TIMEOUT  0x0008
 #define NGX_HTTP_UPSTREAM_DOWN          0x0010
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
+#define NGX_HTTP_UPSTREAM_MAX_CONNS     0x0100
 
 
 struct ngx_http_upstream_srv_conf_s {
@@ -202,6 +208,7 @@ typedef struct {
 
     ngx_array_t                     *cache_valid;
     ngx_array_t                     *cache_bypass;
+    ngx_array_t                     *cache_purge;
     ngx_array_t                     *no_cache;
 #endif
 
@@ -215,7 +222,7 @@ typedef struct {
     unsigned                         intercept_404:1;
     unsigned                         change_buffering:1;
 
-#if (NGX_HTTP_SSL)
+#if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_ssl_t                       *ssl;
     ngx_flag_t                       ssl_session_reuse;
 
@@ -225,6 +232,9 @@ typedef struct {
 #endif
 
     ngx_str_t                        module;
+
+    NGX_COMPAT_BEGIN(2)
+    NGX_COMPAT_END
 } ngx_http_upstream_conf_t;
 
 
@@ -313,6 +323,7 @@ struct ngx_http_upstream_s {
     ngx_chain_writer_ctx_t           writer;
 
     ngx_http_upstream_conf_t        *conf;
+    ngx_http_upstream_srv_conf_t    *upstream;
 #if (NGX_HTTP_CACHE)
     ngx_array_t                     *caches;
 #endif
@@ -356,7 +367,7 @@ struct ngx_http_upstream_s {
     ngx_str_t                        schema;
     ngx_str_t                        uri;
 
-#if (NGX_HTTP_SSL)
+#if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_str_t                        ssl_name;
 #endif
 
@@ -377,6 +388,9 @@ struct ngx_http_upstream_s {
     unsigned                         request_sent:1;
     unsigned                         request_body_sent:1;
     unsigned                         header_sent:1;
+
+    NGX_COMPAT_BEGIN(1)
+    NGX_COMPAT_END
 };
 
 

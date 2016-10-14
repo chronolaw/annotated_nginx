@@ -286,9 +286,7 @@ typedef struct {
     ngx_chain_t                      *bufs;
     ngx_buf_t                        *buf;
     off_t                             rest;
-#if (NGX_HTTP_V2)
     off_t                             received;
-#endif
     ngx_chain_t                      *free;
     ngx_chain_t                      *busy;
     ngx_http_chunked_t               *chunked;
@@ -302,7 +300,7 @@ typedef struct {
     ngx_http_addr_conf_t             *addr_conf;
     ngx_http_conf_ctx_t              *conf_ctx;
 
-#if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
+#if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_str_t                        *ssl_servername;
 #if (NGX_PCRE)
     ngx_http_regex_t                 *ssl_servername_regex;
@@ -315,9 +313,7 @@ typedef struct {
     ngx_buf_t                       **free;
     ngx_int_t                         nfree;
 
-#if (NGX_HTTP_SSL)
     unsigned                          ssl:1;
-#endif
     unsigned                          proxy_protocol:1;
 } ngx_http_connection_t;
 
@@ -438,9 +434,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        err_status;
 
     ngx_http_connection_t            *http_connection;
-#if (NGX_HTTP_V2)
     ngx_http_v2_stream_t             *stream;
-#endif
 
     ngx_http_log_handler_pt           log_handler;
 
@@ -539,11 +533,11 @@ struct ngx_http_request_s {
     unsigned                          subrequest_ranges:1;
     unsigned                          single_range:1;
     unsigned                          disable_not_modified:1;
-
-#if (NGX_STAT_STUB)
     unsigned                          stat_reading:1;
     unsigned                          stat_writing:1;
-#endif
+    unsigned                          stat_processing:1;
+
+    unsigned                          health_check:1;
 
     /* used to parse HTTP headers */
 
