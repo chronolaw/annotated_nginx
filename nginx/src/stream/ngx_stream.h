@@ -220,6 +220,10 @@ typedef struct {
     // 收到tcp连接后的处理函数
     // 相当于http location里的content handler
     // 开发自己的stream模块必须设置此handler
+    //
+    // nginx 1.11.5改为专门的content handler
+    // 之前会有post_accept、access等处理
+    // ngx_stream_content_handler_pt  handler;
     ngx_stream_handler_pt   handler;
 
     // 保存模块的配置结构体，其中的main指向stream里
