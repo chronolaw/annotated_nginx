@@ -1,4 +1,43 @@
 
+Changes with nginx 1.11.5                                        11 Oct 2016
+
+    *) Change: the --with-ipv6 configure option was removed, now IPv6
+       support is configured automatically.
+
+    *) Change: now if there are no available servers in an upstream, nginx
+       will not reset number of failures of all servers as it previously
+       did, but will wait for fail_timeout to expire.
+
+    *) Feature: the ngx_stream_ssl_preread_module.
+
+    *) Feature: the "server" directive in the "upstream" context supports
+       the "max_conns" parameter.
+
+    *) Feature: the --with-compat configure option.
+
+    *) Feature: "manager_files", "manager_threshold", and "manager_sleep"
+       parameters of the "proxy_cache_path", "fastcgi_cache_path",
+       "scgi_cache_path", and "uwsgi_cache_path" directives.
+
+    *) Bugfix: flags passed by the --with-ld-opt configure option were not
+       used while building perl module.
+
+    *) Bugfix: in the "add_after_body" directive when used with the
+       "sub_filter" directive.
+
+    *) Bugfix: in the $realip_remote_addr variable.
+
+    *) Bugfix: the "dav_access", "proxy_store_access",
+       "fastcgi_store_access", "scgi_store_access", and "uwsgi_store_access"
+       directives ignored permissions specified for user.
+
+    *) Bugfix: unix domain listen sockets might not be inherited during
+       binary upgrade on Linux.
+
+    *) Bugfix: nginx returned the 400 response on requests with the "-"
+       character in the HTTP method.
+
+
 Changes with nginx 1.11.4                                        13 Sep 2016
 
     *) Feature: the $upstream_bytes_received variable.

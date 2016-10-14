@@ -1,4 +1,43 @@
 
+Изменения в nginx 1.11.5                                          11.10.2016
+
+    *) Изменение: параметр configure --with-ipv6 упразднён, поддержка IPv6
+       теперь собирается автоматически.
+
+    *) Изменение: теперь, если в блоке upstream не оказалось доступных
+       серверов, nginx не сбрасывает статистику ошибок всех серверов, как
+       делал ранее, а ожидает истечения fail_timeout.
+
+    *) Добавление: модуль ngx_stream_ssl_preread_module.
+
+    *) Добавление: директива server в блоке upstream поддерживает параметр
+       max_conns.
+
+    *) Добавление: параметр configure --with-compat.
+
+    *) Добавление: параметры manager_files, manager_threshold и
+       manager_sleep директив proxy_cache_path, fastcgi_cache_path,
+       scgi_cache_path и uwsgi_cache_path.
+
+    *) Исправление: при сборке perl-модуля не использовались флаги, заданные
+       с помощью параметра configure --with-ld-opt.
+
+    *) Исправление: в директиве add_after_body при использовании совместно с
+       директивой sub_filter.
+
+    *) Исправление: в переменной $realip_remote_addr.
+
+    *) Исправление: директивы dav_access, proxy_store_access,
+       fastcgi_store_access, scgi_store_access и uwsgi_store_access
+       игнорировали права, заданные для пользователя.
+
+    *) Исправление: unix domain listen-сокеты могли не наследоваться при
+       обновлении исполняемого файла на Linux.
+
+    *) Исправление: nginx возвращал ошибку 400 на запросы с символом "-" в
+       HTTP-методе.
+
+
 Изменения в nginx 1.11.4                                          13.09.2016
 
     *) Добавление: переменная $upstream_bytes_received.
