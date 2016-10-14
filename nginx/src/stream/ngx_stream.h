@@ -161,6 +161,11 @@ typedef struct {
     ngx_stream_listen_t     opt;
 } ngx_stream_conf_addr_t;
 
+// nginx 1.11.5 stream结构变动很大
+// 取消了之前固定的xxx_handler
+// 改成了与http类似的阶段处理
+// 使用枚举ngx_stream_phases
+
 
 // 限制访问的函数原型
 // 与ngx_stream_handler_pt很像，但返回的是整数错误码
