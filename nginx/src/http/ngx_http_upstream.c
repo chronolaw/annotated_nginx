@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_upstream_create
+// * ngx_http_upstream_init
 
 /*
  * Copyright (C) Igor Sysoev
@@ -444,23 +448,32 @@ ngx_conf_bitmask_t  ngx_http_upstream_ignore_headers_masks[] = {
 };
 
 
+// Nginx HTTP框架接收到下游的连接就会调用ngx_http_create_request()
+// 创建ngx_http_request_t结构体
+// 这时成员upstream默认是空指针，表示不使用upstream框架。
 ngx_int_t
 ngx_http_upstream_create(ngx_http_request_t *r)
 {
     ngx_http_upstream_t  *u;
 
+    // 获取当前请求里的upstream结构
     u = r->upstream;
 
+    // 如果已经存在，表示之前调用过，就要清理
     if (u && u->cleanup) {
         r->main->count++;
         ngx_http_upstream_cleanup(r);
     }
 
+    // 此时upstream应该是一个空指针
+
+    // 创建upstream结构体
     u = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_t));
     if (u == NULL) {
         return NGX_ERROR;
     }
 
+    // 赋值给请求对象
     r->upstream = u;
 
     u->peer.log = r->connection->log;
@@ -470,6 +483,7 @@ ngx_http_upstream_create(ngx_http_request_t *r)
     r->cache = NULL;
 #endif
 
+    // 默认上游的数据是unset
     u->headers_in.content_length_n = -1;
     u->headers_in.last_modified_time = -1;
 

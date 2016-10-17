@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_upstream_conf_t
+// * ngx_http_upstream_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -147,6 +150,7 @@ typedef struct {
 } ngx_http_upstream_local_t;
 
 
+// 需要设置超时时间、缓冲、限速等必要的参数，才能正确地连接上游服务器
 typedef struct {
     ngx_http_upstream_srv_conf_t    *upstream;
 
@@ -306,37 +310,49 @@ typedef void (*ngx_http_upstream_handler_pt)(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 
 
+// 定义了upstream机制需要的所有信息
 struct ngx_http_upstream_s {
     ngx_http_upstream_handler_pt     read_event_handler;
     ngx_http_upstream_handler_pt     write_event_handler;
 
+    // 连接结构体
     ngx_peer_connection_t            peer;
 
     ngx_event_pipe_t                *pipe;
 
+    //发送的请求数据
     ngx_chain_t                     *request_bufs;
 
     ngx_output_chain_ctx_t           output;
     ngx_chain_writer_ctx_t           writer;
 
+    // 上游的连接参数设置
     ngx_http_upstream_conf_t        *conf;
 #if (NGX_HTTP_CACHE)
     ngx_array_t                     *caches;
 #endif
 
+    // 上游的响应头
     ngx_http_upstream_headers_in_t   headers_in;
 
+    // 上游服务器的地址
     ngx_http_upstream_resolved_t    *resolved;
 
     ngx_buf_t                        from_client;
 
+    // 数据缓冲区
     ngx_buf_t                        buffer;
+
+    // 缓冲数据的长度
     off_t                            length;
 
+    // 从上游接收到的数据
     ngx_chain_t                     *out_bufs;
+
     ngx_chain_t                     *busy_bufs;
     ngx_chain_t                     *free_bufs;
 
+    // 处理上游服务器响应数据的回调函数
     ngx_int_t                      (*input_filter_init)(void *data);
     ngx_int_t                      (*input_filter)(void *data, ssize_t bytes);
     void                            *input_filter_ctx;
@@ -344,6 +360,8 @@ struct ngx_http_upstream_s {
 #if (NGX_HTTP_CACHE)
     ngx_int_t                      (*create_key)(ngx_http_request_t *r);
 #endif
+
+    // 发送接收请求的回调函数，9个
     ngx_int_t                      (*create_request)(ngx_http_request_t *r);
     ngx_int_t                      (*reinit_request)(ngx_http_request_t *r);
     ngx_int_t                      (*process_header)(ngx_http_request_t *r);
@@ -357,6 +375,7 @@ struct ngx_http_upstream_s {
 
     ngx_msec_t                       timeout;
 
+    // 处理的状态信息
     ngx_http_upstream_state_t       *state;
 
     ngx_str_t                        method;
@@ -377,12 +396,19 @@ struct ngx_http_upstream_s {
     unsigned                         cache_status:3;
 #endif
 
+    // 是否使用缓冲
     unsigned                         buffering:1;
+
     unsigned                         keepalive:1;
     unsigned                         upgrade:1;
 
+    // 是否已经发送请求
     unsigned                         request_sent:1;
+
+    // 是否已经发送请求体数据
     unsigned                         request_body_sent:1;
+
+    // 是否已经发送响应头
     unsigned                         header_sent:1;
 };
 
