@@ -206,6 +206,9 @@ static ngx_addr_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
     ngx_http_upstream_local_t *local);
 
 static void *ngx_http_upstream_create_main_conf(ngx_conf_t *cf);
+
+// upstream框架会调用peer.init_upstream
+// 初始化每个上游服务器列表所使用的load-balance模块
 static char *ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf);
 
 #if (NGX_HTTP_SSL)
@@ -6218,6 +6221,8 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
 }
 
 
+// upstream框架会调用peer.init_upstream
+// 初始化每个上游服务器列表所使用的load-balance模块
 static char *
 ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 {
@@ -6233,6 +6238,8 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 
     uscfp = umcf->upstreams.elts;
 
+    // upstream框架会调用peer.init_upstream
+    // 初始化每个上游服务器列表所使用的load-balance模块
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
         init = uscfp[i]->peer.init_upstream ? uscfp[i]->peer.init_upstream:

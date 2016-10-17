@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_upstream_init_round_robin
 
 /*
  * Copyright (C) Igor Sysoev
@@ -27,6 +30,7 @@ static void ngx_http_upstream_empty_save_session(ngx_peer_connection_t *pc,
 #endif
 
 
+// 从配置文件里得到所有的服务器IP地址，构建出可用的IP地址列表
 ngx_int_t
 ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
@@ -37,23 +41,33 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_http_upstream_rr_peer_t   *peer, **peerp;
     ngx_http_upstream_rr_peers_t  *peers, *backup;
 
+    // 默认使用round robin
     us->peer.init = ngx_http_upstream_init_round_robin_peer;
 
+    // 定义了upstream{}块的情况
     if (us->servers) {
+
+        // 服务器数组首地址
         server = us->servers->elts;
 
-        n = 0;
-        w = 0;
+        n = 0;  // 计算地址的总数
+        w = 0;  // 计算总权重
 
+        // 遍历服务器数组
         for (i = 0; i < us->servers->nelts; i++) {
+            // 计算非backup服务器,backup跳过
             if (server[i].backup) {
                 continue;
             }
 
+            // 计算地址的总数
             n += server[i].naddrs;
+
+            // 计算总权重
             w += server[i].naddrs * server[i].weight;
         }
 
+        // 没有定义upstream server则失败
         if (n == 0) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no servers in upstream \"%V\" in %s:%ui",
@@ -171,6 +185,8 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         return NGX_OK;
     }
 
+    // 没有定义upstream{}块的情况
+    // 需要根据字符串解析出后端服务器地址
 
     /* an upstream implicitly defined by proxy_pass, etc. */
 

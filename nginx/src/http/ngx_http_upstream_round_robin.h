@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_upstream_rr_peer_s
+// * ngx_http_upstream_rr_peers_s
+// * ngx_http_upstream_rr_peer_data_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -16,6 +21,7 @@
 
 typedef struct ngx_http_upstream_rr_peer_s   ngx_http_upstream_rr_peer_t;
 
+// 与每个服务器的具体IP地址一一对应
 struct ngx_http_upstream_rr_peer_s {
     struct sockaddr                *sockaddr;
     socklen_t                       socklen;
@@ -52,7 +58,9 @@ struct ngx_http_upstream_rr_peer_s {
 
 typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 
+// 管理IP地址列表
 struct ngx_http_upstream_rr_peers_s {
+    // 服务器数量，即peer的长度
     ngx_uint_t                      number;
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
@@ -63,13 +71,18 @@ struct ngx_http_upstream_rr_peers_s {
 
     ngx_uint_t                      total_weight;
 
+    // 只有一台服务器时优化处理
     unsigned                        single:1;
+
     unsigned                        weighted:1;
 
+    // upstream块的名字
     ngx_str_t                      *name;
 
+    // backup服务器IP列表
     ngx_http_upstream_rr_peers_t   *next;
 
+    // 非backup服务器IP列表
     ngx_http_upstream_rr_peer_t    *peer;
 };
 
@@ -118,6 +131,7 @@ struct ngx_http_upstream_rr_peers_s {
 #endif
 
 
+// 负载均衡算法使用的数据结构，从peers.peer就可以获得可用的IP地址列表
 typedef struct {
     ngx_http_upstream_rr_peers_t   *peers;
     ngx_http_upstream_rr_peer_t    *current;

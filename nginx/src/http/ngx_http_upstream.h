@@ -89,6 +89,7 @@ typedef ngx_int_t (*ngx_http_upstream_init_peer_pt)(ngx_http_request_t *r,
 
 
 // 给load balance模块用初始化结构体
+// 定义了load-balance模块的入口，有两个回调函数，用来初始化load-balance模块
 typedef struct {
     ngx_http_upstream_init_pt        init_upstream;
     ngx_http_upstream_init_peer_pt   init;
@@ -105,6 +106,8 @@ typedef struct {
     ngx_uint_t                       weight;
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
+
+    // 1.11.5新增slow_start、max_conns
 
     unsigned                         down:1;
     unsigned                         backup:1;
