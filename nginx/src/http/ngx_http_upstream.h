@@ -320,7 +320,8 @@ struct ngx_http_upstream_s {
 
     ngx_event_pipe_t                *pipe;
 
-    //发送的请求数据
+    // 发送的请求数据
+    // u->request_bufs = r->request_body->bufs;
     ngx_chain_t                     *request_bufs;
 
     ngx_output_chain_ctx_t           output;
@@ -396,7 +397,7 @@ struct ngx_http_upstream_s {
     unsigned                         cache_status:3;
 #endif
 
-    // 是否使用缓冲
+    // 是否使用更多的缓冲区来接收上游的数据
     unsigned                         buffering:1;
 
     unsigned                         keepalive:1;

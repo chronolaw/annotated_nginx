@@ -2,6 +2,7 @@
 //
 // * ngx_http_upstream_create
 // * ngx_http_upstream_init
+// * ngx_http_upstream_init_request
 
 /*
  * Copyright (C) Igor Sysoev
@@ -29,7 +30,9 @@ static ngx_int_t ngx_http_upstream_cache_etag(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #endif
 
+// 启动upstream框架，开始与上游服务器异步交互
 static void ngx_http_upstream_init_request(ngx_http_request_t *r);
+
 static void ngx_http_upstream_resolve_handler(ngx_resolver_ctx_t *ctx);
 static void ngx_http_upstream_rd_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
@@ -491,11 +494,13 @@ ngx_http_upstream_create(ngx_http_request_t *r)
 }
 
 
+// 启动upstream框架，开始与上游服务器异步交互
 void
 ngx_http_upstream_init(ngx_http_request_t *r)
 {
     ngx_connection_t     *c;
 
+    // 获取连接
     c = r->connection;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -508,10 +513,14 @@ ngx_http_upstream_init(ngx_http_request_t *r)
     }
 #endif
 
+    // 如果连接设置了超时，那么就要删除定时器
+    // 保证连接后端时不会被超时结束
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
 
+    // clear event也就是et模式
+    // 注册写事件
     if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
 
         if (!c->write->active) {
@@ -524,10 +533,12 @@ ngx_http_upstream_init(ngx_http_request_t *r)
         }
     }
 
+    // 真正的启动操作在这里
     ngx_http_upstream_init_request(r);
 }
 
 
+// 启动upstream框架，开始与上游服务器异步交互
 static void
 ngx_http_upstream_init_request(ngx_http_request_t *r)
 {
@@ -593,7 +604,9 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         r->write_event_handler = ngx_http_upstream_wr_check_broken_connection;
     }
 
+    // 检查下游请求里的请求体数据
     if (r->request_body) {
+        // 如果有就赋值给upstream结构体
         u->request_bufs = r->request_body->bufs;
     }
 
