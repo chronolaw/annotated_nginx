@@ -3,6 +3,8 @@
 // * ngx_http_upstream_create
 // * ngx_http_upstream_init
 // * ngx_http_upstream_init_request
+// * ngx_http_upstream_send_request
+// * ngx_http_upstream_finalize_request
 
 /*
  * Copyright (C) Igor Sysoev
@@ -38,14 +40,25 @@ static void ngx_http_upstream_rd_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     ngx_event_t *ev);
+
+// 尝试连接后端服务器
 static void ngx_http_upstream_connect(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
+
+// 如果已经发送了请求
+// 需要重新初始化，调用reinit_request
+// 如果有下游请求体数据也要重新初始化
 static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
+
+// 向后端发送请求
 static void ngx_http_upstream_send_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t do_write);
+
+// 后端服务器连接成功，发送数据
 static ngx_int_t ngx_http_upstream_send_request_body(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t do_write);
+
 static void ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_read_request_handler(ngx_http_request_t *r);
@@ -56,12 +69,19 @@ static ngx_int_t ngx_http_upstream_test_next(ngx_http_request_t *r,
 static ngx_int_t ngx_http_upstream_intercept_errors(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_test_connect(ngx_connection_t *c);
+
+// upstream机制处理头信息
+// 拷贝信息到主请求的header结构体里
 static ngx_int_t ngx_http_upstream_process_headers(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
+
 static void ngx_http_upstream_process_body_in_memory(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
+
+// 发送数据给下游，之前已经正确处理了上游的响应头
 static void ngx_http_upstream_send_response(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
+
 static void ngx_http_upstream_upgrade(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_upgraded_read_downstream(ngx_http_request_t *r);
@@ -80,9 +100,15 @@ static void
 static void
     ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     ngx_uint_t do_write);
+
+// 什么也不做，空函数
 static ngx_int_t ngx_http_upstream_non_buffered_filter_init(void *data);
+
+// 简单地把buffer里收到的数据依次挂到out_bufs链表的末尾
+// 这意味着upstream框架设置的buffer必须足够大，能够容纳上游的所有数据
 static ngx_int_t ngx_http_upstream_non_buffered_filter(void *data,
     ssize_t bytes);
+
 #if (NGX_THREADS)
 static ngx_int_t ngx_http_upstream_thread_handler(ngx_thread_task_t *task,
     ngx_file_t *file);
@@ -102,6 +128,10 @@ static void ngx_http_upstream_dummy_handler(ngx_http_request_t *r,
 static void ngx_http_upstream_next(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t ft_type);
 static void ngx_http_upstream_cleanup(void *data);
+
+// 结束请求，这时会调用finalize_request回调函数
+// 让upstream模块有机会做一些自己的收尾工作
+// 最后调用ngx_http_finalize_request
 static void ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc);
 
@@ -539,6 +569,7 @@ ngx_http_upstream_init(ngx_http_request_t *r)
 
 
 // 启动upstream框架，开始与上游服务器异步交互
+// 调用模块的create_request,创建要发送给后端的请求数据
 static void
 ngx_http_upstream_init_request(ngx_http_request_t *r)
 {
@@ -610,6 +641,8 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         u->request_bufs = r->request_body->bufs;
     }
 
+    // 调用模块的create_request
+    // 创建要发送给后端的请求数据
     if (u->create_request(r) != NGX_OK) {
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
@@ -652,12 +685,14 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
     }
 
+    // 添加请求的清理机制
     cln = ngx_http_cleanup_add(r, 0);
     if (cln == NULL) {
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
 
+    // 设置清理handler
     cln->handler = ngx_http_upstream_cleanup;
     cln->data = r;
     u->cleanup = &cln->handler;
@@ -772,6 +807,7 @@ found:
     u->ssl_name = uscf->host;
 #endif
 
+    // 调用peer.init，loadbalance模块负载均衡选择后端服务器
     if (uscf->peer.init(r, uscf) != NGX_OK) {
         ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -786,6 +822,7 @@ found:
         u->peer.tries = u->conf->next_upstream_tries;
     }
 
+    // 尝试连接后端服务器
     ngx_http_upstream_connect(r, u);
 }
 
@@ -1352,6 +1389,7 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 }
 
 
+// 尝试连接后端服务器
 static void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
@@ -1373,10 +1411,12 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
 
+    // 计算后端连接的时间
     u->state->response_time = ngx_current_msec;
     u->state->connect_time = (ngx_msec_t) -1;
     u->state->header_time = (ngx_msec_t) -1;
 
+    // 连接后端服务器
     rc = ngx_event_connect_peer(&u->peer);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -1390,6 +1430,8 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     u->state->peer = u->peer.name;
 
+    // 如果后端服务器状态不对，选择另外一个服务器
+    // 调用reinit_request
     if (rc == NGX_BUSY) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "no live upstreams");
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_NOLIVE);
@@ -1403,6 +1445,9 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* rc == NGX_OK || rc == NGX_AGAIN || rc == NGX_DONE */
 
+    // 连接成功
+
+    // c是后端的连接对象，不是下游的连接对象
     c = u->peer.connection;
 
     c->data = r;
@@ -1410,7 +1455,10 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     c->write->handler = ngx_http_upstream_handler;
     c->read->handler = ngx_http_upstream_handler;
 
+    // 设置写事件handler，要发送请求
     u->write_event_handler = ngx_http_upstream_send_request_handler;
+
+    // 读事件handler，处理响应头
     u->read_event_handler = ngx_http_upstream_process_header;
 
     c->sendfile &= r->connection->sendfile;
@@ -1440,6 +1488,8 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->writer.connection = c;
     u->writer.limit = 0;
 
+    // 如果已经发送了请求
+    // 需要重新初始化，调用reinit_request
     if (u->request_sent) {
         if (ngx_http_upstream_reinit(r, u) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
@@ -1448,6 +1498,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
         }
     }
 
+    // 有请求体数据
     if (r->request_body
         && r->request_body->buf
         && r->request_body->temp_file
@@ -1477,6 +1528,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->request_sent = 0;
     u->request_body_sent = 0;
 
+    // 设置后端服务器的连接超时
     if (rc == NGX_AGAIN) {
         ngx_add_timer(c->write, u->conf->connect_timeout);
         return;
@@ -1491,6 +1543,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
 #endif
 
+    // 向后端发送请求
     ngx_http_upstream_send_request(r, u, 1);
 }
 
@@ -1728,12 +1781,16 @@ done:
 #endif
 
 
+// 如果已经发送了请求
+// 需要重新初始化，调用reinit_request
+// 如果有下游请求体数据也要重新初始化
 static ngx_int_t
 ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
     off_t         file_pos;
     ngx_chain_t  *cl;
 
+    // 调用模块的reinit_request，重新初始化后端请求
     if (u->reinit_request(r) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -1741,6 +1798,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->keepalive = 0;
     u->upgrade = 0;
 
+    // 重新初始化upstream结构体
     ngx_memzero(&u->headers_in, sizeof(ngx_http_upstream_headers_in_t));
     u->headers_in.content_length_n = -1;
     u->headers_in.last_modified_time = -1;
@@ -1769,6 +1827,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* reinit the subrequest's ngx_output_chain() context */
 
+    // 如果有下游请求体数据也要重新初始化
     if (r->request_body && r->request_body->temp_file
         && r != r->main && u->output.buf)
     {
@@ -1806,6 +1865,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 }
 
 
+// 向后端发送请求
 static void
 ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t do_write)
@@ -1813,15 +1873,18 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_int_t          rc;
     ngx_connection_t  *c;
 
+    // c是后端服务器的连接
     c = u->peer.connection;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http upstream send request");
 
+    // 计算连接时间
     if (u->state->connect_time == (ngx_msec_t) -1) {
         u->state->connect_time = ngx_current_msec - u->state->response_time;
     }
 
+    // 检查连接是否正常
     if (!u->request_sent && ngx_http_upstream_test_connect(c) != NGX_OK) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
@@ -1829,19 +1892,25 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     c->log->action = "sending request to upstream";
 
+    // 连接成功，发送数据
     rc = ngx_http_upstream_send_request_body(r, u, do_write);
 
+    // 失败则尝试下一个后端服务器
     if (rc == NGX_ERROR) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
     }
 
+    // 特别的错误直接结束整个请求
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         ngx_http_upstream_finalize_request(r, u, rc);
         return;
     }
 
+    // again表示已经发送但未发送完，需要等待下一个事件
     if (rc == NGX_AGAIN) {
+
+        // 设置发送超时
         if (!c->write->ready) {
             ngx_add_timer(c->write, u->conf->send_timeout);
 
@@ -1849,6 +1918,7 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
             ngx_del_timer(c->write);
         }
 
+        // 加入写事件，等待epoll报告可用再继续发送
         if (ngx_handle_write_event(c->write, u->conf->send_lowat) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1860,8 +1930,12 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     /* rc == NGX_OK */
 
+    // 此时数据已经全部发送给了后端
+
+    // 设置发送的标记
     u->request_body_sent = 1;
 
+    // 已经发送完，就不需要写超时了
     if (c->write->timer_set) {
         ngx_del_timer(c->write);
     }
@@ -1878,6 +1952,7 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
         c->tcp_nopush = NGX_TCP_NOPUSH_UNSET;
     }
 
+    // 不再需要发送数据，写handler置为空
     u->write_event_handler = ngx_http_upstream_dummy_handler;
 
     if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
@@ -1886,8 +1961,10 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
         return;
     }
 
+    // 准备接受后端服务器返回的数据，读超时
     ngx_add_timer(c->read, u->conf->read_timeout);
 
+    // 如果此时可读（有数据），那么就开始处理响应头
     if (c->read->ready) {
         ngx_http_upstream_process_header(r, u);
         return;
@@ -1895,6 +1972,7 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
 }
 
 
+// 后端服务器连接成功，发送数据
 static ngx_int_t
 ngx_http_upstream_send_request_body(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t do_write)
@@ -2071,6 +2149,8 @@ ngx_http_upstream_read_request_handler(ngx_http_request_t *r)
 }
 
 
+// 检查后端服务器是否读超时，否则选择下一个后端服务器
+// 如果可读（有数据），那么就开始处理响应头
 static void
 ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
@@ -2085,16 +2165,19 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     c->log->action = "reading response header from upstream";
 
+    // 检查后端服务器是否读超时，否则选择下一个后端服务器
     if (c->read->timedout) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_TIMEOUT);
         return;
     }
 
+    // 如果没发数据或者连接失败，选择下一个服务器
     if (!u->request_sent && ngx_http_upstream_test_connect(c) != NGX_OK) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
     }
 
+    // 分配一块内存用来接受后端发送的数据
     if (u->buffer.start == NULL) {
         u->buffer.start = ngx_palloc(r->pool, u->conf->buffer_size);
         if (u->buffer.start == NULL) {
@@ -2103,6 +2186,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
             return;
         }
 
+        // 设置缓冲器的边界
         u->buffer.pos = u->buffer.start;
         u->buffer.last = u->buffer.start;
         u->buffer.end = u->buffer.start + u->conf->buffer_size;
@@ -2110,6 +2194,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
         u->buffer.tag = u->output.tag;
 
+        // 初始化upstream里的头信息链表
         if (ngx_list_init(&u->headers_in.headers, r->pool, 8,
                           sizeof(ngx_table_elt_t))
             != NGX_OK)
@@ -2128,10 +2213,13 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 #endif
     }
 
+    // 与http read类似，反复调用recv接收数据
     for ( ;; ) {
 
+        // 调用recv接收数据
         n = c->recv(c, u->buffer.last, u->buffer.end - u->buffer.last);
 
+        // again，那么就加入读事件，继续读数据，直到超时或错误
         if (n == NGX_AGAIN) {
 #if 0
             ngx_add_timer(rev, u->read_timeout);
@@ -2146,16 +2234,19 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
             return;
         }
 
+        // n==0， 后端服务器主动关闭了连接
         if (n == 0) {
             ngx_log_error(NGX_LOG_ERR, c->log, 0,
                           "upstream prematurely closed connection");
         }
 
+        // 发送错误就尝试下一个后端服务器
         if (n == NGX_ERROR || n == 0) {
             ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
             return;
         }
 
+        // 读到了一些数据，加入缓冲器，长度增加
         u->buffer.last += n;
 
 #if 0
@@ -2164,10 +2255,16 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
         u->peer.cached = 0;
 #endif
 
+        // 调用模块的process_header处理响应头
+        // 由于upstream框架异步接收数据，process_header不可能一次就解析完毕
+        // 所以通常需要使用请求环境数据ctx来暂存解析结果
         rc = u->process_header(r);
 
+        // 未解析完返回NGX_AGAIN继续解析
         if (rc == NGX_AGAIN) {
 
+            // 缓冲区用尽，头还没解析出来
+            // 说明头太大，是错误，尝试下一个后端服务器
             if (u->buffer.last == u->buffer.end) {
                 ngx_log_error(NGX_LOG_ERR, c->log, 0,
                               "upstream sent too big header");
@@ -2177,17 +2274,20 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
                 return;
             }
 
+            // 继续循环，也就是继续recv数据
             continue;
         }
 
         break;
     }
 
+    // 返回头无效，数据出错，尝试下一个后端服务器
     if (rc == NGX_HTTP_UPSTREAM_INVALID_HEADER) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_INVALID_HEADER);
         return;
     }
 
+    // 严重错误，结束upstream请求
     if (rc == NGX_ERROR) {
         ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -2196,8 +2296,12 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* rc == NGX_OK */
 
+    // 接收到的数据成功解析出了响应头
+
+    // 计算响应头接收的时间
     u->state->header_time = ngx_current_msec - u->state->response_time;
 
+    // 查看响应状态，注意是在upstream结构体里
     if (u->headers_in.status_n >= NGX_HTTP_SPECIAL_RESPONSE) {
 
         if (ngx_http_upstream_test_next(r, u) == NGX_OK) {
@@ -2209,23 +2313,31 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
         }
     }
 
+    // upstream机制处理头信息
+    // 拷贝信息到主请求的header结构体里
     if (ngx_http_upstream_process_headers(r, u) != NGX_OK) {
         return;
     }
 
+    // 数据不在内存里做处理
     if (!r->subrequest_in_memory) {
+        // 那么就直接发给下游
         ngx_http_upstream_send_response(r, u);
         return;
     }
 
     /* subrequest content in memory */
 
+    // 数据在内存里做处理
+
+    // 检查过滤器，如果模块没有设置就使用默认的
     if (u->input_filter == NULL) {
         u->input_filter_init = ngx_http_upstream_non_buffered_filter_init;
         u->input_filter = ngx_http_upstream_non_buffered_filter;
         u->input_filter_ctx = r;
     }
 
+    // 过滤器初始化
     if (u->input_filter_init(u->input_filter_ctx) == NGX_ERROR) {
         ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
         return;
@@ -2233,6 +2345,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     n = u->buffer.last - u->buffer.pos;
 
+    // 执行过滤
     if (n) {
         u->buffer.last = u->buffer.pos;
 
@@ -2249,6 +2362,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
         return;
     }
 
+    // 继续读数据并过滤数据
     u->read_event_handler = ngx_http_upstream_process_body_in_memory;
 
     ngx_http_upstream_process_body_in_memory(r, u);
@@ -2473,6 +2587,8 @@ ngx_http_upstream_test_connect(ngx_connection_t *c)
 }
 
 
+// upstream机制处理头信息
+// 拷贝信息到主请求的header结构体里
 static ngx_int_t
 ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
@@ -2693,6 +2809,7 @@ ngx_http_upstream_process_body_in_memory(ngx_http_request_t *r,
 }
 
 
+// 发送数据给下游，之前已经正确处理了上游的响应头
 static void
 ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
@@ -2703,6 +2820,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 发送响应头
     rc = ngx_http_send_header(r);
 
     if (rc == NGX_ERROR || rc > NGX_OK || r->post_action) {
@@ -2710,6 +2828,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
         return;
     }
 
+    // 设置发送头标记
     u->header_sent = 1;
 
     if (u->upgrade) {
@@ -3479,6 +3598,7 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
 }
 
 
+// 什么也不做，空函数
 static ngx_int_t
 ngx_http_upstream_non_buffered_filter_init(void *data)
 {
@@ -3486,6 +3606,8 @@ ngx_http_upstream_non_buffered_filter_init(void *data)
 }
 
 
+// 简单地把buffer里收到的数据依次挂到out_bufs链表的末尾
+// 这意味着upstream框架设置的buffer必须足够大，能够容纳上游的所有数据
 static ngx_int_t
 ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes)
 {
@@ -4088,6 +4210,9 @@ ngx_http_upstream_cleanup(void *data)
 }
 
 
+// 结束请求，这时会调用finalize_request回调函数
+// 让upstream模块有机会做一些自己的收尾工作
+// 最后调用ngx_http_finalize_request
 static void
 ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc)
@@ -4119,6 +4244,7 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         }
     }
 
+    // 调用finalize_request回调函数，让upstream模块有机会做一些自己的收尾工作
     u->finalize_request(r, rc);
 
     if (u->peer.free && u->peer.sockaddr) {
