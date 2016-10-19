@@ -951,6 +951,8 @@ ngx_ssl_dhparam(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file)
             return NGX_ERROR;
         }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100005L
+
         dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
         dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
 
@@ -959,6 +961,23 @@ ngx_ssl_dhparam(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file)
             DH_free(dh);
             return NGX_ERROR;
         }
+
+#else
+        {
+        BIGNUM  *p, *g;
+
+        p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+        g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+
+        if (p == NULL || g == NULL || !DH_set0_pqg(dh, p, NULL, g)) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0, "BN_bin2bn() failed");
+            DH_free(dh);
+            BN_free(p);
+            BN_free(g);
+            return NGX_ERROR;
+        }
+        }
+#endif
 
         SSL_CTX_set_tmp_dh(ssl->ctx, dh);
 
@@ -1938,7 +1957,9 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
             || n == SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST              /*  151 */
             || n == SSL_R_EXCESSIVE_MESSAGE_SIZE                     /*  152 */
             || n == SSL_R_LENGTH_MISMATCH                            /*  159 */
+#ifdef SSL_R_NO_CIPHERS_PASSED
             || n == SSL_R_NO_CIPHERS_PASSED                          /*  182 */
+#endif
             || n == SSL_R_NO_CIPHERS_SPECIFIED                       /*  183 */
             || n == SSL_R_NO_COMPRESSION_SPECIFIED                   /*  187 */
             || n == SSL_R_NO_SHARED_CIPHER                           /*  193 */
@@ -2898,7 +2919,7 @@ ngx_ssl_session_ticket_key_callback(ngx_ssl_conn_t *ssl_conn,
                      ngx_ssl_session_ticket_md(), NULL);
         ngx_memcpy(name, key[0].name, 16);
 
-        return 0;
+        return 1;
 
     } else {
         /* decrypt session ticket */
