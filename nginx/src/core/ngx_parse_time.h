@@ -22,6 +22,9 @@ time_t ngx_parse_http_time(u_char *value, size_t len);
 
 /* compatibility */
 // 使用宏保留了之前版本的名字
+//
+// 之前的版本定义在http/ngx_http.h
+// time_t ngx_http_parse_time(u_char *value, size_t len);
 #define ngx_http_parse_time(value, len)  ngx_parse_http_time(value, len)
 
 
