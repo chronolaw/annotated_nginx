@@ -102,11 +102,18 @@ static void ngx_stream_proxy_connect_handler(ngx_event_t *ev);
 // 测试连接是否成功，失败就再试下一个上游
 static ngx_int_t ngx_stream_proxy_test_connect(ngx_connection_t *c);
 
+// 核心处理函数，处理两个连接的数据收发
+// 可以处理上下游的数据收发
+// 参数标记是否是上游、是否写数据
 static void ngx_stream_proxy_process(ngx_stream_session_t *s,
     ngx_uint_t from_upstream, ngx_uint_t do_write);
 
+// 连接失败，尝试下一个上游server
 static void ngx_stream_proxy_next_upstream(ngx_stream_session_t *s);
+
+// 关闭上下游的连接
 static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_int_t rc);
+
 static u_char *ngx_stream_proxy_log_error(ngx_log_t *log, u_char *buf,
     size_t len);
 
@@ -434,7 +441,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         return;
     }
 
-    // 准备开始连接，设置开始时间，秒数，没有毫秒
+    // 准备开始连接，设置开始时间，毫秒
     u->peer.start_time = ngx_current_msec;
 
     // 设置负载均衡的重试次数
@@ -1050,6 +1057,7 @@ ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
     s = c->data;
     u = s->upstream;
 
+    // c是下游连接，pc是上游连接
     c = s->connection;
     pc = u->peer.connection;
 
@@ -1118,6 +1126,7 @@ ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
         return;
     }
 
+    // 核心处理函数，处理两个连接的数据收发
     ngx_stream_proxy_process(s, from_upstream, ev->write);
 }
 
@@ -1204,6 +1213,7 @@ ngx_stream_proxy_test_connect(ngx_connection_t *c)
 }
 
 
+// 核心处理函数，处理两个连接的数据收发
 // 可以处理上下游的数据收发
 // 参数标记是否是上游、是否写数据
 static void
@@ -1387,7 +1397,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 
                 src->read->eof = 1;
             }
-        }
+        }   // 读数据部分结束
 
         break;
     }   // for循环结束
@@ -1434,6 +1444,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 }
 
 
+// 连接失败，尝试下一个上游server
 static void
 ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
 {
@@ -1487,6 +1498,7 @@ ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
 }
 
 
+// 关闭上下游的连接
 static void
 ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_int_t rc)
 {
