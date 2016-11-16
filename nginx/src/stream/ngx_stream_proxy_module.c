@@ -72,13 +72,23 @@ static void ngx_stream_proxy_handler(ngx_stream_session_t *s);
 // 连接成功要调用init初始化上游
 static void ngx_stream_proxy_connect(ngx_stream_session_t *s);
 
+// 分配供上游读取数据的缓冲区
+// 进入此函数，肯定已经成功连接了上游服务器
+// 修改上游读写事件，不再测试连接，改为ngx_stream_proxy_upstream_handler
+// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s);
 
 // 连接成功之后的事件处理函数
 // 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
 static void ngx_stream_proxy_upstream_handler(ngx_event_t *ev);
 
+// 处理下游的handler
+// ev->write==true，即向下游写数据
 static void ngx_stream_proxy_downstream_handler(ngx_event_t *ev);
+
+// 处理上下游的数据收发
+// from_upstream参数标记是否是上游，使用的是ev->write
+// 可读是上游，可写是下游
 static void ngx_stream_proxy_process_connection(ngx_event_t *ev,
     ngx_uint_t from_upstream);
 
@@ -374,6 +384,7 @@ ngx_module_t  ngx_stream_proxy_module = {
 // 里面有如何获取负载均衡server、上下游buf等
 // 负载均衡算法初始化
 // 准备开始连接，设置开始时间，秒数，没有毫秒
+// 使用内存池分配接收数据的缓冲区
 // 最后启动连接
 static void
 ngx_stream_proxy_handler(ngx_stream_session_t *s)
@@ -1001,6 +1012,8 @@ done:
 #endif
 
 
+// 处理下游的handler
+// ev->write==true，即向下游写数据
 static void
 ngx_stream_proxy_downstream_handler(ngx_event_t *ev)
 {
@@ -1010,6 +1023,7 @@ ngx_stream_proxy_downstream_handler(ngx_event_t *ev)
 
 // 连接成功之后的事件处理函数
 // 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
+// 即从上游读数据
 static void
 ngx_stream_proxy_upstream_handler(ngx_event_t *ev)
 {
@@ -1017,6 +1031,9 @@ ngx_stream_proxy_upstream_handler(ngx_event_t *ev)
 }
 
 
+// 处理上下游的数据收发
+// from_upstream参数标记是否是上游，使用的是ev->write
+// 可读是上游，可写是下游
 static void
 ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
 {
@@ -1184,6 +1201,8 @@ ngx_stream_proxy_test_connect(ngx_connection_t *c)
 }
 
 
+// 可以处理上下游的数据收发
+// 参数标记是否是上游、是否写数据
 static void
 ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
     ngx_uint_t do_write)
@@ -1199,11 +1218,17 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
     ngx_stream_upstream_t        *u;
     ngx_stream_proxy_srv_conf_t  *pscf;
 
+    // u是上游结构体
     u = s->upstream;
 
+    // c是下游的连接
     c = s->connection;
+
+    // pc是上游的连接，如果连接失败就是nullptr
     pc = u->connected ? u->peer.connection : NULL;
 
+    // nginx处于即将停止状态，连接是udp
+    // 使用连接的log记录日志
     if (c->type == SOCK_DGRAM && (ngx_terminate || ngx_exiting)) {
 
         /* socket is already closed on worker shutdown */
@@ -1219,8 +1244,11 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         return;
     }
 
+    // 取proxy模块的配置
     pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
 
+    // 根据上下游状态决定来源和目标
+    // 以及缓冲区、限速等
     if (from_upstream) {
         src = pc;
         dst = c;
@@ -1236,12 +1264,16 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         received = &s->received;
     }
 
+    // b指向当前需要操作的缓冲区
+    // 死循环操作，直到出错或者again
     for ( ;; ) {
 
+        // 如果要求写，那么把缓冲区里的数据发到dst
         if (do_write) {
 
             size = b->last - b->pos;
 
+            // 条件是有数据，且dst连接是可写的
             if (size && dst && dst->write->ready) {
 
                 n = dst->send(dst, b->pos, size);
@@ -1261,21 +1293,30 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                     return;
                 }
 
+                // n > 0， 已经成功发送了n字节的数据
+                // 消费缓冲区
                 if (n > 0) {
                     b->pos += n;
 
+                    // 如果数据都发完了，缓冲区清空
+                    // 指针都移动到start位置
                     if (b->pos == b->last) {
                         b->pos = b->start;
                         b->last = b->start;
                     }
                 }
+
+                // n = ngx_again，需要等待可写才能再次发送
             }
         }
 
+        // size是缓冲区的剩余可用空间
         size = b->end - b->last;
 
+        // 如果缓冲区有剩余，且src还可以读数据
         if (size && src->read->ready && !src->read->delayed) {
 
+            // 限速处理
             if (limit_rate) {
                 limit = (off_t) limit_rate * (ngx_time() - u->start_sec + 1)
                         - *received;
@@ -1292,13 +1333,19 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                 }
             }
 
+            // 尽量读满缓冲区
             n = src->recv(src, b->last, size);
 
+            // 如果不可读，或者已经读完
+            // break结束for循环
             if (n == NGX_AGAIN || n == 0) {
                 break;
             }
 
+            // 读取了n字节的数据
             if (n > 0) {
+
+                // 限速
                 if (limit_rate) {
                     delay = (ngx_msec_t) (n * 1000 / limit_rate);
 
@@ -1308,19 +1355,27 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                     }
                 }
 
+                // udp处理
                 if (c->type == SOCK_DGRAM && ++u->responses == pscf->responses)
                 {
                     src->read->ready = 0;
                     src->read->eof = 1;
                 }
 
+                // 增加接收的数据字节数
                 *received += n;
+
+                // 缓冲区的末尾指针移动，表示收到了n字节新数据
                 b->last += n;
+
+                // 有数据，那么就可以继续向dst发送
                 do_write = 1;
 
+                // 回到for循环开头，继续发送数据
                 continue;
             }
 
+            // 读数据出错，尝试下一个upstream
             if (n == NGX_ERROR) {
                 if (c->type == SOCK_DGRAM && u->received == 0) {
                     ngx_stream_proxy_next_upstream(s);
@@ -1332,8 +1387,9 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         }
 
         break;
-    }
+    }   // for循环结束
 
+    // 这时应该是src已经读完，数据也发送完
     if (src->read->eof && (b->pos == b->last || (dst && dst->read->eof))) {
         handler = c->log->handler;
         c->log->handler = NULL;
