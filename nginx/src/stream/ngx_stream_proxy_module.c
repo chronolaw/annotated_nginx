@@ -4,6 +4,7 @@
 // * ngx_stream_proxy_handler
 // * ngx_stream_proxy_connect_handler
 // * ngx_stream_proxy_init_upstream
+// * ngx_stream_proxy_process
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -103,6 +104,7 @@ static ngx_int_t ngx_stream_proxy_test_connect(ngx_connection_t *c);
 
 static void ngx_stream_proxy_process(ngx_stream_session_t *s,
     ngx_uint_t from_upstream, ngx_uint_t do_write);
+
 static void ngx_stream_proxy_next_upstream(ngx_stream_session_t *s);
 static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_int_t rc);
 static u_char *ngx_stream_proxy_log_error(ngx_log_t *log, u_char *buf,
@@ -708,6 +710,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         ngx_post_event(pc->read, &ngx_posted_events);
     }
 
+    // 参数表示上游连接，上游可写
     ngx_stream_proxy_process(s, 0, 1);
 }
 
