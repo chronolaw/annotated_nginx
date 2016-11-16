@@ -16,6 +16,8 @@
 #include <ngx_stream.h>
 
 
+// 定义各种连接上游服务器的参数
+// 例如超时、缓冲区大小
 typedef struct {
     ngx_msec_t                       connect_timeout;
     ngx_msec_t                       timeout;
@@ -55,6 +57,8 @@ typedef struct {
 
 
 // ngx_stream_init_connection->ngx_stream_init_session之后调用，处理请求
+// 即content handler
+//
 // 创建连接上游的结构体
 // 里面有如何获取负载均衡server、上下游buf等
 // 负载均衡算法初始化
