@@ -85,6 +85,7 @@ struct ngx_rbtree_s {
 // 插入后旋转红黑树，保持平衡
 void ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node);
 
+// 在红黑树里删除一个节点
 void ngx_rbtree_delete(ngx_rbtree_t *tree, ngx_rbtree_node_t *node);
 
 // 普通红黑树插入函数
