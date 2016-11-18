@@ -1417,6 +1417,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 
         c->log->handler = handler;
 
+        // 在这里记录访问日志
         ngx_stream_proxy_finalize(s, NGX_OK);
         return;
     }
