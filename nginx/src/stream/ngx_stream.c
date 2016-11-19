@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_stream_block
+// * ngx_stream_optimize_servers
 
 /*
  * Copyright (C) Roman Arutyunyan
