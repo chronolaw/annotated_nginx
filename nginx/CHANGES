@@ -1,4 +1,43 @@
 
+Changes with nginx 1.11.6                                        15 Nov 2016
+
+    *) Change: format of the $ssl_client_s_dn and $ssl_client_i_dn variables
+       has been changed to follow RFC 2253 (RFC 4514); values in the old
+       format are available in the $ssl_client_s_dn_legacy and
+       $ssl_client_i_dn_legacy variables.
+
+    *) Change: when storing temporary files in a cache directory they will
+       be stored in the same subdirectories as corresponding cache files
+       instead of a separate subdirectory for temporary files.
+
+    *) Feature: EXTERNAL authentication mechanism support in mail proxy.
+       Thanks to Robert Norris.
+
+    *) Feature: WebP support in the ngx_http_image_filter_module.
+
+    *) Feature: variables support in the "proxy_method" directive.
+       Thanks to Dmitry Lazurkin.
+
+    *) Feature: the "http2_max_requests" directive in the
+       ngx_http_v2_module.
+
+    *) Feature: the "proxy_cache_max_range_offset",
+       "fastcgi_cache_max_range_offset", "scgi_cache_max_range_offset", and
+       "uwsgi_cache_max_range_offset" directives.
+
+    *) Bugfix: graceful shutdown of old worker processes might require
+       infinite time when using HTTP/2.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+
+    *) Bugfix: "ignore long locked inactive cache entry" alerts might appear
+       in logs when proxying WebSocket connections with caching enabled.
+
+    *) Bugfix: nginx did not write anything to log and returned a response
+       with code 502 instead of 504 when a timeout occurred during an SSL
+       handshake to a backend.
+
+
 Changes with nginx 1.11.5                                        11 Oct 2016
 
     *) Change: the --with-ipv6 configure option was removed, now IPv6
