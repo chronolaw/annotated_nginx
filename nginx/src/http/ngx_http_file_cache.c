@@ -1920,17 +1920,18 @@ ngx_http_file_cache_manager(void *data)
     ngx_http_file_cache_t  *cache = data;
 
     off_t       size;
-    time_t      next, wait;
-    ngx_msec_t  elapsed;
+    time_t      wait;
+    ngx_msec_t  elapsed, next;
     ngx_uint_t  count, watermark;
 
     cache->last = ngx_current_msec;
     cache->files = 0;
 
-    next = ngx_http_file_cache_expire(cache);
+    next = (ngx_msec_t) ngx_http_file_cache_expire(cache) * 1000;
 
     if (next == 0) {
-        return cache->manager_sleep;
+        next = cache->manager_sleep;
+        goto done;
     }
 
     for ( ;; ) {
@@ -1947,21 +1948,23 @@ ngx_http_file_cache_manager(void *data)
                        size, count, (ngx_int_t) watermark);
 
         if (size < cache->max_size && count < watermark) {
-            return (ngx_msec_t) next * 1000;
+            break;
         }
 
         wait = ngx_http_file_cache_forced_expire(cache);
 
         if (wait > 0) {
-            return (ngx_msec_t) wait * 1000;
+            next = (ngx_msec_t) wait * 1000;
+            break;
         }
 
         if (ngx_quit || ngx_terminate) {
-            return (ngx_msec_t) next * 1000;
+            break;
         }
 
         if (++cache->files >= cache->manager_files) {
-            return cache->manager_sleep;
+            next = cache->manager_sleep;
+            break;
         }
 
         ngx_time_update();
@@ -1969,9 +1972,20 @@ ngx_http_file_cache_manager(void *data)
         elapsed = ngx_abs((ngx_msec_int_t) (ngx_current_msec - cache->last));
 
         if (elapsed >= cache->manager_threshold) {
-            return cache->manager_sleep;
+            next = cache->manager_sleep;
+            break;
         }
     }
+
+done:
+
+    elapsed = ngx_abs((ngx_msec_int_t) (ngx_current_msec - cache->last));
+
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "http file cache manager: %ui e:%M n:%M",
+                   cache->files, elapsed, next);
+
+    return next;
 }
 
 
@@ -2096,6 +2110,17 @@ ngx_http_file_cache_add_file(ngx_tree_ctx_t *ctx, ngx_str_t *name)
 
     if (name->len < 2 * NGX_HTTP_CACHE_KEY_LEN) {
         return NGX_ERROR;
+    }
+
+    /*
+     * Temporary files in cache have a suffix consisting of a dot
+     * followed by 10 digits.
+     */
+
+    if (name->len >= 2 * NGX_HTTP_CACHE_KEY_LEN + 1 + 10
+        && name->data[name->len - 10 - 1] == '.')
+    {
+        return NGX_OK;
     }
 
     if (ctx->size < (off_t) sizeof(ngx_http_file_cache_header_t)) {
@@ -2242,7 +2267,6 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     off_t                   max_size;
     u_char                 *last, *p;
     time_t                  inactive;
-    size_t                  len;
     ssize_t                 size;
     ngx_str_t               s, name, *value;
     ngx_int_t               loader_files, manager_files;
@@ -2515,37 +2539,6 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (!use_temp_path) {
-        cache->temp_path = ngx_pcalloc(cf->pool, sizeof(ngx_path_t));
-        if (cache->temp_path == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        len = cache->path->name.len + sizeof("/temp") - 1;
-
-        p = ngx_pnalloc(cf->pool, len + 1);
-        if (p == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        cache->temp_path->name.len = len;
-        cache->temp_path->name.data = p;
-
-        p = ngx_cpymem(p, cache->path->name.data, cache->path->name.len);
-        ngx_memcpy(p, "/temp", sizeof("/temp"));
-
-        ngx_memcpy(&cache->temp_path->level, &cache->path->level,
-                   NGX_MAX_PATH_LEVEL * sizeof(size_t));
-
-        cache->temp_path->len = cache->path->len;
-        cache->temp_path->conf_file = cf->conf_file->file.name.data;
-        cache->temp_path->line = cf->conf_file->line;
-
-        if (ngx_add_path(cf, &cache->temp_path) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
-    }
-
     cache->shm_zone = ngx_shared_memory_add(cf, &name, size, cmd->post);
     if (cache->shm_zone == NULL) {
         return NGX_CONF_ERROR;
@@ -2560,6 +2553,8 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cache->shm_zone->init = ngx_http_file_cache_init;
     cache->shm_zone->data = cache;
+
+    cache->use_temp_path = use_temp_path;
 
     cache->inactive = inactive;
     cache->max_size = max_size;

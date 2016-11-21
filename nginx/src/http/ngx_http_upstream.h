@@ -128,7 +128,6 @@ struct ngx_http_upstream_srv_conf_s {
     u_char                          *file_name;
     ngx_uint_t                       line;
     in_port_t                        port;
-    in_port_t                        default_port;
     ngx_uint_t                       no_port;  /* unsigned no_port:1 */
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
@@ -198,6 +197,8 @@ typedef struct {
     ngx_uint_t                       cache_min_uses;
     ngx_uint_t                       cache_use_stale;
     ngx_uint_t                       cache_methods;
+
+    off_t                            cache_max_range_offset;
 
     ngx_flag_t                       cache_lock;
     ngx_msec_t                       cache_lock_timeout;
@@ -300,6 +301,7 @@ typedef struct {
 
     struct sockaddr                 *sockaddr;
     socklen_t                        socklen;
+    ngx_str_t                        name;
 
     ngx_resolver_ctx_t              *ctx;
 } ngx_http_upstream_resolved_t;
