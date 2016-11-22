@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// 工作在CONTENT阶段
+// 读取磁盘上的静态文件作为响应内容
+// 提供Nginx作为Web服务器最基本的功能
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,10 +15,14 @@
 #include <ngx_http.h>
 
 
+// 读取磁盘上的静态文件作为响应内容
 static ngx_int_t ngx_http_static_handler(ngx_http_request_t *r);
+
+// postconfiguration，注册处理函数
 static ngx_int_t ngx_http_static_init(ngx_conf_t *cf);
 
 
+// 仅一个函数指针，注册处理函数
 ngx_http_module_t  ngx_http_static_module_ctx = {
     NULL,                                  /* preconfiguration */
     ngx_http_static_init,                  /* postconfiguration */
@@ -45,6 +54,7 @@ ngx_module_t  ngx_http_static_module = {
 };
 
 
+// 读取磁盘上的静态文件作为响应内容
 static ngx_int_t
 ngx_http_static_handler(ngx_http_request_t *r)
 {
@@ -59,10 +69,12 @@ ngx_http_static_handler(ngx_http_request_t *r)
     ngx_open_file_info_t       of;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 检查method，必须是get/head/post
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD|NGX_HTTP_POST))) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
+    // 检查uri，最后一个字符不能是'/'，也就是说不允许操作目录
     if (r->uri.data[r->uri.len - 1] == '/') {
         return NGX_DECLINED;
     }
@@ -271,19 +283,23 @@ ngx_http_static_handler(ngx_http_request_t *r)
 }
 
 
+// postconfiguration，注册处理函数
 static ngx_int_t
 ngx_http_static_init(ngx_conf_t *cf)
 {
     ngx_http_handler_pt        *h;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 获取core模块的main conf
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
+    // 使用CONTENT_PHASE
     h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
     if (h == NULL) {
         return NGX_ERROR;
     }
 
+    // 添加到phases数组，完成注册
     *h = ngx_http_static_handler;
 
     return NGX_OK;
