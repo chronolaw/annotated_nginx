@@ -86,18 +86,23 @@ ngx_http_static_handler(ngx_http_request_t *r)
      * so we do not need to reserve memory for '/' for possible redirect
      */
 
+    // 把uri映射到磁盘目录path
+    // 根据root/alias指令决定正确的文件位置
     last = ngx_http_map_uri_to_path(r, &path, &root, 0);
     if (last == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // last是计算后的末尾位置，减去开始地址就是path长度
     path.len = last - path.data;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
                    "http filename: \"%s\"", path.data);
 
+    // 获取core loc conf
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 设置打开文件的选项
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 
     of.read_ahead = clcf->read_ahead;
@@ -107,6 +112,7 @@ ngx_http_static_handler(ngx_http_request_t *r)
     of.errors = clcf->open_file_cache_errors;
     of.events = clcf->open_file_cache_events;
 
+    // 不允许符号链接
     if (ngx_http_set_disable_symlinks(r, clcf, &path, &of) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -216,10 +222,13 @@ ngx_http_static_handler(ngx_http_request_t *r)
 
 #endif
 
+    // 不允许post数据到一个文件
+    // 即只允许get/head
     if (r->method == NGX_HTTP_POST) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
+    // 丢弃请求体
     rc = ngx_http_discard_request_body(r);
 
     if (rc != NGX_OK) {
@@ -228,47 +237,63 @@ ngx_http_static_handler(ngx_http_request_t *r)
 
     log->action = "sending response to client";
 
+    // 设置响应头信息：状态码，长度，修改时间
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = of.size;
     r->headers_out.last_modified_time = of.mtime;
 
+    // 设置etag头
     if (ngx_http_set_etag(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // content type
     if (ngx_http_set_content_type(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // r != r->main 子请求
+    // of.size == 0 文件长度是0
+    // 那么就只发送头，没有实际的响应数据
     if (r != r->main && of.size == 0) {
         return ngx_http_send_header(r);
     }
 
+    // 允许range请求
     r->allow_ranges = 1;
 
     /* we need to allocate all before the header would be sent */
 
+    // 创建一个缓冲区结构体，注意不分配实际内存
     b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 创建一个文件结构体，用于描述磁盘文件
     b->file = ngx_pcalloc(r->pool, sizeof(ngx_file_t));
     if (b->file == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 先发送头
     rc = ngx_http_send_header(r);
 
+    // 发送出错，或者head请求，就无需发送body
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
         return rc;
     }
 
+    // 设置缓冲区里的file位置信息
     b->file_pos = 0;
     b->file_last = of.size;
 
     b->in_file = b->file_last ? 1: 0;
+
+    // 如果是主请求，那么last_buf，即最后一块数据
     b->last_buf = (r == r->main) ? 1: 0;
+
+    // 因为只有一块数据，链里的唯一一个也就是最后一个
     b->last_in_chain = 1;
 
     b->file->fd = of.fd;
@@ -276,9 +301,13 @@ ngx_http_static_handler(ngx_http_request_t *r)
     b->file->log = log;
     b->file->directio = of.is_directio;
 
+    // 把缓冲区放进链表里
     out.buf = b;
+
+    // 重要操作，链表的指针必须是nullptr，否则会发生严重错误
     out.next = NULL;
 
+    // 调用过滤链表，走过滤模块，最终发送给客户端
     return ngx_http_output_filter(r, &out);
 }
 
