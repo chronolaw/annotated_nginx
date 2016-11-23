@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -14,6 +16,8 @@ static ngx_uint_t ngx_http_test_if_unmodified(ngx_http_request_t *r);
 static ngx_uint_t ngx_http_test_if_modified(ngx_http_request_t *r);
 static ngx_uint_t ngx_http_test_if_match(ngx_http_request_t *r,
     ngx_table_elt_t *header, ngx_uint_t weak);
+
+// 添加处理函数到链表头，实现过滤链表的注册
 static ngx_int_t ngx_http_not_modified_filter_init(ngx_conf_t *cf);
 
 
@@ -48,12 +52,15 @@ ngx_module_t  ngx_http_not_modified_filter_module = {
 };
 
 
+// 本模块内部的函数指针，保存过滤链表
 static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 
 
+// 过滤处理函数
 static ngx_int_t
 ngx_http_not_modified_header_filter(ngx_http_request_t *r)
 {
+    // 请求处理失败，不是主请求，禁用not_modified
     if (r->headers_out.status != NGX_HTTP_OK
         || r != r->main
         || r->disable_not_modified)
@@ -61,6 +68,7 @@ ngx_http_not_modified_header_filter(ngx_http_request_t *r)
         return ngx_http_next_header_filter(r);
     }
 
+    // 异常情况,if_unmodified_since头不对
     if (r->headers_in.if_unmodified_since
         && !ngx_http_test_if_unmodified(r))
     {
@@ -68,6 +76,7 @@ ngx_http_not_modified_header_filter(ngx_http_request_t *r)
                                                 NGX_HTTP_PRECONDITION_FAILED);
     }
 
+    // 异常情况
     if (r->headers_in.if_match
         && !ngx_http_test_if_match(r, r->headers_in.if_match, 0))
     {
@@ -75,14 +84,17 @@ ngx_http_not_modified_header_filter(ngx_http_request_t *r)
                                                 NGX_HTTP_PRECONDITION_FAILED);
     }
 
+    // 检查是否有if_modified_since和if_none_match头
     if (r->headers_in.if_modified_since || r->headers_in.if_none_match) {
 
+        // 修改时间戳判断
         if (r->headers_in.if_modified_since
             && ngx_http_test_if_modified(r))
         {
             return ngx_http_next_header_filter(r);
         }
 
+        // etag判断
         if (r->headers_in.if_none_match
             && !ngx_http_test_if_match(r, r->headers_in.if_none_match, 1))
         {
@@ -91,10 +103,21 @@ ngx_http_not_modified_header_filter(ngx_http_request_t *r)
 
         /* not modified */
 
+        // 测试完毕，没有修改
+
+        // 把状态码改为304
         r->headers_out.status = NGX_HTTP_NOT_MODIFIED;
+
+        // 状态行清空
         r->headers_out.status_line.len = 0;
+
+        // 内容清空
         r->headers_out.content_type.len = 0;
+
+        // 内容长度清零
         ngx_http_clear_content_length(r);
+
+        // 清除accept_range标志位
         ngx_http_clear_accept_ranges(r);
 
         if (r->headers_out.content_encoding) {
@@ -102,9 +125,12 @@ ngx_http_not_modified_header_filter(ngx_http_request_t *r)
             r->headers_out.content_encoding = NULL;
         }
 
+        // 修改完毕，调用链表指针继续其他过滤模块的处理
         return ngx_http_next_header_filter(r);
     }
 
+    // 没有if_modified_since和if_none_match头
+    // 不需要其他操作，直接走后续链表处理
     return ngx_http_next_header_filter(r);
 }
 
@@ -256,6 +282,7 @@ ngx_http_test_if_match(ngx_http_request_t *r, ngx_table_elt_t *header,
 }
 
 
+// 添加处理函数到链表头，实现过滤链表的注册
 static ngx_int_t
 ngx_http_not_modified_filter_init(ngx_conf_t *cf)
 {
