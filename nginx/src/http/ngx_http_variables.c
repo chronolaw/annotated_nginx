@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_add_variable
+// * ngx_http_variables_init_vars
 
 /*
  * Copyright (C) Igor Sysoev
@@ -503,6 +506,7 @@ ngx_http_get_variable_index(ngx_conf_t *cf, ngx_str_t *name)
 }
 
 
+// 使用index获取变量值，index即数组里的位置
 ngx_http_variable_value_t *
 ngx_http_get_indexed_variable(ngx_http_request_t *r, ngx_uint_t index)
 {
@@ -511,18 +515,23 @@ ngx_http_get_indexed_variable(ngx_http_request_t *r, ngx_uint_t index)
 
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // 检查index是否有效
     if (cmcf->variables.nelts <= index) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                       "unknown variable index: %ui", index);
         return NULL;
     }
 
+    // 变量值仍然有效，或者是没有，那就直接返回
     if (r->variables[index].not_found || r->variables[index].valid) {
         return &r->variables[index];
     }
 
+    // v是变量结构体数组
     v = cmcf->variables.elts;
 
+    // 直接用index得到变量结构体，然后调用get handler
+    // 获取的值存储在请求的数组里
     if (v[index].get_handler(r, &r->variables[index], v[index].data)
         == NGX_OK)
     {
@@ -533,6 +542,7 @@ ngx_http_get_indexed_variable(ngx_http_request_t *r, ngx_uint_t index)
         return &r->variables[index];
     }
 
+    // get失败，设置为not found
     r->variables[index].valid = 0;
     r->variables[index].not_found = 1;
 
@@ -545,17 +555,23 @@ ngx_http_get_flushed_variable(ngx_http_request_t *r, ngx_uint_t index)
 {
     ngx_http_variable_value_t  *v;
 
+    // 检查请求里的变量值数组
     v = &r->variables[index];
 
+    // 检查变量值是否有效
     if (v->valid || v->not_found) {
+
+        // 如果允许cache那么直接返回
         if (!v->no_cacheable) {
             return v;
         }
 
+        // 设置为无效，要求重新获取
         v->valid = 0;
         v->not_found = 0;
     }
 
+    // 使用index重新获取
     return ngx_http_get_indexed_variable(r, index);
 }
 
@@ -591,6 +607,8 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
             return NULL;
         }
     }
+
+    // 没找到，可能是http、arg等前缀的变量
 
     vv = ngx_palloc(r->pool, sizeof(ngx_http_variable_value_t));
     if (vv == NULL) {
@@ -662,6 +680,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    // 还是没有找到，那么就值not found
     vv->not_found = 1;
 
     return vv;
@@ -2517,6 +2536,8 @@ ngx_http_variables_add_core_vars(ngx_conf_t *cf)
 }
 
 
+// 在配置解析结束时调用
+// 对变量数组建立hash，加速查找
 ngx_int_t
 ngx_http_variables_init_vars(ngx_conf_t *cf)
 {
@@ -2530,15 +2551,18 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
+    // 变量数组
     v = cmcf->variables.elts;
     key = cmcf->variables_keys->keys.elts;
 
     for (i = 0; i < cmcf->variables.nelts; i++) {
 
+        // 查看变量key数组
         for (n = 0; n < cmcf->variables_keys->keys.nelts; n++) {
 
             av = key[n].value;
 
+            // 通常变量都应该在keys数组里
             if (v[i].name.len == key[n].key.len
                 && ngx_strncmp(v[i].name.data, key[n].key.data, v[i].name.len)
                    == 0)
@@ -2546,6 +2570,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
                 v[i].get_handler = av->get_handler;
                 v[i].data = av->data;
 
+                // 这里设置indexed标志位
                 av->flags |= NGX_HTTP_VAR_INDEXED;
                 v[i].flags = av->flags;
 
@@ -2626,6 +2651,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
     }
 
 
+    // 检查是否有不要求hash的变量
     for (n = 0; n < cmcf->variables_keys->keys.nelts; n++) {
         av = key[n].value;
 
@@ -2635,6 +2661,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
     }
 
 
+    // 对变量数组建立hash，加速查找
     hash.hash = &cmcf->variables_hash;
     hash.key = ngx_hash_key;
     hash.max_size = cmcf->variables_hash_max_size;

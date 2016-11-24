@@ -142,6 +142,9 @@ void *ngx_http_map_find(ngx_http_request_t *r, ngx_http_map_t *map,
 
 
 ngx_int_t ngx_http_variables_add_core_vars(ngx_conf_t *cf);
+
+// 在配置解析结束时调用
+// 对变量数组建立hash，加速查找
 ngx_int_t ngx_http_variables_init_vars(ngx_conf_t *cf);
 
 
