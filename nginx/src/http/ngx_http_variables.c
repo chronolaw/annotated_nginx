@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -355,6 +356,7 @@ ngx_http_variable_value_t  ngx_http_variable_true_value =
     ngx_http_variable("1");
 
 
+// Nginx变量机制的核心函数，创建一个命名的变量访问对象
 ngx_http_variable_t *
 ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
 {
@@ -364,14 +366,19 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
     ngx_http_variable_t        *v;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 不允许空的变量名
     if (name->len == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid variable name \"$\"");
         return NULL;
     }
 
+    // 取core配置
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
+    // 在variables_keys数组里查找
+    // 不允许添加重复的变量
+    // 但如果是changeable的是可以的
     key = cmcf->variables_keys->keys.elts;
     for (i = 0; i < cmcf->variables_keys->keys.nelts; i++) {
         if (name->len != key[i].key.len
@@ -382,34 +389,43 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
 
         v = key[i].value;
 
+        // 不是changeable则报错
         if (!(v->flags & NGX_HTTP_VAR_CHANGEABLE)) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "the duplicate \"%V\" variable", name);
             return NULL;
         }
 
+        // 是changeable，不需要新建，直接返回对象
         return v;
     }
 
+    // 查找完毕，没有重名
+
+    // 新建一个变量结构体
     v = ngx_palloc(cf->pool, sizeof(ngx_http_variable_t));
     if (v == NULL) {
         return NULL;
     }
 
+    // 拷贝变量的名字，在cf的内存池里分配内存
     v->name.len = name->len;
     v->name.data = ngx_pnalloc(cf->pool, name->len);
     if (v->name.data == NULL) {
         return NULL;
     }
 
+    // 小写化同时拷贝
     ngx_strlow(v->name.data, name->data, name->len);
 
+    // 初始化结构体
     v->set_handler = NULL;
     v->get_handler = NULL;
     v->data = 0;
     v->flags = flags;
     v->index = 0;
 
+    // 把变量的hash key加入查找数组，方便之后查找
     rc = ngx_hash_add_key(cmcf->variables_keys, &v->name, v, 0);
 
     if (rc == NGX_ERROR) {
@@ -422,6 +438,7 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
         return NULL;
     }
 
+    // 返回创建好的对象，注意里面的指针都是空
     return v;
 }
 
@@ -543,6 +560,9 @@ ngx_http_get_flushed_variable(ngx_http_request_t *r, ngx_uint_t index)
 }
 
 
+// 访问Nginx变量值
+// 使用变量名和hash key在ngx_http_core_module里查找已经添加的变量
+// 再调用get_handler获取变量值
 ngx_http_variable_value_t *
 ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 {
@@ -552,6 +572,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
+    // 用hash快速查找
     v = ngx_hash_find(&cmcf->variables_hash, key, name->data, name->len);
 
     if (v) {
@@ -562,6 +583,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
             vv = ngx_palloc(r->pool, sizeof(ngx_http_variable_value_t));
 
+            // 调用变量的get_handler获取值
             if (vv && v->get_handler(r, vv, v->data) == NGX_OK) {
                 return vv;
             }
@@ -575,6 +597,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    // 特殊处理http、arg等前缀的变量
     if (name->len >= 5 && ngx_strncmp(name->data, "http_", 5) == 0) {
 
         if (ngx_http_variable_unknown_header_in(r, vv, (uintptr_t) name)

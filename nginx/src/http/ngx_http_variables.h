@@ -57,9 +57,13 @@ struct ngx_http_variable_s {
     ngx_str_t                     name;   /* must be first to build the hash */
 
     // 设置变量值函数
+    // typedef void (*ngx_http_set_variable_pt) (ngx_http_request_t *r,
+    //  ngx_http_variable_value_t *v, uintptr_t data);
     ngx_http_set_variable_pt      set_handler;
 
     // 获取变量值函数
+    // typedef ngx_int_t (*ngx_http_get_variable_pt) (ngx_http_request_t *r,
+    //  ngx_http_variable_value_t *v, uintptr_t data);
     ngx_http_get_variable_pt      get_handler;
 
     // set/get函数使用的辅助参数
@@ -73,14 +77,19 @@ struct ngx_http_variable_s {
 };
 
 
+// Nginx变量机制的核心函数，创建一个命名的变量访问对象
 ngx_http_variable_t *ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name,
     ngx_uint_t flags);
+
 ngx_int_t ngx_http_get_variable_index(ngx_conf_t *cf, ngx_str_t *name);
 ngx_http_variable_value_t *ngx_http_get_indexed_variable(ngx_http_request_t *r,
     ngx_uint_t index);
 ngx_http_variable_value_t *ngx_http_get_flushed_variable(ngx_http_request_t *r,
     ngx_uint_t index);
 
+// 访问Nginx变量值
+// 使用变量名和hash key在ngx_http_core_module里查找已经添加的变量
+// 再调用get_handler获取变量值
 ngx_http_variable_value_t *ngx_http_get_variable(ngx_http_request_t *r,
     ngx_str_t *name, ngx_uint_t key);
 
