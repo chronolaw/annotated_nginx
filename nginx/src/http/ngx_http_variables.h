@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -14,30 +15,60 @@
 #include <ngx_http.h>
 
 
+// 与ngx_str_t类似，表示一个内存里的字符串空间
+// 在http模块里重定义
+//
+// typedef struct {
+//     unsigned    len:28;             //字符串长度，只有28位，剩下4位留给标志位
+//
+//     unsigned    valid:1;            //变量值是否有效
+//     unsigned    no_cacheable:1;     //变量值是否允许缓存，默认允许
+//     unsigned    not_found:1;        //变量未找到
+//     unsigned    escape:1;
+//
+//     u_char     *data;               //字符串的地址，同ngx_str_t::data
+// } ngx_variable_value_t;
 typedef ngx_variable_value_t  ngx_http_variable_value_t;
 
+// 初始化变量结构体
 #define ngx_http_variable(v)     { sizeof(v) - 1, 1, 0, 0, 0, (u_char *) v }
 
 typedef struct ngx_http_variable_s  ngx_http_variable_t;
 
+// get/set函数指针
 typedef void (*ngx_http_set_variable_pt) (ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 typedef ngx_int_t (*ngx_http_get_variable_pt) (ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
 
+// 变量的一些属性，是否可修改
 #define NGX_HTTP_VAR_CHANGEABLE   1
 #define NGX_HTTP_VAR_NOCACHEABLE  2
 #define NGX_HTTP_VAR_INDEXED      4
 #define NGX_HTTP_VAR_NOHASH       8
 
 
+// 为变量值的读写增加了一个间接层
+// 它表示真正的Nginx变量
+// 使用get/set函数而不是简单的字符串来访问变量值
 struct ngx_http_variable_s {
+    // 变量的名字
     ngx_str_t                     name;   /* must be first to build the hash */
+
+    // 设置变量值函数
     ngx_http_set_variable_pt      set_handler;
+
+    // 获取变量值函数
     ngx_http_get_variable_pt      get_handler;
+
+    // set/get函数使用的辅助参数
     uintptr_t                     data;
+
+    // 变量属性标志位
     ngx_uint_t                    flags;
+
+    // 变量所在的数组序号
     ngx_uint_t                    index;
 };
 
