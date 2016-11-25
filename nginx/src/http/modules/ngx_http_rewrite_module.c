@@ -906,27 +906,33 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_script_var_code_t          *vcode;
     ngx_http_script_var_handler_code_t  *vhcode;
 
+    // 指令数组
     value = cf->args->elts;
 
+    // value[1]是变量名，必须以$开头
     if (value[1].data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid variable name \"%V\"", &value[1]);
         return NGX_CONF_ERROR;
     }
 
+    // 减去$，得到变量名
     value[1].len--;
     value[1].data++;
 
+    // Nginx变量机制的核心函数，创建一个命名的变量访问对象
     v = ngx_http_add_variable(cf, &value[1], NGX_HTTP_VAR_CHANGEABLE);
     if (v == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 找到在cmcf->variables数组里的位置
     index = ngx_http_get_variable_index(cf, &value[1]);
     if (index == NGX_ERROR) {
         return NGX_CONF_ERROR;
     }
 
+    // 不是需要临时计算的http等变量
     if (v->get_handler == NULL
         && ngx_strncasecmp(value[1].data, (u_char *) "http_", 5) != 0
         && ngx_strncasecmp(value[1].data, (u_char *) "sent_http_", 10) != 0
@@ -936,10 +942,14 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
            != 0
         && ngx_strncasecmp(value[1].data, (u_char *) "arg_", 4) != 0)
     {
+        // 设置get handler
         v->get_handler = ngx_http_rewrite_var;
+
+        // 使用的data参数是变量的位置
         v->data = index;
     }
 
+    // 使用value[2]，即指令里变量的值
     if (ngx_http_rewrite_value(cf, lcf, &value[2]) != NGX_CONF_OK) {
         return NGX_CONF_ERROR;
     }
