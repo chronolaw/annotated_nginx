@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_complex_value
+// * ngx_http_compile_complex_value
 
 /*
  * Copyright (C) Igor Sysoev
@@ -54,6 +58,7 @@ ngx_http_script_flush_complex_value(ngx_http_request_t *r,
 }
 
 
+// 运行时获取变量值
 ngx_int_t
 ngx_http_complex_value(ngx_http_request_t *r, ngx_http_complex_value_t *val,
     ngx_str_t *value)
@@ -104,6 +109,7 @@ ngx_http_complex_value(ngx_http_request_t *r, ngx_http_complex_value_t *val,
 }
 
 
+// 编译复杂变量
 ngx_int_t
 ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
 {
@@ -114,7 +120,10 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
 
     v = ccv->value;
 
+    // 变量计数，即$的数量
     nv = 0;
+
+    // 正则capture计数
     nc = 0;
 
     for (i = 0; i < v->len; i++) {
@@ -128,6 +137,7 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
         }
     }
 
+    // 空字符串，或者第一个字符不是$
     if ((v->len == 0 || v->data[0] != '$')
         && (ccv->conf_prefix || ccv->root_prefix))
     {
@@ -139,17 +149,22 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
         ccv->root_prefix = 0;
     }
 
+    // 设置复杂变量的值
+    // value指向原始字符串
     ccv->complex_value->value = *v;
     ccv->complex_value->flushes = NULL;
     ccv->complex_value->lengths = NULL;
     ccv->complex_value->values = NULL;
 
+    // 如果没有$，就是普通字符串，不需要再处理了
     if (nv == 0 && nc == 0) {
         return NGX_OK;
     }
 
+    // 变量数加1
     n = nv + 1;
 
+    // 初始化flushes数组
     if (ngx_array_init(&flushes, ccv->cf->pool, n, sizeof(ngx_uint_t))
         != NGX_OK)
     {
@@ -160,6 +175,7 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
                   + sizeof(ngx_http_script_var_code_t))
         + sizeof(uintptr_t);
 
+    // 初始化lengths数组
     if (ngx_array_init(&lengths, ccv->cf->pool, n, 1) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -171,6 +187,7 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
                 + sizeof(uintptr_t) - 1)
             & ~(sizeof(uintptr_t) - 1);
 
+    // 初始化values数组
     if (ngx_array_init(&values, ccv->cf->pool, n, 1) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -192,6 +209,7 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
     sc.conf_prefix = ccv->conf_prefix;
     sc.root_prefix = ccv->root_prefix;
 
+    // 执行脚本编译
     if (ngx_http_script_compile(&sc) != NGX_OK) {
         return NGX_ERROR;
     }

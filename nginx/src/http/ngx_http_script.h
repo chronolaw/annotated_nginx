@@ -1,3 +1,9 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_complex_value_t
+// * ngx_http_compile_complex_value_t
+// * ngx_http_complex_value
+// * ngx_http_compile_complex_value
 
 /*
  * Copyright (C) Igor Sysoev
@@ -63,6 +69,8 @@ typedef struct {
 } ngx_http_script_compile_t;
 
 
+// 复杂变量，即含有多个'$'的字符串
+// 需要在运行时计算
 typedef struct {
     ngx_str_t                   value;
     ngx_uint_t                 *flushes;
@@ -71,9 +79,15 @@ typedef struct {
 } ngx_http_complex_value_t;
 
 
+// 对字符串进行“编译”，之后才能正确得到变量值
 typedef struct {
+    // nginx的配置结构体指针
     ngx_conf_t                 *cf;
+
+    // 原始字符串
     ngx_str_t                  *value;
+
+    // 编译后的输出结果，即复杂变量
     ngx_http_complex_value_t   *complex_value;
 
     unsigned                    zero:1;
@@ -205,8 +219,12 @@ typedef struct {
 
 void ngx_http_script_flush_complex_value(ngx_http_request_t *r,
     ngx_http_complex_value_t *val);
+
+// 运行时获取变量值
 ngx_int_t ngx_http_complex_value(ngx_http_request_t *r,
     ngx_http_complex_value_t *val, ngx_str_t *value);
+
+// 编译复杂变量
 ngx_int_t ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv);
 char *ngx_http_set_complex_value_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
