@@ -2670,6 +2670,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
     hash.pool = cf->pool;
     hash.temp_pool = NULL;
 
+    // 初始化hash表
     if (ngx_hash_init(&hash, cmcf->variables_keys->keys.elts,
                       cmcf->variables_keys->keys.nelts)
         != NGX_OK)
@@ -2677,6 +2678,8 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
+    // hash表初始化完毕，临时的variables_keys不再需要
+    // 置为空指针，最后在tmp_pool时释放
     cmcf->variables_keys = NULL;
 
     return NGX_OK;
