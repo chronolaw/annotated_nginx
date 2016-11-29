@@ -3,6 +3,7 @@
 // * ngx_preinit_modules
 // * ngx_init_modules
 // * ngx_count_modules
+// * ngx_add_module
 
 /*
  * Copyright (C) Igor Sysoev

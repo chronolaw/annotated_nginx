@@ -1655,6 +1655,7 @@ ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 第一个参数是动态库文件名
     file = value[1];
 
+    // 计算正确的路径，如果不是绝对路径就从prefix开始
     if (ngx_conf_full_name(cf->cycle, &file, 0) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
