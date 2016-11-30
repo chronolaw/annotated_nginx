@@ -11,7 +11,11 @@
 #include <nginx.h>
 
 
+// 计算得到系统的cpu数量
 ngx_int_t   ngx_ncpu;
+
+// 使用系统调用getrlimit(RLIMIT_NOFILE, &rlmt)
+// 是nginx能够打开的最多描述数量，但似乎并没有使用
 ngx_int_t   ngx_max_sockets;
 
 // 在接受连接时使用accept4调用
