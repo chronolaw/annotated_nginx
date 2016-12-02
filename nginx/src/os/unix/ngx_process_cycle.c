@@ -67,7 +67,9 @@ ngx_uint_t    ngx_process;
 // nginx 1.9.x增加新全局变量ngx_worker，即进程id号
 ngx_uint_t    ngx_worker;
 
-// 记录nginx master进程的pid，在main()里使用
+// 记录master/worker进程的pid
+// master在main()里获取
+// worker在fork之后重新获取
 ngx_pid_t     ngx_pid;
 
 // 原子变量，用于进程中检查信号
