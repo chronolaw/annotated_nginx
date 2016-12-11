@@ -47,10 +47,10 @@ struct ngx_listening_s {
     // TCP的backlog队列，即等待连接的队列
     int                 backlog;
 
-    // 接收缓冲区大小
+    // 内核接收缓冲区大小
     int                 rcvbuf;
 
-    // 发送缓冲区大小
+    // 内核发送缓冲区大小
     int                 sndbuf;
 
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
@@ -85,8 +85,10 @@ struct ngx_listening_s {
     ngx_listening_t    *previous;
 
     // 监听端口对应的连接对象
+    // 从cycle的内存池分配，但只用了read事件
     ngx_connection_t   *connection;
 
+    // worker进程的序号，用于reuseport
     ngx_uint_t          worker;
 
     // 以下是一些标志位
@@ -94,14 +96,20 @@ struct ngx_listening_s {
     unsigned            remain:1;
     unsigned            ignore:1;
 
+    // 因为总是绑定，所以无意义
     unsigned            bound:1;       /* already bound */
+
     unsigned            inherited:1;   /* inherited from previous process */
+
+    // 总是无阻塞，暂无意义
     unsigned            nonblocking_accept:1;
 
     // 是否已经被监听
     unsigned            listen:1;
 
+    // 总是无阻塞，暂无意义
     unsigned            nonblocking:1;
+
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
     unsigned            wildcard:1;
