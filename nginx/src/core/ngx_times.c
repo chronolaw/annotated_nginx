@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -18,13 +20,21 @@
  * to run more than NGX_TIME_SLOTS seconds.
  */
 
+// 最大64个时间槽
 #define NGX_TIME_SLOTS   64
 
+// 当前使用的时间槽
 static ngx_uint_t        slot;
+
+// 更新时间使用的锁，给多线程用
 static ngx_atomic_t      ngx_time_lock;
 
+// 当前的毫秒时间戳
 volatile ngx_msec_t      ngx_current_msec;
+
+// 当前cache的时间，指向某个时间槽
 volatile ngx_time_t     *ngx_cached_time;
+
 volatile ngx_str_t       ngx_cached_err_log_time;
 volatile ngx_str_t       ngx_cached_http_time;
 volatile ngx_str_t       ngx_cached_http_log_time;
@@ -42,7 +52,9 @@ volatile ngx_str_t       ngx_cached_syslog_time;
 static ngx_int_t         cached_gmtoff;
 #endif
 
+// 缓存的时间值，共64个
 static ngx_time_t        cached_time[NGX_TIME_SLOTS];
+
 static u_char            cached_err_log_time[NGX_TIME_SLOTS]
                                     [sizeof("1970/09/28 12:00:00")];
 static u_char            cached_http_time[NGX_TIME_SLOTS]
@@ -59,6 +71,8 @@ static char  *week[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 static char  *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
+// main函数调用，初始化时间
+// cache时间指向时间槽的0位置
 void
 ngx_time_init(void)
 {
@@ -68,12 +82,14 @@ ngx_time_init(void)
     ngx_cached_http_log_iso8601.len = sizeof("1970-09-28T12:00:00+06:00") - 1;
     ngx_cached_syslog_time.len = sizeof("Sep 28 12:00:00") - 1;
 
+    // cache时间指向时间槽的0位置
     ngx_cached_time = &cached_time[0];
 
     ngx_time_update();
 }
 
 
+// 更新时间
 void
 ngx_time_update(void)
 {
@@ -84,36 +100,47 @@ ngx_time_update(void)
     ngx_time_t      *tp;
     struct timeval   tv;
 
+    // 首先获取锁，避免并发错误
     if (!ngx_trylock(&ngx_time_lock)) {
         return;
     }
 
+    // 系统调用，获取微秒精度的时间
     ngx_gettimeofday(&tv);
 
+    // 转换为秒和毫秒
     sec = tv.tv_sec;
     msec = tv.tv_usec / 1000;
 
+    // 得到毫秒时间戳
     ngx_current_msec = (ngx_msec_t) sec * 1000 + msec;
 
+    // 当前使用的时间槽
     tp = &cached_time[slot];
 
+    // 如果秒没变那么仍然使用这个槽
+    // 只更新毫秒
     if (tp->sec == sec) {
         tp->msec = msec;
         ngx_unlock(&ngx_time_lock);
         return;
     }
 
+    // 前进slot，超过则归0
     if (slot == NGX_TIME_SLOTS - 1) {
         slot = 0;
     } else {
         slot++;
     }
 
+    // 更新时间槽里的时间
     tp = &cached_time[slot];
 
     tp->sec = sec;
     tp->msec = msec;
 
+
+    // 各种格式的时间字符串
     ngx_gmtime(sec, &gmt);
 
 
@@ -176,8 +203,10 @@ ngx_time_update(void)
                        months[tm.ngx_tm_mon - 1], tm.ngx_tm_mday,
                        tm.ngx_tm_hour, tm.ngx_tm_min, tm.ngx_tm_sec);
 
+    // 原子操作相关，禁止语句顺序优化
     ngx_memory_barrier();
 
+    // 时间更新完毕，更新cache指针
     ngx_cached_time = tp;
     ngx_cached_http_time.data = p0;
     ngx_cached_err_log_time.data = p1;
