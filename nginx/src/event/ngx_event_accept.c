@@ -427,7 +427,9 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+    // 事件已经超时
     if (ev->timedout) {
+        // 遍历监听端口列表，重新加入epoll连接事件
         if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
             return;
         }
@@ -441,21 +443,32 @@ ngx_event_recvmsg(ngx_event_t *ev)
         ev->available = ecf->multi_accept;
     }
 
+    // 事件的连接对象
     lc = ev->data;
+
+    // 事件对应的监听端口对象
     ls = lc->listening;
+
+    // 此时还没有数据可读
     ev->ready = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
+        // 清空msghdr结构体，准备读取数据
         ngx_memzero(&msg, sizeof(struct msghdr));
 
+        // 设置接收数据的缓冲区
+        // 大小是65535字节
         iov[0].iov_base = (void *) buffer;
         iov[0].iov_len = sizeof(buffer);
 
+        // 客户端的地址
         msg.msg_name = &sa;
         msg.msg_namelen = sizeof(sa);
+
+        // 设置接收数据的缓冲区
         msg.msg_iov = iov;
         msg.msg_iovlen = 1;
 
@@ -480,8 +493,10 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+        // 接收udp数据
         n = recvmsg(lc->fd, &msg, 0);
 
+        // 调用失败直接返回
         if (n == -1) {
             err = ngx_socket_errno;
 
@@ -511,12 +526,16 @@ ngx_event_recvmsg(ngx_event_t *ev)
         ngx_accept_disabled = ngx_cycle->connection_n / 8
                               - ngx_cycle->free_connection_n;
 
+        // 接收数据成功，获取一个新的连接
         c = ngx_get_connection(lc->fd, ev->log);
         if (c == NULL) {
             return;
         }
 
+        // ？？？
         c->shared = 1;
+
+        // udp类型的连接
         c->type = SOCK_DGRAM;
         c->socklen = msg.msg_namelen;
 
@@ -536,6 +555,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             return;
         }
 
+        // 从msghdr里拷贝地址
         ngx_memcpy(c->sockaddr, msg.msg_name, c->socklen);
 
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
@@ -546,11 +566,13 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
         *log = ls->log;
 
+        // udp发送函数
         c->send = ngx_udp_send;
 
         c->log = log;
         c->pool->log = log;
 
+        // 监听端口和服务器地址
         c->listening = ls;
         c->local_sockaddr = ls->sockaddr;
         c->local_socklen = ls->socklen;
@@ -632,14 +654,17 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+        // 创建连接用的缓冲区
         c->buffer = ngx_create_temp_buf(c->pool, n);
         if (c->buffer == NULL) {
             ngx_close_accepted_connection(c);
             return;
         }
 
+        // 把之前收到的数据拷贝到连接里的缓冲区
         c->buffer->last = ngx_cpymem(c->buffer->last, buffer, n);
 
+        // 设置读写事件
         rev = c->read;
         wev = c->write;
 
@@ -657,6 +682,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
          *             or protection by critical section or light mutex
          */
 
+        // 连接计数增加
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
 #if (NGX_STAT_STUB)
