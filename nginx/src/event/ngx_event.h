@@ -2,6 +2,8 @@
 //
 // * ngx_event_s
 // * ngx_event_actions_t
+// * ngx_event_conf_t
+// * ngx_event_module_t
 // * ngx_event_accept
 // * ngx_process_events_and_timers
 
