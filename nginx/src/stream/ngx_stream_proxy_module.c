@@ -695,8 +695,12 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         u->upstream_buf.last = p;
     }
 
+    // udp处理
     if (c->type == SOCK_DGRAM) {
+        // 使用客户端连接的buffer计算收到的字节数
         s->received = c->buffer->last - c->buffer->pos;
+
+        // downstream_buf直接就是客户端连接的buffer
         u->downstream_buf = *c->buffer;
 
         if (pscf->responses == 0) {
@@ -1263,6 +1267,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
     // 根据上下游状态决定来源和目标
     // 以及缓冲区、限速等
     if (from_upstream) {
+        // 数据下行
         src = pc;
         dst = c;
         b = &u->upstream_buf;
@@ -1270,9 +1275,13 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         received = &u->received;
 
     } else {
+        // 数据上行
         src = c;
         dst = pc;
+
+        // udp:downstream_buf直接就是客户端连接的buffer
         b = &u->downstream_buf;
+
         limit_rate = pscf->upload_rate;
         received = &s->received;
     }

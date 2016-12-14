@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_event_accept
+// * ngx_event_recvmsg
 // * ngx_trylock_accept_mutex
 
 /*
