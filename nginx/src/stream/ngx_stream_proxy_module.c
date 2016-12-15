@@ -700,6 +700,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         // 使用客户端连接的buffer计算收到的字节数
         s->received = c->buffer->last - c->buffer->pos;
 
+        // nginx 1.11.x删除了此行代码！！
         // downstream_buf直接就是客户端连接的buffer
         u->downstream_buf = *c->buffer;
 
@@ -1358,12 +1359,14 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
             // 尽量读满缓冲区
             n = src->recv(src, b->last, size);
 
+            // nginx 1.11.x代码不同，只判断NGX_AGAIN
             // 如果不可读，或者已经读完
             // break结束for循环
             if (n == NGX_AGAIN || n == 0) {
                 break;
             }
 
+            // nginx 1.11.x代码不同，判断n >= 0
             // 读取了n字节的数据
             if (n > 0) {
 
