@@ -232,6 +232,30 @@ struct ngx_event_aio_s {
 
 #endif
 
+// 可以使用typedef来简化ngx_event_actions_t的定义
+#if 0
+typedef ngx_int_t  (*events_ctl_pt)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+typedef ngx_int_t  (*events_add_all_pt)(ngx_connection_t *c);
+typedef ngx_int_t  (*events_del_all_pt)(ngx_connection_t *c, ngx_uint_t flags);
+typedef ngx_int_t  (*events_notify_pt)(ngx_event_handler_pt handler);
+typedef ngx_int_t  (*events_process_pt)(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags);
+typedef ngx_int_t  (*events_init_pt)(ngx_cycle_t *cycle, ngx_msec_t timer);
+typedef void       (*events_done_pt)(ngx_cycle_t *cycle);
+
+typedef struct {
+    events_ctl_pt       add;
+    events_ctl_pt       del;
+    events_ctl_pt       enable;
+    events_ctl_pt       disable;
+    events_add_all_pt   add_conn;
+    events_del_all_pt   del_conn;
+    events_notify_pt    notify;
+    events_process_pt   process_events;
+    events_init_pt      init;
+    events_done_pt      done;
+} ngx_event_actions_t;
+#endif
+
 // 添加读事件的便捷接口，适合epoll/kqueue/select等各种事件模型
 // 内部还是调用ngx_add_event
 // ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);

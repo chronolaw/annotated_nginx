@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_post_event
+// * ngx_delete_posted_event
+// * ngx_posted_accept_events
+// * ngx_posted_events
 
 /*
  * Copyright (C) Igor Sysoev
