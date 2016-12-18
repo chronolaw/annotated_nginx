@@ -74,7 +74,7 @@ static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
 // 如果有的指令没有写，就要给正确的默认值
 // 模块默认使用epoll
 // 默认不接受多个请求，也就是一次只accept一个连接
-// 默认使用负载均衡锁
+// 1.11.3之前默认使用负载均衡锁，之后默认关闭
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
@@ -278,7 +278,7 @@ ngx_event_module_t  ngx_event_core_module_ctx = {
     // 如果有的指令没有写，就要给正确的默认值
     // 模块默认使用epoll
     // 默认不接受多个请求，也就是一次只accept一个连接
-    // 默认使用负载均衡锁
+    // 1.11.3之前默认使用负载均衡锁，之后默认关闭
     ngx_event_core_init_conf,              /* init configuration */
 
     // 不实现具体的事件模型，所以actions函数表全是空指针
@@ -1559,7 +1559,7 @@ ngx_event_core_create_conf(ngx_cycle_t *cycle)
 // 如果有的指令没有写，就要给正确的默认值
 // 模块默认使用epoll
 // 默认不接受多个请求，也就是一次只accept一个连接
-// 默认使用负载均衡锁
+// 1.11.3之前默认使用负载均衡锁，之后默认关闭
 static char *
 ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 {
@@ -1663,7 +1663,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     // 默认不接受多个请求，也就是一次只accept一个连接
     ngx_conf_init_value(ecf->multi_accept, 0);
 
-    // 默认使用负载均衡锁
+    // 1.11.3之前默认使用负载均衡锁，之后默认关闭
     ngx_conf_init_value(ecf->accept_mutex, 1);
 
     // 默认负载均衡锁的等待时间是500毫秒
