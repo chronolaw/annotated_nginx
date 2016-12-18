@@ -949,6 +949,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         }
     }
 
+    // poll, /dev/poll进入这个分支处理
     if (ngx_event_flags & NGX_USE_FD_EVENT) {
         struct rlimit  rlmt;
 
@@ -1067,9 +1068,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c->type = ls[i].type;
         c->log = &ls[i].log;
 
+        // 连接的listening对象
+        // 两者相互连接
         c->listening = &ls[i];
         ls[i].connection = c;
 
+        // 监听端口只关心读事件
         rev = c->read;
 
         rev->log = c->log;
