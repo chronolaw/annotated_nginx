@@ -1,4 +1,31 @@
 
+Changes with nginx 1.11.7                                        13 Dec 2016
+
+    *) Change: now in case of a client certificate verification error the
+       $ssl_client_verify variable contains a string with the failure
+       reason, for example, "FAILED:certificate has expired".
+
+    *) Feature: the $ssl_ciphers, $ssl_curves, $ssl_client_v_start,
+       $ssl_client_v_end, and $ssl_client_v_remain variables.
+
+    *) Feature: the "volatile" parameter of the "map" directive.
+
+    *) Bugfix: dependencies specified for a module were ignored while
+       building dynamic modules.
+
+    *) Bugfix: when using HTTP/2 and the "limit_req" or "auth_request"
+       directives client request body might be corrupted; the bug had
+       appeared in 1.11.0.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       using HTTP/2; the bug had appeared in 1.11.3.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+       Thanks to Congcong Hu.
+
+    *) Bugfix: in the ngx_http_perl_module.
+
+
 Changes with nginx 1.11.6                                        15 Nov 2016
 
     *) Change: format of the $ssl_client_s_dn and $ssl_client_i_dn variables
