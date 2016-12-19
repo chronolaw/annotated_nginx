@@ -59,6 +59,12 @@ static int ngx_ssl_session_ticket_key_callback(ngx_ssl_conn_t *ssl_conn,
 static ngx_int_t ngx_ssl_check_name(ngx_str_t *name, ASN1_STRING *str);
 #endif
 
+static time_t ngx_ssl_parse_time(
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+    const
+#endif
+    ASN1_TIME *asn1time);
+
 static void *ngx_openssl_create_conf(ngx_cycle_t *cycle);
 static char *ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_openssl_exit(ngx_cycle_t *cycle);
@@ -106,6 +112,7 @@ int  ngx_ssl_session_cache_index;
 int  ngx_ssl_session_ticket_keys_index;
 int  ngx_ssl_certificate_index;
 int  ngx_ssl_next_certificate_index;
+int  ngx_ssl_certificate_name_index;
 int  ngx_ssl_stapling_index;
 
 
@@ -189,6 +196,14 @@ ngx_ssl_init(ngx_log_t *log)
     ngx_ssl_next_certificate_index = X509_get_ex_new_index(0, NULL, NULL, NULL,
                                                            NULL);
     if (ngx_ssl_next_certificate_index == -1) {
+        ngx_ssl_error(NGX_LOG_ALERT, log, 0, "X509_get_ex_new_index() failed");
+        return NGX_ERROR;
+    }
+
+    ngx_ssl_certificate_name_index = X509_get_ex_new_index(0, NULL, NULL, NULL,
+                                                           NULL);
+
+    if (ngx_ssl_certificate_name_index == -1) {
         ngx_ssl_error(NGX_LOG_ALERT, log, 0, "X509_get_ex_new_index() failed");
         return NGX_ERROR;
     }
@@ -380,6 +395,15 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
     if (SSL_CTX_use_certificate(ssl->ctx, x509) == 0) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_certificate(\"%s\") failed", cert->data);
+        X509_free(x509);
+        BIO_free(bio);
+        return NGX_ERROR;
+    }
+
+    if (X509_set_ex_data(x509, ngx_ssl_certificate_name_index, cert->data)
+        == 0)
+    {
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0, "X509_set_ex_data() failed");
         X509_free(x509);
         BIO_free(bio);
         return NGX_ERROR;
@@ -3270,6 +3294,158 @@ ngx_ssl_get_cipher_name(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 
 
 ngx_int_t
+ngx_ssl_get_ciphers(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+#ifdef SSL_CTRL_GET_RAW_CIPHERLIST
+
+    int                n, i, bytes;
+    size_t             len;
+    u_char            *ciphers, *p;
+    const SSL_CIPHER  *cipher;
+
+    bytes = SSL_get0_raw_cipherlist(c->ssl->connection, NULL);
+    n = SSL_get0_raw_cipherlist(c->ssl->connection, &ciphers);
+
+    if (n <= 0) {
+        s->len = 0;
+        return NGX_OK;
+    }
+
+    len = 0;
+    n /= bytes;
+
+    for (i = 0; i < n; i++) {
+        cipher = SSL_CIPHER_find(c->ssl->connection, ciphers + i * bytes);
+
+        if (cipher) {
+            len += ngx_strlen(SSL_CIPHER_get_name(cipher));
+
+        } else {
+            len += sizeof("0x") - 1 + bytes * (sizeof("00") - 1);
+        }
+
+        len += sizeof(":") - 1;
+    }
+
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = s->data;
+
+    for (i = 0; i < n; i++) {
+        cipher = SSL_CIPHER_find(c->ssl->connection, ciphers + i * bytes);
+
+        if (cipher) {
+            p = ngx_sprintf(p, "%s", SSL_CIPHER_get_name(cipher));
+
+        } else {
+            p = ngx_sprintf(p, "0x");
+            p = ngx_hex_dump(p, ciphers + i * bytes, bytes);
+        }
+
+        *p++ = ':';
+    }
+
+    p--;
+
+    s->len = p - s->data;
+
+#else
+
+    u_char  buf[4096];
+
+    if (SSL_get_shared_ciphers(c->ssl->connection, (char *) buf, 4096)
+        == NULL)
+    {
+        s->len = 0;
+        return NGX_OK;
+    }
+
+    s->len = ngx_strlen(buf);
+    s->data = ngx_pnalloc(pool, s->len);
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(s->data, buf, s->len);
+
+#endif
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_curves(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+#ifdef SSL_CTRL_GET_CURVES
+
+    int         *curves, n, i, nid;
+    u_char      *p;
+    size_t       len;
+
+    n = SSL_get1_curves(c->ssl->connection, NULL);
+
+    if (n <= 0) {
+        s->len = 0;
+        return NGX_OK;
+    }
+
+    curves = ngx_palloc(pool, n * sizeof(int));
+
+    n = SSL_get1_curves(c->ssl->connection, curves);
+    len = 0;
+
+    for (i = 0; i < n; i++) {
+        nid = curves[i];
+
+        if (nid & TLSEXT_nid_unknown) {
+            len += sizeof("0x0000") - 1;
+
+        } else {
+            len += ngx_strlen(OBJ_nid2sn(nid));
+        }
+
+        len += sizeof(":") - 1;
+    }
+
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = s->data;
+
+    for (i = 0; i < n; i++) {
+        nid = curves[i];
+
+        if (nid & TLSEXT_nid_unknown) {
+            p = ngx_sprintf(p, "0x%04xd", nid & 0xffff);
+
+        } else {
+            p = ngx_sprintf(p, "%s", OBJ_nid2sn(nid));
+        }
+
+        *p++ = ':';
+    }
+
+    p--;
+
+    s->len = p - s->data;
+
+#else
+
+    s->len = 0;
+
+#endif
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
 ngx_ssl_get_session_id(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
     u_char        *buf;
@@ -3699,25 +3875,207 @@ ngx_ssl_get_fingerprint(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 ngx_int_t
 ngx_ssl_get_client_verify(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
-    X509  *cert;
-
-    if (SSL_get_verify_result(c->ssl->connection) != X509_V_OK) {
-        ngx_str_set(s, "FAILED");
-        return NGX_OK;
-    }
+    X509        *cert;
+    long         rc;
+    const char  *str;
 
     cert = SSL_get_peer_certificate(c->ssl->connection);
-
-    if (cert) {
-        ngx_str_set(s, "SUCCESS");
-
-    } else {
+    if (cert == NULL) {
         ngx_str_set(s, "NONE");
+        return NGX_OK;
     }
 
     X509_free(cert);
 
+    rc = SSL_get_verify_result(c->ssl->connection);
+
+    if (rc == X509_V_OK) {
+        ngx_str_set(s, "SUCCESS");
+        return NGX_OK;
+    }
+
+    str = X509_verify_cert_error_string(rc);
+
+    s->data = ngx_pnalloc(pool, sizeof("FAILED:") - 1 + ngx_strlen(str));
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    s->len = ngx_sprintf(s->data, "FAILED:%s", str) - s->data;
+
     return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_client_v_start(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    BIO     *bio;
+    X509    *cert;
+    size_t   len;
+
+    s->len = 0;
+
+    cert = SSL_get_peer_certificate(c->ssl->connection);
+    if (cert == NULL) {
+        return NGX_OK;
+    }
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        X509_free(cert);
+        return NGX_ERROR;
+    }
+
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+    ASN1_TIME_print(bio, X509_get0_notBefore(cert));
+#else
+    ASN1_TIME_print(bio, X509_get_notBefore(cert));
+#endif
+
+    len = BIO_pending(bio);
+
+    s->len = len;
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        BIO_free(bio);
+        X509_free(cert);
+        return NGX_ERROR;
+    }
+
+    BIO_read(bio, s->data, len);
+    BIO_free(bio);
+    X509_free(cert);
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_client_v_end(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    BIO     *bio;
+    X509    *cert;
+    size_t   len;
+
+    s->len = 0;
+
+    cert = SSL_get_peer_certificate(c->ssl->connection);
+    if (cert == NULL) {
+        return NGX_OK;
+    }
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        X509_free(cert);
+        return NGX_ERROR;
+    }
+
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+    ASN1_TIME_print(bio, X509_get0_notAfter(cert));
+#else
+    ASN1_TIME_print(bio, X509_get_notAfter(cert));
+#endif
+
+    len = BIO_pending(bio);
+
+    s->len = len;
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        BIO_free(bio);
+        X509_free(cert);
+        return NGX_ERROR;
+    }
+
+    BIO_read(bio, s->data, len);
+    BIO_free(bio);
+    X509_free(cert);
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    X509    *cert;
+    time_t   now, end;
+
+    s->len = 0;
+
+    cert = SSL_get_peer_certificate(c->ssl->connection);
+    if (cert == NULL) {
+        return NGX_OK;
+    }
+
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+    end = ngx_ssl_parse_time(X509_get0_notAfter(cert));
+#else
+    end = ngx_ssl_parse_time(X509_get_notAfter(cert));
+#endif
+
+    if (end == (time_t) NGX_ERROR) {
+        X509_free(cert);
+        return NGX_OK;
+    }
+
+    now = ngx_time();
+
+    if (end < now + 86400) {
+        ngx_str_set(s, "0");
+        X509_free(cert);
+        return NGX_OK;
+    }
+
+    s->data = ngx_pnalloc(pool, NGX_TIME_T_LEN);
+    if (s->data == NULL) {
+        X509_free(cert);
+        return NGX_ERROR;
+    }
+
+    s->len = ngx_sprintf(s->data, "%T", (end - now) / 86400) - s->data;
+
+    X509_free(cert);
+
+    return NGX_OK;
+}
+
+
+static time_t
+ngx_ssl_parse_time(
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+    const
+#endif
+    ASN1_TIME *asn1time)
+{
+    BIO     *bio;
+    u_char  *value;
+    size_t   len;
+    time_t   time;
+
+    /*
+     * OpenSSL doesn't provide a way to convert ASN1_TIME
+     * into time_t.  To do this, we use ASN1_TIME_print(),
+     * which uses the "MMM DD HH:MM:SS YYYY [GMT]" format (e.g.,
+     * "Feb  3 00:55:52 2015 GMT"), and parse the result.
+     */
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        return NGX_ERROR;
+    }
+
+    /* fake weekday prepended to match C asctime() format */
+
+    BIO_write(bio, "Tue ", sizeof("Tue ") - 1);
+    ASN1_TIME_print(bio, asn1time);
+    len = BIO_get_mem_data(bio, &value);
+
+    time = ngx_parse_http_time(value, len);
+
+    BIO_free(bio);
+
+    return time;
 }
 
 
