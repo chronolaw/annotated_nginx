@@ -610,7 +610,7 @@ extern ngx_os_io_t  ngx_io;
 #define NGX_EVENT_CONF        0x02000000
 
 
-// event模块的配置结构体
+// event_core模块的配置结构体
 typedef struct {
     // nginx每个进程可使用的连接数量，即cycle里的连接池大小
     ngx_uint_t    connections;
@@ -628,6 +628,7 @@ typedef struct {
     ngx_msec_t    accept_mutex_delay;
 
     // 事件模块的名字，如epoll/select/kqueue
+    // 使用name在event模块里查找，决定使用的事件机制
     u_char       *name;
 
 #if (NGX_DEBUG)
