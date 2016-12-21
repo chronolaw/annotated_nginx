@@ -2,6 +2,8 @@
 //
 // * ngx_process_events_and_timers
 // * ngx_event_process_init
+// * ngx_handle_read_event
+// * ngx_handle_write_event
 
 /*
  * Copyright (C) Igor Sysoev
