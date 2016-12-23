@@ -47,9 +47,9 @@ struct ngx_thread_task_s {
     // 在线程运行时用户的handler看不到
     ngx_uint_t           id;
 
-    // 用户使用的数据，也就是handl的data参数
+    // 用户使用的数据，也就是handler的data参数
     // 用这个参数传递给线程要处理的各种数据
-    // 比较灵活的方式是传递一个指针，而不是真正的数据结构地址
+    // 比较灵活的方式是传递一个指针，而不是真正的数据结构内容
     // 例如 struct ctx {xxx *params;};
     //
     // 由ngx_thread_task_alloc分配内存空间并赋值

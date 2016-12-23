@@ -2,6 +2,10 @@
 //
 // * ngx_epoll_process_events
 // * ngx_epoll_notify
+// * ngx_epoll_add_event
+// * ngx_epoll_del_event
+// * ngx_epoll_add_connection
+// * ngx_epoll_del_connection
 
 /*
  * Copyright (C) Igor Sysoev
