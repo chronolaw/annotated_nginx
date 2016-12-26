@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// * ngx_epoll_init
 // * ngx_epoll_process_events
 // * ngx_epoll_notify
 // * ngx_epoll_add_event
