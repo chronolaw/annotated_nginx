@@ -1,4 +1,32 @@
 
+Changes with nginx 1.11.8                                        27 Dec 2016
+
+    *) Feature: the "absolute_redirect" directive.
+
+    *) Feature: the "escape" parameter of the "log_format" directive.
+
+    *) Feature: client SSL certificates verification in the stream module.
+
+    *) Feature: the "ssl_session_ticket_key" directive supports AES256
+       encryption of TLS session tickets when used with 80-byte keys.
+
+    *) Feature: vim-commentary support in vim scripts.
+       Thanks to Armin Grodon.
+
+    *) Bugfix: recursion when evaluating variables was not limited.
+
+    *) Bugfix: in the ngx_stream_ssl_preread_module.
+
+    *) Bugfix: if a server in an upstream in the stream module failed, it
+       was considered alive only when a test connection sent to it after
+       fail_timeout was closed; now a successfully established connection is
+       enough.
+
+    *) Bugfix: nginx/Windows could not be built with 64-bit Visual Studio.
+
+    *) Bugfix: nginx/Windows could not be built with OpenSSL 1.1.0.
+
+
 Changes with nginx 1.11.7                                        13 Dec 2016
 
     *) Change: now in case of a client certificate verification error the
