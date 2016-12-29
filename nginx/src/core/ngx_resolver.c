@@ -300,6 +300,10 @@ ngx_resolver_cleanup(void *data)
 #endif
 
         if (r->event) {
+            if (r->event->timer_set) {
+                ngx_del_timer(r->event);
+            }
+
             ngx_free(r->event);
         }
 
@@ -347,6 +351,10 @@ ngx_resolver_cleanup_tree(ngx_resolver_t *r, ngx_rbtree_t *tree)
             next = ctx->next;
 
             if (ctx->event) {
+                if (ctx->event->timer_set) {
+                    ngx_del_timer(ctx->event);
+                }
+
                 ngx_resolver_free(r, ctx->event);
             }
 
@@ -772,7 +780,7 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
 #endif
 
         if (rn->nsrvs) {
-            for (i = 0; i < rn->nsrvs; i++) {
+            for (i = 0; i < (ngx_uint_t) rn->nsrvs; i++) {
                 if (rn->u.srvs[i].name.data) {
                     ngx_resolver_free_locked(r, rn->u.srvs[i].name.data);
                 }
@@ -867,7 +875,7 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
         ngx_add_timer(ctx->event, ctx->timeout);
     }
 
-    if (ngx_queue_empty(resend_queue)) {
+    if (ngx_resolver_resend_empty(r)) {
         ngx_add_timer(r->event, (ngx_msec_t) (r->resend_timeout * 1000));
     }
 
@@ -1090,7 +1098,7 @@ ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
         ngx_add_timer(ctx->event, ctx->timeout);
     }
 
-    if (ngx_queue_empty(resend_queue)) {
+    if (ngx_resolver_resend_empty(r)) {
         ngx_add_timer(r->event, (ngx_msec_t) (r->resend_timeout * 1000));
     }
 
@@ -1548,6 +1556,7 @@ static ngx_uint_t
 ngx_resolver_resend_empty(ngx_resolver_t *r)
 {
     return ngx_queue_empty(&r->name_resend_queue)
+           && ngx_queue_empty(&r->srv_resend_queue)
 #if (NGX_HAVE_INET6)
            && ngx_queue_empty(&r->addr6_resend_queue)
 #endif
@@ -2946,7 +2955,11 @@ ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx, ngx_resolver_node_t *rn)
     ctx->srvs = srvs;
     ctx->nsrvs = rn->nsrvs;
 
-    for (i = 0; i < rn->nsrvs; i++) {
+    if (ctx->event && ctx->event->timer_set) {
+        ngx_del_timer(ctx->event);
+    }
+
+    for (i = 0; i < (ngx_uint_t) rn->nsrvs; i++) {
         srvs[i].name.data = ngx_resolver_alloc(r, rn->u.srvs[i].name.len);
         if (srvs[i].name.data == NULL) {
             goto failed;
@@ -2965,7 +2978,7 @@ ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx, ngx_resolver_node_t *rn)
         cctx->handler = ngx_resolver_srv_names_handler;
         cctx->data = ctx;
         cctx->srvs = &srvs[i];
-        cctx->timeout = 0;
+        cctx->timeout = ctx->timeout;
 
         srvs[i].priority = rn->u.srvs[i].priority;
         srvs[i].weight = rn->u.srvs[i].weight;
@@ -4064,7 +4077,7 @@ ngx_resolver_free_node(ngx_resolver_t *r, ngx_resolver_node_t *rn)
 #endif
 
     if (rn->nsrvs) {
-        for (i = 0; i < rn->nsrvs; i++) {
+        for (i = 0; i < (ngx_uint_t) rn->nsrvs; i++) {
             if (rn->u.srvs[i].name.data) {
                 ngx_resolver_free_locked(r, rn->u.srvs[i].name.data);
             }
@@ -4193,10 +4206,10 @@ ngx_resolver_export(ngx_resolver_t *r, ngx_resolver_node_t *rn,
                 d = 0;
             }
 
-            if (j == rn->naddrs) {
+            if (j == (ngx_uint_t) rn->naddrs) {
                 j = 0;
             }
-        } while (++i < rn->naddrs);
+        } while (++i < (ngx_uint_t) rn->naddrs);
     }
 
 #if (NGX_HAVE_INET6)
