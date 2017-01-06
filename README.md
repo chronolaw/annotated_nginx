@@ -6,7 +6,9 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 
 当前使用的是1.10.2稳定版。
 
-Nginx1.10的变动较大，增加了动态模块、http2、reuseport，值得仔细研究。
+Nginx1.10增加了动态模块、http2、reuseport。
+
+Nginx1.11.x里的stream模块的变动较大，完善了阶段处理，待1.12发布后即可详细注解。
 
 请参考：
 * [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
