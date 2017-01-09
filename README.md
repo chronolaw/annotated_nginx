@@ -13,9 +13,9 @@ Nginx1.11.x里的stream模块的变动较大，完善了阶段处理，待1.12�
 请参考：
 * [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
+* [openresty_dev](https://github.com/chronolaw/openresty_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
-* [openresty_dev](https://github.com/chronolaw/openresty_dev)
 
 # 当前状态
 nginx 1.10.2
