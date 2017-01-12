@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * ngx_inet_addr
+// * ngx_sock_ntop
+// * ngx_parse_addr
 
 /*
  * Copyright (C) Igor Sysoev
@@ -181,6 +185,8 @@ ngx_inet6_addr(u_char *p, size_t len, u_char *addr)
 
 
 // socket地址转换为字符串
+// port是个标志量，是否输出端口号，不是实际的端口值
+// 支持ipv4/v6，不需要再调用ntoa函数了
 size_t
 ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
     ngx_uint_t port)
@@ -1297,3 +1303,7 @@ ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
 
     return NGX_OK;
 }
+
+// 1.11.x 新增
+// ngx_inet_get_port
+// ngx_inet_set_port
