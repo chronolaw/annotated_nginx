@@ -1,4 +1,8 @@
 // annotated by chrono since 2016
+//
+// * ngx_conf_handler
+// * ngx_conf_read_token
+// * ngx_conf_full_name
 
 /*
  * Copyright (C) Igor Sysoev
