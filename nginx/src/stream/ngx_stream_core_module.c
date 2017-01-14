@@ -335,13 +335,19 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     struct sockaddr_in6          *sin6;
 #endif
 
+    // 获取指令后的参数数组
     value = cf->args->elts;
 
+    // 准备解析url
     ngx_memzero(&u, sizeof(ngx_url_t));
 
+    // 设置url为第一个参数，也就是端口
     u.url = value[1];
+
+    // 设置为监听url
     u.listen = 1;
 
+    // 解析url，得到地址等信息
     if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
         if (u.err) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -361,12 +367,14 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 遍历已经添加的端口，如果重复则报错
     for (i = 0; i < cmcf->listen.nelts; i++) {
 
+        // 这里的u是一个union
         sa = &ls[i].u.sockaddr;
 
         if (sa->sa_family != u.family) {
             continue;
         }
 
+        // 根据ipv4/ipv6/unix，计算off/port等信息
         switch (sa->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -394,12 +402,14 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             break;
         }
 
+        // 比较socket地址
         if (ngx_memcmp(ls[i].u.sockaddr_data + off, u.sockaddr + off, len)
             != 0)
         {
             continue;
         }
 
+        // 比较端口
         if (port != u.port) {
             continue;
         }
@@ -445,6 +455,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 #endif
 
+        // 是否bind地址
         if (ngx_strcmp(value[i].data, "bind") == 0) {
             ls->bind = 1;
             continue;
