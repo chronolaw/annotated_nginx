@@ -14,6 +14,7 @@
 #include <ngx_stream.h>
 
 
+// 用于记录日志的handler，在log里使用
 static u_char *ngx_stream_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 // 创建ctx数组，用于存储模块的ctx数据

@@ -145,7 +145,12 @@ typedef struct {
 // 端口
 typedef struct {
     /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
+
+    // 一个数组，里面存储了一个或多个ngx_stream_in_addr_t
+    // 在ngx_stream_add_ports里检查相同的端口添加
+    // 在ngx_stream_init_connection里使用
     void                   *addrs;
+
     ngx_uint_t              naddrs;
 } ngx_stream_port_t;
 
