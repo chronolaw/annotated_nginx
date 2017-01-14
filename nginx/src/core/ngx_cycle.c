@@ -664,14 +664,19 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
 
     } else {
+        // 没有old cycle，直接使用目前的监听端口列表
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
+
+            // 设置端口的状态是open
             ls[i].open = 1;
+
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
             if (ls[i].accept_filter) {
                 ls[i].add_deferred = 1;
             }
 #endif
+            //支持defered特性则可以使用
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
             if (ls[i].deferred_accept) {
                 ls[i].add_deferred = 1;
@@ -703,6 +708,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     pool->log = cycle->log;
 
     // 调用所有模块的init_module函数指针，初始化模块
+    // 注意是在所有模块完成配置post configuration之后
+    // 在打开端口之后才初始化模块
+    // 此时还没有创建连接池（在init process里）
     if (ngx_init_modules(cycle) != NGX_OK) {
         /* fatal */
         exit(1);

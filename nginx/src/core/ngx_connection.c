@@ -469,6 +469,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 #if (NGX_HAVE_REUSEPORT)
 
             // 检查是否已经设置的标志位
+            // 在init_cycle里设置
             if (ls[i].add_reuseport) {
 
                 /*
