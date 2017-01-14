@@ -118,7 +118,9 @@ typedef struct {
     // ctx里存储server{}对应的配置数组
     ngx_stream_conf_ctx_t  *ctx;
 
+    // 地址的文本形式
     ngx_str_t               addr_text;
+
 #if (NGX_STREAM_SSL)
     ngx_uint_t              ssl;    /* unsigned   ssl:1; */
 #endif
@@ -169,6 +171,7 @@ typedef struct {
 
 // 限制访问的函数原型
 // 与ngx_stream_handler_pt很像，但返回的是整数错误码
+// 1.11.5已经取消，统一改成了phase handler
 typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 
 
@@ -235,6 +238,8 @@ typedef struct {
     ngx_int_t               line;
 
     ngx_log_t              *error_log;
+
+    // 使用nodelay特性
     ngx_flag_t              tcp_nodelay;
 } ngx_stream_core_srv_conf_t;
 
@@ -253,6 +258,8 @@ struct ngx_stream_session_s {
     // 收到的字节数
     off_t                   received;
 
+    // 1.11.x增加启动的秒数和毫秒数
+
     ngx_log_handler_pt      log_handler;
 
     // 数组，存储每个stream模块的ctx
@@ -269,6 +276,8 @@ struct ngx_stream_session_s {
     // 连接上游相关的信息，用于转发请求
     // 里面有如何获取负载均衡server、上下游buf等
     ngx_stream_upstream_t  *upstream;
+
+    // 1.11.x增加变量数组和phase计数器
 };
 
 
