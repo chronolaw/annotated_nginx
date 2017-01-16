@@ -254,6 +254,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
 // 创建ctx数组，用于存储模块的ctx数据
 // 调用handler，处理tcp数据，收发等等
+// 1.11.5之后不再使用，改用ngx_stream_core_run_phases
 static void
 ngx_stream_init_session(ngx_connection_t *c)
 {
@@ -364,6 +365,8 @@ ngx_stream_close_connection(ngx_connection_t *c)
 }
 
 
+// 错误日志用的上下文handler
+// 打印地址、端口号等信息，方便调试
 static u_char *
 ngx_stream_log_error(ngx_log_t *log, u_char *buf, size_t len)
 {
