@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_conf_ctx_t
+// * ngx_http_module_t
 
 /*
  * Copyright (C) Igor Sysoev
