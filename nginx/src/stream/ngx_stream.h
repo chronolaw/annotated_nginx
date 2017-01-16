@@ -3,6 +3,7 @@
 // 1.10.x版本里的stream缺少变量和log功能
 // 1.11.x添加了变量、log
 //
+// * ngx_stream_conf_ctx_t
 // * ngx_stream_core_main_conf_t
 // * ngx_stream_core_srv_conf_t
 // * ngx_stream_session_s
@@ -100,13 +101,17 @@ typedef struct {
     unsigned                reuseport:1;
 #endif
 
+    // 启用so_keepalive特性
     unsigned                so_keepalive:2;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
     int                     tcp_keepintvl;
     int                     tcp_keepcnt;
 #endif
+    // 内核里等待连接的队列长度
     int                     backlog;
+
+    // socket的类型，SOCK_STREAM 表示TCP
     int                     type;
 } ngx_stream_listen_t;
 
