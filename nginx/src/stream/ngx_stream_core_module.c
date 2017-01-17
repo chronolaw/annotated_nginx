@@ -318,6 +318,7 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 // 解析stream/server{}里的listen指令，监听tcp端口
 // 遍历已经添加的端口，如果重复则报错
+// 向cmcf->listen数组里添加一个ngx_stream_listen_t结构体
 // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *
 ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -420,6 +421,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     // 向数组里添加一个ngx_stream_listen_t结构体
+    // 注意是在cmcf里
     ls = ngx_array_push(&cmcf->listen);
     if (ls == NULL) {
         return NGX_CONF_ERROR;
@@ -427,6 +429,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memzero(ls, sizeof(ngx_stream_listen_t));
 
+    // 拷贝ip地址
     ngx_memcpy(&ls->u.sockaddr, u.sockaddr, u.socklen);
 
     // 从ngx_url_t里拷贝信息
@@ -436,6 +439,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->wildcard = u.wildcard;
 
     // 注意这里,存储了cf->ctx，也就是此server的配置数组ngx_stream_conf_ctx_t
+    // 也就是监听端口关联了定义listen的server{}
     ls->ctx = cf->ctx;
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
