@@ -132,8 +132,11 @@ typedef struct {
 } ngx_stream_addr_conf_t;
 
 typedef struct {
+    // in_addr_t 一般为 32位的unsigned int
+    // 其字节顺序为网络顺序（network byte ordered)
     in_addr_t               addr;
     ngx_stream_addr_conf_t  conf;
+
 } ngx_stream_in_addr_t;
 
 
@@ -171,6 +174,7 @@ typedef struct {
     int                     type;
 
     // 监听的端口，支持ipv4和ipv6
+    // in_port_t通常是uint16
     in_port_t               port;
 
     // 用来保存多个相同的监听端口

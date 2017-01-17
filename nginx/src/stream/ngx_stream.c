@@ -37,8 +37,10 @@ static ngx_int_t ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
 // 设置有连接发生时的回调函数ngx_stream_init_connection
 static char *ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports);
 
+// 处理ipv4的地址
 static ngx_int_t ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_stream_conf_addr_t *addr);
+
 #if (NGX_HAVE_INET6)
 static ngx_int_t ngx_stream_add_addrs6(ngx_conf_t *cf,
     ngx_stream_port_t *stport, ngx_stream_conf_addr_t *addr);
@@ -371,6 +373,8 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     // 得到监听端口结构体里的socket地址
     sa = &listen->u.sockaddr;
 
+    // 得到监听端口结构体里的端口
+    // 1.11.x后使用函数ngx_inet_get_port
     switch (sa->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -424,7 +428,7 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
 
     port->port = p;
 
-    // 把listen结构体存储在addrs数组里供以后使用
+    // 把stream listen结构体存储在addrs数组里供以后使用
     if (ngx_array_init(&port->addrs, cf->temp_pool, 2,
                        sizeof(ngx_stream_conf_addr_t))
         != NGX_OK)
@@ -440,7 +444,8 @@ found:
         return NGX_ERROR;
     }
 
-    // 把listen结构体存储在addrs数组里供以后使用
+    // 把stream listen结构体存储在addrs数组里供以后使用
+    // 注意使用的是opt字段，完全拷贝
     addr->opt = *listen;
 
     return NGX_OK;
@@ -471,7 +476,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
         ngx_sort(port[p].addrs.elts, (size_t) port[p].addrs.nelts,
                  sizeof(ngx_stream_conf_addr_t), ngx_stream_cmp_conf_addrs);
 
-        // addrs.elts里存储的是监听端口结构体ngx_stream_listen_t
+        // addrs.elts.opt里存储的是监听端口结构体ngx_stream_listen_t
         // addr 数组首地址， last 数组长度
         addr = port[p].addrs.elts;
         last = port[p].addrs.nelts;
@@ -515,6 +520,8 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             // 设置连接的内存池是256bytes，不可配置
             ls->pool_size = 256;
+
+            // addrs.elts.opt里存储的是监听端口结构体ngx_stream_listen_t
             ls->type = addr[i].opt.type;
 
             // addr[i].opt就是ngx_stream_listen_t
@@ -557,6 +564,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
                 return NGX_CONF_ERROR;
             }
 
+            // 存储在ngx_listening_t.servers里
             ls->servers = stport;
 
             stport->naddrs = i + 1;
@@ -570,6 +578,9 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
                 break;
 #endif
             default: /* AF_INET */
+
+                // 处理ipv4的地址
+                // 拷贝到stport，也就是存储在了ls里
                 if (ngx_stream_add_addrs(cf, stport, addr) != NGX_OK) {
                     return NGX_CONF_ERROR;
                 }
@@ -591,6 +602,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 }
 
 
+// 处理ipv4的地址
 static ngx_int_t
 ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_stream_conf_addr_t *addr)
@@ -602,20 +614,29 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_stream_in_addr_t  *addrs;
     u_char                 buf[NGX_SOCKADDR_STRLEN];
 
+    // 分配内存，数量是stport->naddrs
     stport->addrs = ngx_pcalloc(cf->pool,
                                 stport->naddrs * sizeof(ngx_stream_in_addr_t));
     if (stport->addrs == NULL) {
         return NGX_ERROR;
     }
 
+    // 指针赋值，数组的起始位置
     addrs = stport->addrs;
 
+    // 为数组元素赋值
     for (i = 0; i < stport->naddrs; i++) {
 
+        // 从ngx_stream_listen_t里得到ip地址
         sin = &addr[i].opt.u.sockaddr_in;
+
+        // 拷贝到数组里
         addrs[i].addr = sin->sin_addr.s_addr;
 
+        // 监听端口所在的配置结构体数组
+        // 即定义该端口的server{}
         addrs[i].conf.ctx = addr[i].opt.ctx;
+
 #if (NGX_STREAM_SSL)
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
