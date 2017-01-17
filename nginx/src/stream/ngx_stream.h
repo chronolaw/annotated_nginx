@@ -148,6 +148,7 @@ typedef struct {
 
 
 // 端口
+// 存储在ls->servers
 typedef struct {
     /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
 
@@ -160,15 +161,25 @@ typedef struct {
 } ngx_stream_port_t;
 
 // 用在ngx_stream_add_ports
+// 整理在stream{}里定义的监听端口
+// 多个相同的端口会存储在addrs里
+// 用addrs[0].opt的方式得到实际的端口信息
 typedef struct {
     int                     family;
+
+    // 监听的类型， tcp/udp
     int                     type;
+
+    // 监听的端口，支持ipv4和ipv6
     in_port_t               port;
+
+    // 用来保存多个相同的监听端口
     ngx_array_t             addrs;       /* array of ngx_stream_conf_addr_t */
 } ngx_stream_conf_port_t;
 
 
 // 存储在ngx_stream_conf_port_t的addrs数组里
+// 用来保存多个相同的监听端口
 typedef struct {
     ngx_stream_listen_t     opt;
 } ngx_stream_conf_addr_t;

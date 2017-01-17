@@ -237,6 +237,9 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cf->cmd_type = NGX_STREAM_MAIN_CONF;
 
     // 递归解析stream模块
+    // 里面解析了server、listen等指令
+    // 在cmcf->servers里添加了server的配置srv_conf
+    // 在cmcf->listen里添加监听端口
     rv = ngx_conf_parse(cf, NULL);
 
     if (rv != NGX_CONF_OK) {
@@ -617,16 +620,21 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
 
+        // socket地址转换为字符串
+        // 参数1表示字符串里含有端口，即xxxx:port
         len = ngx_sock_ntop(&addr[i].opt.u.sockaddr, addr[i].opt.socklen, buf,
                             NGX_SOCKADDR_STRLEN, 1);
 
+        // 分配内存，准备拷贝地址字符串
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
             return NGX_ERROR;
         }
 
+        // 拷贝地址字符串
         ngx_memcpy(p, buf, len);
 
+        // 设置地址字符串
         addrs[i].conf.addr_text.len = len;
         addrs[i].conf.addr_text.data = p;
     }
