@@ -131,10 +131,13 @@ typedef struct {
 #endif
 } ngx_stream_addr_conf_t;
 
+// 记录地址信息和定义端口的server{}信息
 typedef struct {
     // in_addr_t 一般为 32位的unsigned int
     // 其字节顺序为网络顺序（network byte ordered)
     in_addr_t               addr;
+
+    // ctx里存储server{}对应的配置数组
     ngx_stream_addr_conf_t  conf;
 
 } ngx_stream_in_addr_t;
@@ -150,7 +153,7 @@ typedef struct {
 #endif
 
 
-// 端口
+// 给事件机制用的端口信息
 // 存储在ls->servers
 typedef struct {
     /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
