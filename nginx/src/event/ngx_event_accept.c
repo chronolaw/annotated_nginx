@@ -367,13 +367,17 @@ ngx_event_accept(ngx_event_t *ev)
         }
 #endif
 
-        // 连接的读写事件都加入epoll，即有读写都会由epoll收集事件并处理
+        // 如果事件机制不是epoll
+        // 连接的读写事件都加入监控，即有读写都会由select/poll/kqueue等收集事件并处理
         if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
             if (ngx_add_conn(c) == NGX_ERROR) {
                 ngx_close_accepted_connection(c);
                 return;
             }
         }
+
+        // 在linux上通常都使用epoll，所以上面的if代码不会执行
+        // 需要在后续的处理流程中自己控制读写事件的监控时机
 
         log->data = NULL;
         log->handler = NULL;
