@@ -109,11 +109,16 @@ typedef struct {
 
     // listen指令设置的backlog队列，收发缓冲区
     int                        backlog;
+
+    // 收发缓冲区大小
     int                        rcvbuf;
     int                        sndbuf;
+
 #if (NGX_HAVE_SETFIB)
     int                        setfib;
 #endif
+
+    // tcp专用的fast open特性
 #if (NGX_HAVE_TCP_FASTOPEN)
     int                        fastopen;
 #endif
