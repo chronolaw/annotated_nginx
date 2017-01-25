@@ -284,14 +284,19 @@ ngx_stream_ssl_handler(ngx_stream_session_t *s)
 {
     long                    rc;
     X509                   *cert;
+    ngx_int_t               rv;
     ngx_connection_t       *c;
     ngx_stream_ssl_conf_t  *sslcf;
+
+    if (!s->ssl) {
+        return NGX_OK;
+    }
 
     c = s->connection;
 
     sslcf = ngx_stream_get_module_srv_conf(s, ngx_stream_ssl_module);
 
-    if (s->ssl && c->ssl == NULL) {
+    if (c->ssl == NULL) {
         c->log->action = "SSL handshaking";
 
         if (sslcf->ssl.ctx == NULL) {
@@ -301,7 +306,11 @@ ngx_stream_ssl_handler(ngx_stream_session_t *s)
             return NGX_ERROR;
         }
 
-        return ngx_stream_ssl_init_connection(&sslcf->ssl, c);
+        rv = ngx_stream_ssl_init_connection(&sslcf->ssl, c);
+
+        if (rv != NGX_OK) {
+            return rv;
+        }
     }
 
     if (sslcf->verify) {
