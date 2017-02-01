@@ -4,7 +4,7 @@ Annotated Nginx Source（中文）
 # 简介
 Nginx源码分析，注解代码，帮助学习Nginx。
 
-当前使用的是1.10.2稳定版。
+当前使用的是1.10.3稳定版。
 
 Nginx1.10增加了动态模块、http2、reuseport。
 
@@ -23,8 +23,8 @@ nginx 1.10.2
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx稳定版1.10.2|有
-upgrade | nginx稳定版1.10.2|无
+master  | nginx稳定版1.10.3|有
+upgrade | nginx稳定版1.10.3|无
 mainline| nginx开发版1.11.8|无
 
 # 已注解
