@@ -4441,16 +4441,25 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t              n;
     ngx_http_listen_opt_t   lsopt;
 
+    // server有listen的标志位
     cscf->listen = 1;
 
+    // 获取指令后的参数数组
     value = cf->args->elts;
 
+    // 准备解析url
     ngx_memzero(&u, sizeof(ngx_url_t));
 
+    // url是第一个参数
     u.url = value[1];
+
+    // 设置为监听url
     u.listen = 1;
+
+    // 默认端口是http标准的80
     u.default_port = 80;
 
+    // 解析url，得到地址等信息
     if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
         if (u.err) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -4463,8 +4472,10 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memzero(&lsopt, sizeof(ngx_http_listen_opt_t));
 
+    // 拷贝ip地址
     ngx_memcpy(&lsopt.u.sockaddr, u.sockaddr, u.socklen);
 
+    // 从ngx_url_t里拷贝信息
     lsopt.socklen = u.socklen;
     lsopt.backlog = NGX_LISTEN_BACKLOG;
     lsopt.rcvbuf = -1;
@@ -4480,9 +4491,11 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     lsopt.ipv6only = 1;
 #endif
 
+    // 存储地址的字符串形式
     (void) ngx_sock_ntop(&lsopt.u.sockaddr, lsopt.socklen, lsopt.addr,
                          NGX_SOCKADDR_STRLEN, 1);
 
+    // 检查其他参数，如bind/backlog/sndbuf/rcvbuf
     for (n = 2; n < cf->args->nelts; n++) {
 
         if (ngx_strcmp(value[n].data, "default_server") == 0
@@ -4492,6 +4505,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        // 是否bind地址
         if (ngx_strcmp(value[n].data, "bind") == 0) {
             lsopt.set = 1;
             lsopt.bind = 1;
@@ -4788,7 +4802,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid parameter \"%V\"", &value[n]);
         return NGX_CONF_ERROR;
-    }
+    }   //for检查参数结束
 
     if (ngx_http_add_listen(cf, cscf, &lsopt) == NGX_OK) {
         return NGX_CONF_OK;
