@@ -4804,6 +4804,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }   //for检查参数结束
 
+    // 加入cmcf->ports数组
     if (ngx_http_add_listen(cf, cscf, &lsopt) == NGX_OK) {
         return NGX_CONF_OK;
     }
