@@ -1,4 +1,36 @@
 
+Changes with nginx 1.11.10                                       14 Feb 2017
+
+    *) Change: cache header format has been changed, previously cached
+       responses will be invalidated.
+
+    *) Feature: support of "stale-while-revalidate" and "stale-if-error"
+       extensions in the "Cache-Control" backend response header line.
+
+    *) Feature: the "proxy_cache_background_update",
+       "fastcgi_cache_background_update", "scgi_cache_background_update",
+       and "uwsgi_cache_background_update" directives.
+
+    *) Feature: nginx is now able to cache responses with the "Vary" header
+       line up to 128 characters long (instead of 42 characters in previous
+       versions).
+
+    *) Feature: the "build" parameter of the "server_tokens" directive.
+       Thanks to Tom Thorogood.
+
+    *) Bugfix: "[crit] SSL_write() failed" messages might appear in logs
+       when handling requests with the "Expect: 100-continue" request header
+       line.
+
+    *) Bugfix: the ngx_http_slice_module did not work in named locations.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       using AIO after an "X-Accel-Redirect" redirection.
+
+    *) Bugfix: reduced memory consumption for long-lived requests using
+       gzipping.
+
+
 Changes with nginx 1.11.9                                        24 Jan 2017
 
     *) Bugfix: nginx might hog CPU when using the stream module; the bug had

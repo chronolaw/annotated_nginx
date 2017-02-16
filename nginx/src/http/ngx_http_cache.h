@@ -24,10 +24,10 @@
 #define NGX_HTTP_CACHE_SCARCE        8
 
 #define NGX_HTTP_CACHE_KEY_LEN       16
-#define NGX_HTTP_CACHE_ETAG_LEN      42
-#define NGX_HTTP_CACHE_VARY_LEN      42
+#define NGX_HTTP_CACHE_ETAG_LEN      128
+#define NGX_HTTP_CACHE_VARY_LEN      128
 
-#define NGX_HTTP_CACHE_VERSION       3
+#define NGX_HTTP_CACHE_VERSION       5
 
 
 typedef struct {
@@ -71,6 +71,8 @@ struct ngx_http_cache_s {
 
     ngx_file_uniq_t                  uniq;
     time_t                           valid_sec;
+    time_t                           updating_sec;
+    time_t                           error_sec;
     time_t                           last_modified;
     time_t                           date;
 
@@ -114,12 +116,18 @@ struct ngx_http_cache_s {
     unsigned                         purged:1;
     unsigned                         reading:1;
     unsigned                         secondary:1;
+    unsigned                         background:1;
+
+    unsigned                         stale_updating:1;
+    unsigned                         stale_error:1;
 };
 
 
 typedef struct {
     ngx_uint_t                       version;
     time_t                           valid_sec;
+    time_t                           updating_sec;
+    time_t                           error_sec;
     time_t                           last_modified;
     time_t                           date;
     uint32_t                         crc32;
