@@ -194,6 +194,10 @@ void ngx_http_run_posted_requests(ngx_connection_t *c);
 ngx_int_t ngx_http_post_request(ngx_http_request_t *r,
     ngx_http_posted_request_t *pr);
 
+// 重要函数，以“适当”的方式“结束”请求
+// 并不一定会真正结束，大部分情况下只是暂时停止处理，等待epoll事件发生
+// 参数rc决定了函数的逻辑，在content阶段就是handler的返回值
+// 调用ngx_http_finalize_connection，检查请求相关的异步事件，尝试关闭请求
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
 
 // 释放请求相关的资源，调用cleanup链表，相当于析构
@@ -202,7 +206,11 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
 // 但连接的内存池还在，可以用于长连接继续使用
 void ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc);
 
+// 用于忽略读写事件，即不处理
 void ngx_http_empty_handler(ngx_event_t *wev);
+
+// 用于忽略写事件，即不处理
+// r->write_event_handler = ngx_http_request_empty_handler;
 void ngx_http_request_empty_handler(ngx_http_request_t *r);
 
 

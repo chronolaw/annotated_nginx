@@ -4015,6 +4015,8 @@ ngx_http_empty_handler(ngx_event_t *wev)
 }
 
 
+// 用于忽略写事件，即不处理
+// r->write_event_handler = ngx_http_request_empty_handler;
 void
 ngx_http_request_empty_handler(ngx_http_request_t *r)
 {
