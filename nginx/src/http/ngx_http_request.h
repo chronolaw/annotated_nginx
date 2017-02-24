@@ -20,13 +20,13 @@
 
 // 最多只能产生50个子请求
 // 避免过多子请求导致处理效率降低
-// 在1.8版是200,1.10减少到50
+// 在1.8版之前是200,1.10之后减少到50
 #define NGX_HTTP_MAX_SUBREQUESTS           50
 
 /* must be 2^n */
 #define NGX_HTTP_LC_HEADER_LEN             32
 
-// 在丢弃请求体数据时的缓冲区长度，4k
+// 在丢弃请求体数据时使用的缓冲区长度，4k
 // 用在ngx_http_read_discarded_request_body
 #define NGX_HTTP_DISCARD_BUFFER_SIZE       4096
 
@@ -424,6 +424,9 @@ struct ngx_http_cleanup_s {
 typedef ngx_int_t (*ngx_http_post_subrequest_pt)(ngx_http_request_t *r,
     void *data, ngx_int_t rc);
 
+// 子请求相关的功能代码不建议仔细研究
+// 可能Nginx今后会逐渐废弃子请求
+
 // 子请求完成后的处理函数，相当于闭包/lambda
 typedef struct {
     ngx_http_post_subrequest_pt       handler;
@@ -460,25 +463,32 @@ typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 // 保存有所有http模块的配置、ctx数据、请求头、请求体
 // 读写事件的处理函数
 struct ngx_http_request_s {
+    // 结构体的“签名”，C程序里的常用手段，用特殊字符来标记结构体
     uint32_t                          signature;         /* "HTTP" */
 
     // 请求对应的连接对象，里面有log用于记录日志
     // 里面还有读写事件read/write
+    // 使用它来与客户端通信收发数据
     ngx_connection_t                 *connection;
 
     // 保存有所有http模块的配置、ctx数据
     // 使用ngx_http_get_module_ctx获取ctx
+    // 是一个数组，里面存储的是void*
     void                            **ctx;
 
     // 使用ngx_http_get_module_main_conf访问
+    // 都是一维数组，里面存储的是void*
     void                            **main_conf;
     void                            **srv_conf;
     void                            **loc_conf;
 
-    // 读写事件的处理函数
+    // 读事件的处理函数
     // 随着处理的阶段不同会变化
+    // ngx_http_discarded_request_body_handler:丢弃请求体
+    // ngx_http_block_reading:忽略读事件，即不读取数据
     ngx_http_event_handler_pt         read_event_handler;
 
+    // 写事件的处理函数
     // 写最开始是ngx_http_empty_handler
     // 然后是ngx_http_core_run_phases
     // 当进入content阶段调用location handler后变成ngx_http_request_empty_handler
@@ -569,6 +579,7 @@ struct ngx_http_request_s {
     ngx_http_posted_request_t        *posted_requests;
 
     // 执行ngx_http_core_run_phases时的重要参数，标记在引擎数组里的位置
+    // 可以理解为一个执行的“游标”
     ngx_int_t                         phase_handler;
 
     // 重要！！
@@ -580,6 +591,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        access_code;
 
     // 变量值数组，每个请求都不同
+    // 1.11.10增加了prefix_variables
     ngx_http_variable_value_t        *variables;
 
 #if (NGX_PCRE)
@@ -632,7 +644,9 @@ struct ngx_http_request_s {
     // 子请求数量，最多不能超过50个
     unsigned                          subrequests:8;
 
-    // 请求的阻塞数量，用于线程池，当发起一个多线程task时需要增加
+    // 请求的阻塞数量，用于线程池
+    // 当发起一个多线程task时需要增加
+    // task结束时需要减少
     unsigned                          blocked:8;
 
     unsigned                          aio:1;
@@ -749,6 +763,7 @@ struct ngx_http_request_s {
     unsigned                          done:1;
     unsigned                          logged:1;
 
+    // 发送数据是否已经被缓冲，即没有完全发送完
     unsigned                          buffered:4;
 
     unsigned                          main_filter_need_in_memory:1;
