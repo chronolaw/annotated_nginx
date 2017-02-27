@@ -377,6 +377,9 @@ typedef struct ngx_http_addr_conf_s  ngx_http_addr_conf_t;
 // 建立连接时server{}里相关的信息
 // 重要的是conf_ctx，server的配置数组
 typedef struct {
+    // in ngx_http_core_module.h
+    // 保存了server的基本配置信息，如ssl/http2等
+    // 关键字段是default_server
     ngx_http_addr_conf_t             *addr_conf;
 
     // server{}里的配置数组
@@ -389,9 +392,12 @@ typedef struct {
 #endif
 #endif
 
+    // 正在使用的缓冲区数组，nbusy表示数组长度
+    // 收到的数据都放在这个数组里
     ngx_buf_t                       **busy;
     ngx_int_t                         nbusy;
 
+    // 未使用的缓冲区数组，nfree表示数组长度
     ngx_buf_t                       **free;
     ngx_int_t                         nfree;
 

@@ -835,7 +835,8 @@ ngx_http_create_request(ngx_connection_t *c)
     // accept的连接是主请求
     r->main = r;
 
-    // 当前只有一个请求，所有子请求最大不能超过200
+    // 当前只有一个请求，所有子请求最大不能超过50
+    // 在1.8版之前是200,1.10之后减少到50
     r->count = 1;
 
     // 得到当前时间
@@ -858,9 +859,11 @@ ngx_http_create_request(ngx_connection_t *c)
     r->headers_out.last_modified_time = -1;
 
     // uri改写次数限制，最多10次
+    // 每次rewrite就会减少，到0就不能rewrite，返回错误
     r->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
 
-    // 所有子请求最大不能超过200
+    // 所有子请求最大不能超过50
+    // 在1.8版之前是200,1.10之后减少到50
     // 每产生一个子请求，r->subrequests递减
     r->subrequests = NGX_HTTP_MAX_SUBREQUESTS + 1;
 
