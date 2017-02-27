@@ -778,6 +778,10 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         return NGX_OK;
     }
 
+    // 头里声明了body的数据长度
+    // 或者body是chunked，即长度不确定
+    // 这两种情况都需要读取数据并丢弃
+
     // 检查缓冲区里在解析完头后是否还有数据
     // 也就是说之前可能读取了部分请求体数据
     size = r->header_in->last - r->header_in->pos;
