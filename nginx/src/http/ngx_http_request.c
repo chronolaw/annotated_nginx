@@ -1702,6 +1702,13 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                 return;
             }
 
+            // 此时已经读取了完整的http请求头，可以开始处理请求了
+            // 如果还在定时器红黑树里，那么就删除，不需要检查超时
+            // 连接的读写事件handler都设置为ngx_http_request_handler
+            // 请求的读事件设置为ngx_http_block_reading
+            // 启动引擎数组，即r->write_event_handler = ngx_http_core_run_phases
+            // 从phase_handler的位置开始调用模块处理
+            // 如果有子请求，那么都要处理
             ngx_http_process_request(r);
 
             return;
@@ -2930,7 +2937,10 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+    // 到这里，请求应该基本可以确定要结束了，设置done
     r->done = 1;
+
+    // 不需要再关注写事件，因为数据已经发送完了
     r->write_event_handler = ngx_http_request_empty_handler;
 
     if (!r->post_action) {
