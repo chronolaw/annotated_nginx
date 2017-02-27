@@ -520,6 +520,8 @@ ngx_http_init_phases(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 }
 
 
+// 初始化常见的http头，提高查找效率
+// 定义在ngx_http_request.c
 static ngx_int_t
 ngx_http_init_headers_in_hash(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 {
@@ -577,6 +579,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     // 两个分别是sever和location rewrite
     cmcf->phase_engine.server_rewrite_index = (ngx_uint_t) -1;
     cmcf->phase_engine.location_rewrite_index = (ngx_uint_t) -1;
+
     find_config_index = 0;
 
     // 看是否有rewrite模块
@@ -612,6 +615,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
         switch (i) {
 
         // 地址改写阶段
+        // ngx_http_core_rewrite_phase
         case NGX_HTTP_SERVER_REWRITE_PHASE:
             // 如果rewrite索引未初始化，那么设置为第一个rewrite模块
             if (cmcf->phase_engine.server_rewrite_index == (ngx_uint_t) -1) {
@@ -636,6 +640,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
             continue;
 
         // 地址改写阶段
+        // ngx_http_core_rewrite_phase
         case NGX_HTTP_REWRITE_PHASE:
             // 如果rewrite索引未初始化，那么设置为第一个rewrite模块
             if (cmcf->phase_engine.location_rewrite_index == (ngx_uint_t) -1) {
@@ -661,6 +666,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
             continue;
 
         // 检查访问权限
+        // ngx_http_core_access_phase
         case NGX_HTTP_ACCESS_PHASE:
             // 子请求不做访问控制，直接跳过本阶段
             // decline:表示不处理,继续在本阶段（rewrite）里查找下一个模块
@@ -691,6 +697,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
         // 处理请求，产生响应内容，最常用的阶段
         // 这已经是处理的最后阶段了（log阶段不处理请求，不算）
+        // ngx_http_core_content_phase
         case NGX_HTTP_CONTENT_PHASE:
             checker = ngx_http_core_content_phase;
             break;
