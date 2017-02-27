@@ -825,7 +825,10 @@ typedef struct {
 #define ngx_http_ephemeral(r)  (void *) (&r->uri_start)
 
 
+// 使用字符串映射操作函数，填充headers_in
+// 在ngx_http_init_headers_in_hash构造为散列表，提高查找效率
 extern ngx_http_header_t       ngx_http_headers_in[];
+
 extern ngx_http_header_out_t   ngx_http_headers_out[];
 
 

@@ -1319,6 +1319,7 @@ ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     struct sockaddr_in6        *sin6;
 #endif
 
+    // 获取http core模块的main_conf，只有一个
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
     if (cmcf->ports == NULL) {

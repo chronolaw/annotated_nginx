@@ -362,6 +362,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     // 取监听同一端口的server信息
     port = c->listening->servers;
 
+    // 一个端口对应多个地址的情况
     if (port->naddrs > 1) {
 
         /*
@@ -464,12 +465,14 @@ ngx_http_init_connection(ngx_connection_t *c)
     // 暂时不处理写事件
     c->write->handler = ngx_http_empty_handler;
 
+    // http 2.0使用特殊的读事件处理函数ngx_http_v2_init
 #if (NGX_HTTP_V2)
     if (hc->addr_conf->http2) {
         rev->handler = ngx_http_v2_init;
     }
 #endif
 
+    // ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
 #if (NGX_HTTP_SSL)
     {
     ngx_http_ssl_srv_conf_t  *sscf;
@@ -604,6 +607,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
         c->buffer = b;
 
+    // 虽然已经有了buf结构，但没有关联的内存空间
+    // 之前因为again被释放了，所以要重新分配内存
+    // 见后面的recv判断
     } else if (b->start == NULL) {
 
         b->start = ngx_palloc(c->pool, size);
