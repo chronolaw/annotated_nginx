@@ -814,6 +814,7 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     // 需要使用回调ngx_http_discarded_request_body_handler读取数据
     rc = ngx_http_read_discarded_request_body(r);
 
+    // ok表示一次就成功读取了全部的body，完成丢弃工作
     if (rc == NGX_OK) {
         r->lingering_close = 0;
         return NGX_OK;
@@ -933,16 +934,19 @@ ngx_http_discarded_request_body_handler(ngx_http_request_t *r)
     }
 
     // 如果是一开始就丢弃请求体，那么就不会走这里， timer=0
+    // 设置读事件的超时时间
     if (timer) {
 
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
         timer *= 1000;
 
+        // 等待时间不能超过配置的lingering_timeout
         if (timer > clcf->lingering_timeout) {
             timer = clcf->lingering_timeout;
         }
 
+        // 把读事件加入定时器红黑树，等待超时事件
         ngx_add_timer(rev, timer);
     }
 }
