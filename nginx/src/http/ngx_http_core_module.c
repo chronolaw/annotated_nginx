@@ -1330,7 +1330,7 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 
     // 模块handler返回decline，表示不处理
     if (rc == NGX_DECLINED) {
-        // 继续在本阶段（rewrite）里查找下一个模块
+        // 继续在本阶段（access）里查找下一个模块
         // 索引加1
         r->phase_handler++;
 
@@ -1347,14 +1347,23 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 要求所有的权限检查模块都满足
     if (clcf->satisfy == NGX_HTTP_SATISFY_ALL) {
 
+        // 模块返回ok，满足条件，需要下一个模块再进行检查
         if (rc == NGX_OK) {
             r->phase_handler++;
+
+            // again继续引擎数组的循环
             return NGX_AGAIN;
         }
 
+        // 模块检查失败，需要结束请求
+
     } else {
+        // NGX_HTTP_SATISFY_ANY，仅一个满足即可
+
+        // 模块返回ok，满足条件
         if (rc == NGX_OK) {
             r->access_code = 0;
 
@@ -1362,10 +1371,16 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
                 r->headers_out.www_authenticate->hash = 0;
             }
 
+            // 跳过本阶段的后续检查模块，进入下一个阶段
             r->phase_handler = ph->next;
+
+            // again继续引擎数组的循环
             return NGX_AGAIN;
         }
 
+        // 模块检查失败，禁止访问
+        // 但因为是any，也许后续的模块检查会成功，所以继续执行引擎
+        // 让后续的模块再检查权限，只要一个成功就可以
         if (rc == NGX_HTTP_FORBIDDEN || rc == NGX_HTTP_UNAUTHORIZED) {
             if (r->access_code != NGX_HTTP_UNAUTHORIZED) {
                 r->access_code = rc;
@@ -1383,6 +1398,7 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     // 结束请求
     // 但如果count>1，则不会真正结束
     ngx_http_finalize_request(r, rc);
+
     return NGX_OK;
 }
 
