@@ -2805,15 +2805,19 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+    // 返回了300以上的http错误码
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE
         || rc == NGX_HTTP_CREATED
         || rc == NGX_HTTP_NO_CONTENT)
     {
+        // NGX_HTTP_CLOSE是Nginx自己定义的错误码
+        // #define NGX_HTTP_CLOSE                     444
         if (rc == NGX_HTTP_CLOSE) {
             ngx_http_terminate_request(r, rc);
             return;
         }
 
+        // 主请求，需要删除定时器，不再考虑超时
         if (r == r->main) {
             if (c->read->timer_set) {
                 ngx_del_timer(c->read);
