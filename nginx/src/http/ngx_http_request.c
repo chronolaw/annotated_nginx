@@ -9,6 +9,9 @@
 // * ngx_http_request_handler
 // * ngx_http_run_posted_requests
 //
+// * ngx_http_set_write_handler
+// * ngx_http_writer
+//
 // * ngx_http_log_request
 // * ngx_http_free_request
 // * ngx_http_close_connection
