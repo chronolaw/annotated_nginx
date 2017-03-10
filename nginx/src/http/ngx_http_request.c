@@ -2834,6 +2834,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         c->read->handler = ngx_http_request_handler;
         c->write->handler = ngx_http_request_handler;
 
+        // 发生错误时返回合适的响应内容
         ngx_http_finalize_request(r, ngx_http_special_response_handler(r, rc));
         return;
     }
