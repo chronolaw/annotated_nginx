@@ -1,4 +1,26 @@
 
+Changes with nginx 1.11.11                                       21 Mar 2017
+
+    *) Feature: the "worker_shutdown_timeout" directive.
+
+    *) Feature: vim syntax highlighting scripts improvements.
+       Thanks to Wei-Ko Kao.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       $limit_rate variable was set to an empty string.
+
+    *) Bugfix: the "proxy_cache_background_update",
+       "fastcgi_cache_background_update", "scgi_cache_background_update",
+       and "uwsgi_cache_background_update" directives might work incorrectly
+       if the "if" directive was used.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       number of large_client_header_buffers in a virtual server was
+       different from the one in the default server.
+
+    *) Bugfix: in the mail proxy server.
+
+
 Changes with nginx 1.11.10                                       14 Feb 2017
 
     *) Change: cache header format has been changed, previously cached
