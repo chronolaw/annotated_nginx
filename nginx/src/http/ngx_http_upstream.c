@@ -188,7 +188,7 @@ static ngx_int_t ngx_http_upstream_ssl_name(ngx_http_request_t *r,
 #endif
 
 
-ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
+static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
     { ngx_string("Status"),
                  ngx_http_upstream_process_header_line,
@@ -5554,7 +5554,7 @@ ngx_http_upstream_cookie_variable(ngx_http_request_t *r,
 
 #if (NGX_HTTP_CACHE)
 
-ngx_int_t
+static ngx_int_t
 ngx_http_upstream_cache_status(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
