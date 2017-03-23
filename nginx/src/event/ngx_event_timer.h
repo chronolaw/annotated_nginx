@@ -38,6 +38,8 @@ ngx_msec_t ngx_event_find_timer(void);
 void ngx_event_expire_timers(void);
 
 // 取消定时器，调用handler处理
+// 在1.11.11此函数已经删除
+// 改为ngx_event_no_timers_left()
 void ngx_event_cancel_timers(void);
 
 
