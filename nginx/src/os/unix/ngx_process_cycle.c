@@ -910,6 +910,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
         // 收到了-s quit，关闭监听端口后再停止进程（优雅关闭）
         if (ngx_exiting) {
             // 取消定时器，调用handler处理
+            //
+            // 1.11.11改成了ngx_event_no_timers_left()
+            // 解决了"is shutting down"进程的问题
             ngx_event_cancel_timers();
 
             // 定时器红黑树为空，即已经没有任何事件
