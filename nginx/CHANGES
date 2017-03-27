@@ -1,4 +1,9 @@
 
+Changes with nginx 1.11.12                                       24 Mar 2017
+
+    *) Bugfix: nginx might hog CPU; the bug had appeared in 1.11.11.
+
+
 Changes with nginx 1.11.11                                       21 Mar 2017
 
     *) Feature: the "worker_shutdown_timeout" directive.
