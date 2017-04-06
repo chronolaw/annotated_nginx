@@ -769,6 +769,8 @@ ngx_http_v2_create_headers_frame(ngx_http_request_t *r, u_char *pos,
         rest -= frame_size;
 
         if (rest) {
+            frame->length += NGX_HTTP_V2_FRAME_HEADER_SIZE;
+
             type = NGX_HTTP_V2_CONTINUATION_FRAME;
             flags = NGX_HTTP_V2_NO_FLAG;
             continue;
@@ -1208,6 +1210,9 @@ ngx_http_v2_headers_frame_handler(ngx_http_v2_connection_t *h2c,
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                    "http2:%ui HEADERS frame %p was sent",
                    stream->node->id, frame);
+
+    stream->request->header_size += NGX_HTTP_V2_FRAME_HEADER_SIZE
+                                    + frame->length;
 
     ngx_http_v2_handle_frame(stream, frame);
 
