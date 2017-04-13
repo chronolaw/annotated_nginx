@@ -4,7 +4,7 @@ Annotated Nginx Source（中文）
 # 简介
 Nginx源码分析，注解代码，帮助学习Nginx。
 
-当前使用的是1.10.3稳定版。
+当前正在由1.10.3迁移至1.12.0稳定版。
 
 Nginx1.10增加了动态模块、http2、reuseport。
 
