@@ -61,6 +61,20 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     // 1.11.x增加了对rev->available的检查
     // 如果!rev->available则不接收数据，直接返回NGX_AGAIN
+#if (NGX_HAVE_EPOLLRDHUP)
+
+    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+        ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                       "recv: eof:%d, avail:%d",
+                       rev->pending_eof, rev->available);
+
+        if (!rev->available && !rev->pending_eof) {
+            rev->ready = 0;
+            return NGX_AGAIN;
+        }
+    }
+
+#endif
 
     do {
         // 使用系统调用recv读数据
@@ -125,6 +139,25 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
             // 在epoll模块ngx_epoll_init里已经设置了全局变量ngx_event_flags
             // NGX_USE_CLEAR_EVENT|NGX_USE_GREEDY_EVENT|NGX_USE_EPOLL_EVENT
+#if (NGX_HAVE_EPOLLRDHUP)
+
+            if ((ngx_event_flags & NGX_USE_EPOLL_EVENT)
+                && ngx_use_epoll_rdhup)
+            {
+                if ((size_t) n < size) {
+                    if (!rev->pending_eof) {
+                        rev->ready = 0;
+                    }
+
+                    rev->available = 0;
+                }
+
+                return n;
+            }
+
+#endif
+
+>>>>>>> upgrade
             if ((size_t) n < size
                 && !(ngx_event_flags & NGX_USE_GREEDY_EVENT))
             {
