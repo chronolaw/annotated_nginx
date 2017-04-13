@@ -909,16 +909,17 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
         // 进程正在退出,即quit
         // 收到了-s quit，关闭监听端口后再停止进程（优雅关闭）
         if (ngx_exiting) {
+            // 1.11.11之前
             // 取消定时器，调用handler处理
+            // ngx_event_cancel_timers();
+            // if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
             //
             // 1.11.11改成了ngx_event_no_timers_left()
             // 解决了"is shutting down"进程的问题
-            ngx_event_cancel_timers();
 
             // 定时器红黑树为空，即已经没有任何事件
             // 否则表示还有事件未处理，暂不退出
-            if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
-            {
+            if (ngx_event_no_timers_left() == NGX_OK) {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 
                 // 调用所有模块的exit_process，进程结束hook
@@ -962,6 +963,10 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 // 等所有事件都处理完了才能真正退出
                 ngx_exiting = 1;
 
+                // 1.11.11新增
+                // 设置关闭的定时器，由指令worker_shutdown_timeout确定
+                ngx_set_shutdown_timer(cycle);
+
                 // in ngx_connection.c
                 // 遍历监听端口列表，逐个删除监听事件
                 // 不再接受新的连接请求
@@ -992,6 +997,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 {
     sigset_t          set;
     ngx_int_t         n;
+    ngx_time_t       *tp;
     ngx_uint_t        i;
     ngx_cpuset_t     *cpu_affinity;
     struct rlimit     rlmt;
@@ -1097,7 +1103,9 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
     }
 
     // 根据pid设置随机数种子
-    srandom((ngx_pid << 16) ^ ngx_time());
+    // 旧实现：srandom((ngx_pid << 16) ^ ngx_time());
+    tp = ngx_timeofday();
+    srandom(((unsigned) ngx_pid << 16) ^ tp->sec ^ tp->msec);
 
     /*
      * disable deleting previous events for the listening sockets because
@@ -1374,11 +1382,11 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
 static void
 ngx_cache_manager_process_handler(ngx_event_t *ev)
 {
-    time_t        next, n;
     ngx_uint_t    i;
+    ngx_msec_t    next, n;
     ngx_path_t  **path;
 
-    next = 60 * 60;
+    next = 60 * 60 * 1000;
 
     path = ngx_cycle->paths.elts;
     for (i = 0; i < ngx_cycle->paths.nelts; i++) {
@@ -1396,7 +1404,7 @@ ngx_cache_manager_process_handler(ngx_event_t *ev)
         next = 1;
     }
 
-    ngx_add_timer(ev, next * 1000);
+    ngx_add_timer(ev, next);
 }
 
 

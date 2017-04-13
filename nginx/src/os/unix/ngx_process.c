@@ -367,7 +367,7 @@ ngx_init_signals(ngx_log_t *log)
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
 // 检查子进程结束，设置进程数组ngx_processes里的状态
-void
+static void
 ngx_signal_handler(int signo)
 {
     char            *action;
