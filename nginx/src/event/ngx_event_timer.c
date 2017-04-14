@@ -98,7 +98,7 @@ ngx_event_expire_timers(void)
         // 取红黑树的最小节点
         node = ngx_rbtree_min(root, sentinel);
 
-        /* node->key > ngx_current_time */
+        /* node->key > ngx_current_msec */
 
         // 与当前时间进行比较，>0即还没有超时
 
@@ -139,8 +139,12 @@ ngx_event_expire_timers(void)
 // 取消定时器，调用handler处理
 // 在1.11.11此函数已经删除
 // 改为ngx_event_no_timers_left()
-void
-ngx_event_cancel_timers(void)
+//void
+//ngx_event_cancel_timers(void)
+
+// 检查红黑树里是否还有定时器
+ngx_int_t
+ngx_event_no_timers_left(void)
 {
     ngx_event_t        *ev;
     ngx_rbtree_node_t  *node, *root, *sentinel;
@@ -148,43 +152,33 @@ ngx_event_cancel_timers(void)
     // 红黑树的哨兵
     sentinel = ngx_event_timer_rbtree.sentinel;
 
-    for ( ;; ) {
-        // 红黑树的根
-        root = ngx_event_timer_rbtree.root;
+    // 红黑树的根
+    root = ngx_event_timer_rbtree.root;
 
-        // 红黑树已经空
-        if (root == sentinel) {
-            return;
-        }
+    // 红黑树已经空
+    if (root == sentinel) {
+        return NGX_OK;
+    }
 
-        // 取红黑树的最小节点
-        node = ngx_rbtree_min(root, sentinel);
-
+    // 取红黑树的最小节点
+    // 开始顺序遍历红黑树
+    for (node = ngx_rbtree_min(root, sentinel);
+         node;
+         node = ngx_rbtree_next(&ngx_event_timer_rbtree, node))
+    {
         // 通过offsetof获得事件对象
         ev = (ngx_event_t *) ((char *) node - offsetof(ngx_event_t, timer));
 
         // 事件不能被取消
+        // 找到了一个定时器事件，即还有定时器
         if (!ev->cancelable) {
-            return;
+            return NGX_AGAIN;
         }
-
-        ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
-                       "event timer cancel: %d: %M",
-                       ngx_event_ident(ev->data), ev->timer.key);
-
-        // 事件从红黑树里移除
-        ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
-
-#if (NGX_DEBUG)
-        ev->timer.left = NULL;
-        ev->timer.right = NULL;
-        ev->timer.parent = NULL;
-#endif
-
-        // 定时器标志清零
-        ev->timer_set = 0;
-
-        // 调用事件的handler
-        ev->handler(ev);
     }
+
+    /* only cancelable timers left */
+
+    // 红黑树里都是可以取消的定时器，即无需要等待的事件
+
+    return NGX_OK;
 }
