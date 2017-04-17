@@ -32,13 +32,12 @@ typedef ngx_int_t (*ngx_event_get_peer_pt)(ngx_peer_connection_t *pc,
 // 释放一个上游地址，维护upstream{}负载均衡信息
 typedef void (*ngx_event_free_peer_pt)(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state);
-#if (NGX_SSL)
-
+typedef void (*ngx_event_notify_peer_pt)(ngx_peer_connection_t *pc,
+    void *data, ngx_uint_t type);
 typedef ngx_int_t (*ngx_event_set_peer_session_pt)(ngx_peer_connection_t *pc,
     void *data);
 typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
     void *data);
-#endif
 
 
 // nginx作为客户端发起的主动连接，连接上游服务器
@@ -74,10 +73,12 @@ struct ngx_peer_connection_s {
     // ngx_stream_upstream_free_round_robin_peer
     ngx_event_free_peer_pt           free;
 
+    ngx_event_notify_peer_pt         notify;
+
     // get/free函数所需的参数
     void                            *data;
 
-#if (NGX_SSL)
+#if (NGX_SSL || NGX_COMPAT)
     ngx_event_set_peer_session_pt    set_session;
     ngx_event_save_peer_session_pt   save_session;
 #endif
@@ -96,9 +97,13 @@ struct ngx_peer_connection_s {
 
     // 连接是否已经缓存
     unsigned                         cached:1;
+    unsigned                         transparent:1;
 
                                      /* ngx_connection_log_error_e */
     unsigned                         log_error:2;
+
+    NGX_COMPAT_BEGIN(2)
+    NGX_COMPAT_END
 };
 
 
