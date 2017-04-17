@@ -143,20 +143,20 @@ ngx_int_t             ngx_accept_disabled;
 // 统计用的共享内存变量指针
 #if (NGX_STAT_STUB)
 
-ngx_atomic_t   ngx_stat_accepted0;
-ngx_atomic_t  *ngx_stat_accepted = &ngx_stat_accepted0;
-ngx_atomic_t   ngx_stat_handled0;
-ngx_atomic_t  *ngx_stat_handled = &ngx_stat_handled0;
-ngx_atomic_t   ngx_stat_requests0;
-ngx_atomic_t  *ngx_stat_requests = &ngx_stat_requests0;
-ngx_atomic_t   ngx_stat_active0;
-ngx_atomic_t  *ngx_stat_active = &ngx_stat_active0;
-ngx_atomic_t   ngx_stat_reading0;
-ngx_atomic_t  *ngx_stat_reading = &ngx_stat_reading0;
-ngx_atomic_t   ngx_stat_writing0;
-ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
-ngx_atomic_t   ngx_stat_waiting0;
-ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
+static ngx_atomic_t   ngx_stat_accepted0;
+ngx_atomic_t         *ngx_stat_accepted = &ngx_stat_accepted0;
+static ngx_atomic_t   ngx_stat_handled0;
+ngx_atomic_t         *ngx_stat_handled = &ngx_stat_handled0;
+static ngx_atomic_t   ngx_stat_requests0;
+ngx_atomic_t         *ngx_stat_requests = &ngx_stat_requests0;
+static ngx_atomic_t   ngx_stat_active0;
+ngx_atomic_t         *ngx_stat_active = &ngx_stat_active0;
+static ngx_atomic_t   ngx_stat_reading0;
+ngx_atomic_t         *ngx_stat_reading = &ngx_stat_reading0;
+static ngx_atomic_t   ngx_stat_writing0;
+ngx_atomic_t         *ngx_stat_writing = &ngx_stat_writing0;
+static ngx_atomic_t   ngx_stat_waiting0;
+ngx_atomic_t         *ngx_stat_waiting = &ngx_stat_waiting0;
 
 #endif
 
@@ -269,7 +269,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
 
 // event_core模块是event模块，不是core模块
 // 但它不实现具体的事件模型，所以actions函数表全是空指针
-ngx_event_module_t  ngx_event_core_module_ctx = {
+static ngx_event_module_t  ngx_event_core_module_ctx = {
     // event_core模块的名字："event_core"
     &event_core_name,
 
@@ -759,8 +759,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     // 创建共享内存，存放负载均衡锁和统计用的原子变量
     shm.size = size;
-    shm.name.len = sizeof("nginx_shared_zone") - 1;
-    shm.name.data = (u_char *) "nginx_shared_zone";
+    ngx_str_set(&shm.name, "nginx_shared_zone");
     shm.log = cycle->log;
 
     if (ngx_shm_alloc(&shm) != NGX_OK) {
@@ -1154,18 +1153,44 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
                                                 : ngx_event_recvmsg;
 
-        // 如果使用负载均衡，不向epoll添加事件，只有抢到锁才添加
-        if (ngx_use_accept_mutex
 #if (NGX_HAVE_REUSEPORT)
-            && !ls[i].reuseport
-#endif
-           )
-        {
-            // 对一个监听端口的处理结束，只设置了回调函数
+
+        if (ls[i].reuseport) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
             continue;
         }
 
-        // nginx 1.9.x不再使用rtsig
+#endif
+
+        // 如果使用负载均衡，不向epoll添加事件，只有抢到锁才添加
+        if (ngx_use_accept_mutex) {
+            continue;
+        }
+
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+
+        if ((ngx_event_flags & NGX_USE_EPOLL_EVENT)
+            && ccf->worker_processes > 1)
+        {
+            // nginx 1.9.x不再使用rtsig
+
+            // 单进程、未明确指定负载均衡，不使用负载均衡
+            // 直接加入epoll事件，开始监听，可以接受请求
+            // 如果支持EPOLLEXCLUSIVE，使用特殊的标志位
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_EXCLUSIVE_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            // 跳过下面的普通add event
+            continue;
+        }
+
+#endif
 
         // 单进程、未明确指定负载均衡，不使用负载均衡
         // 直接加入epoll事件，开始监听，可以接受请求
@@ -1670,7 +1695,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_value(ecf->multi_accept, 0);
 
     // 1.11.3之前默认使用负载均衡锁，之后默认关闭
-    ngx_conf_init_value(ecf->accept_mutex, 1);
+    ngx_conf_init_value(ecf->accept_mutex, 0);
 
     // 默认负载均衡锁的等待时间是500毫秒
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
