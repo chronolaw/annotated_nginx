@@ -210,20 +210,23 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
 {
     ngx_chain_t  *cl;
 
-    // 把out链表挂到busy指针上
-    if (*busy == NULL) {
+    // 1.11.x增加了空指针检查
+    if (*out) {
+        // 把out链表挂到busy指针上
+        if (*busy == NULL) {
 
-        // busy是空直接挂
-        *busy = *out;
+            // busy是空直接挂
+            *busy = *out;
 
-    } else {
-        // 否则找到busy的链表末尾再挂上
-        for (cl = *busy; cl->next; cl = cl->next) { /* void */ }
+        } else {
+            // 否则找到busy的链表末尾再挂上
+            for (cl = *busy; cl->next; cl = cl->next) { /* void */ }
 
-        cl->next = *out;
+            cl->next = *out;
+        }
+
+        *out = NULL;
     }
-
-    *out = NULL;
 
     // 遍历busy链表
     while (*busy) {
