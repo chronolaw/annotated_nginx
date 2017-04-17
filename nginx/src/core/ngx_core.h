@@ -15,24 +15,26 @@
 
 
 // 对核心的数据结构定义为_t类型，方便使用
-typedef struct ngx_module_s      ngx_module_t;          // ngx_conf_file.h
-typedef struct ngx_conf_s        ngx_conf_t;            // ngx_conf_file.h
-typedef struct ngx_cycle_s       ngx_cycle_t;           // ngx_cycle.h
-typedef struct ngx_pool_s        ngx_pool_t;            // ngx_palloc.h
-typedef struct ngx_chain_s       ngx_chain_t;           // ngx_buf.h
-typedef struct ngx_log_s         ngx_log_t;
-typedef struct ngx_open_file_s   ngx_open_file_t;
-typedef struct ngx_command_s     ngx_command_t;         // ngx_conf_file.h
-typedef struct ngx_file_s        ngx_file_t;
-typedef struct ngx_event_s       ngx_event_t;           // event/ngx_event.h
-typedef struct ngx_event_aio_s   ngx_event_aio_t;
-typedef struct ngx_connection_s  ngx_connection_t;      // ngx_connection.h
+typedef struct ngx_module_s          ngx_module_t;      // ngx_conf_file.h
+typedef struct ngx_conf_s            ngx_conf_t;        // ngx_conf_file.h
+typedef struct ngx_cycle_s           ngx_cycle_t;       // ngx_cycle.h
+typedef struct ngx_pool_s            ngx_pool_t;        // ngx_palloc.h
+typedef struct ngx_chain_s           ngx_chain_t;       // ngx_buf.h
+typedef struct ngx_log_s             ngx_log_t;
+typedef struct ngx_open_file_s       ngx_open_file_t;
+typedef struct ngx_command_s         ngx_command_t;     // ngx_conf_file.h
+typedef struct ngx_file_s            ngx_file_t;
+typedef struct ngx_event_s           ngx_event_t;       // event/ngx_event.h
+typedef struct ngx_event_aio_s       ngx_event_aio_t;
+typedef struct ngx_connection_s      ngx_connection_t;  // ngx_connection.h
+
 
 // 1.8版开始正式支持线程，比旧版有较大的改动，使用传统的线程池
 // 一个task队列，一个done队列，使用条件变量等待task
-#if (NGX_THREADS)
-typedef struct ngx_thread_task_s  ngx_thread_task_t;
-#endif
+typedef struct ngx_thread_task_s     ngx_thread_task_t;
+
+typedef struct ngx_ssl_s             ngx_ssl_t;
+typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 
 // 事件发生时调用的函数
 // 例如监听端口时会回调ngx_event_accept
