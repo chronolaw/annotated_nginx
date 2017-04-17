@@ -51,13 +51,13 @@
 #define NGX_MODULE_SIGNATURE_2   "0"
 #endif
 
-#if (NGX_HAVE_FILE_AIO)
+#if (NGX_HAVE_FILE_AIO || NGX_COMPAT)
 #define NGX_MODULE_SIGNATURE_3   "1"
 #else
 #define NGX_MODULE_SIGNATURE_3   "0"
 #endif
 
-#if (NGX_HAVE_AIO_SENDFILE)
+#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
 #define NGX_MODULE_SIGNATURE_4   "1"
 #else
 #define NGX_MODULE_SIGNATURE_4   "0"
@@ -87,17 +87,8 @@
 #define NGX_MODULE_SIGNATURE_8   "0"
 #endif
 
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 #define NGX_MODULE_SIGNATURE_9   "1"
-#else
-#define NGX_MODULE_SIGNATURE_9   "0"
-#endif
-
-#if (NGX_HAVE_REUSEPORT)
 #define NGX_MODULE_SIGNATURE_10  "1"
-#else
-#define NGX_MODULE_SIGNATURE_10  "0"
-#endif
 
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
 #define NGX_MODULE_SIGNATURE_11  "1"
@@ -105,11 +96,7 @@
 #define NGX_MODULE_SIGNATURE_11  "0"
 #endif
 
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
 #define NGX_MODULE_SIGNATURE_12  "1"
-#else
-#define NGX_MODULE_SIGNATURE_12  "0"
-#endif
 
 #if (NGX_HAVE_SETFIB)
 #define NGX_MODULE_SIGNATURE_13  "1"
@@ -135,17 +122,8 @@
 #define NGX_MODULE_SIGNATURE_16  "0"
 #endif
 
-#if (NGX_HAVE_MD5)
-#define NGX_MODULE_SIGNATURE_17  "1"
-#else
 #define NGX_MODULE_SIGNATURE_17  "0"
-#endif
-
-#if (NGX_HAVE_SHA1)
-#define NGX_MODULE_SIGNATURE_18  "1"
-#else
 #define NGX_MODULE_SIGNATURE_18  "0"
-#endif
 
 #if (NGX_HAVE_OPENAT)
 #define NGX_MODULE_SIGNATURE_19  "1"
@@ -165,7 +143,7 @@
 #define NGX_MODULE_SIGNATURE_21  "0"
 #endif
 
-#if (NGX_THREADS)
+#if (NGX_THREADS || NGX_COMPAT)
 #define NGX_MODULE_SIGNATURE_22  "1"
 #else
 #define NGX_MODULE_SIGNATURE_22  "0"
@@ -177,17 +155,13 @@
 #define NGX_MODULE_SIGNATURE_23  "0"
 #endif
 
-#if (NGX_HTTP_SSL)
+#if (NGX_HTTP_SSL || NGX_COMPAT)
 #define NGX_MODULE_SIGNATURE_24  "1"
 #else
 #define NGX_MODULE_SIGNATURE_24  "0"
 #endif
 
-#if (NGX_HTTP_V2)
 #define NGX_MODULE_SIGNATURE_25  "1"
-#else
-#define NGX_MODULE_SIGNATURE_25  "0"
-#endif
 
 #if (NGX_HTTP_GZIP)
 #define NGX_MODULE_SIGNATURE_26  "1"
@@ -195,11 +169,7 @@
 #define NGX_MODULE_SIGNATURE_26  "0"
 #endif
 
-#if (NGX_HTTP_DEGRADATION)
 #define NGX_MODULE_SIGNATURE_27  "1"
-#else
-#define NGX_MODULE_SIGNATURE_27  "0"
-#endif
 
 #if (NGX_HTTP_X_FORWARDED_FOR)
 #define NGX_MODULE_SIGNATURE_28  "1"
@@ -237,6 +207,13 @@
 #define NGX_MODULE_SIGNATURE_33  "0"
 #endif
 
+// 1.11.x新增，标记与nginx plus的兼容性
+#if (NGX_COMPAT)
+#define NGX_MODULE_SIGNATURE_34  "1"
+#else
+#define NGX_MODULE_SIGNATURE_34  "0"
+#endif
+
 // 最后得到一个很长的字符串，每个位置都标记了一个系统特性
 // 模块使用这个签名字符串比对，只有一致才能加载
 // 1-epoll, 10-reuseport, ...
@@ -258,7 +235,7 @@
     NGX_MODULE_SIGNATURE_24 NGX_MODULE_SIGNATURE_25 NGX_MODULE_SIGNATURE_26   \
     NGX_MODULE_SIGNATURE_27 NGX_MODULE_SIGNATURE_28 NGX_MODULE_SIGNATURE_29   \
     NGX_MODULE_SIGNATURE_30 NGX_MODULE_SIGNATURE_31 NGX_MODULE_SIGNATURE_32   \
-    NGX_MODULE_SIGNATURE_33
+    NGX_MODULE_SIGNATURE_33 NGX_MODULE_SIGNATURE_34
 
 
 // 重新定义了填充宏，加入了签名字符串
