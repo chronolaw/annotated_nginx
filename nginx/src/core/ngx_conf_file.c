@@ -15,6 +15,9 @@
 
 #define NGX_CONF_BUFFER  4096
 
+// 给-T用，dump配置文件内容
+static ngx_int_t ngx_conf_add_dump(ngx_conf_t *cf, ngx_str_t *filename);
+
 // 在所有模块里查找匹配的指令，进行解析
 static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last);
 
@@ -119,18 +122,72 @@ ngx_conf_param(ngx_conf_t *cf)
 }
 
 
+// 给-T用，dump配置文件内容
+static ngx_int_t
+ngx_conf_add_dump(ngx_conf_t *cf, ngx_str_t *filename)
+{
+    off_t             size;
+    u_char           *p;
+    uint32_t          hash;
+    ngx_buf_t        *buf;
+    ngx_str_node_t   *sn;
+    ngx_conf_dump_t  *cd;
+
+    hash = ngx_crc32_long(filename->data, filename->len);
+
+    sn = ngx_str_rbtree_lookup(&cf->cycle->config_dump_rbtree, filename, hash);
+
+    if (sn) {
+        cf->conf_file->dump = NULL;
+        return NGX_OK;
+    }
+
+    p = ngx_pstrdup(cf->cycle->pool, filename);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    cd = ngx_array_push(&cf->cycle->config_dump);
+    if (cd == NULL) {
+        return NGX_ERROR;
+    }
+
+    size = ngx_file_size(&cf->conf_file->file.info);
+
+    buf = ngx_create_temp_buf(cf->cycle->pool, (size_t) size);
+    if (buf == NULL) {
+        return NGX_ERROR;
+    }
+
+    cd->name.data = p;
+    cd->name.len = filename->len;
+    cd->buffer = buf;
+
+    cf->conf_file->dump = buf;
+
+    sn = ngx_palloc(cf->temp_pool, sizeof(ngx_str_node_t));
+    if (sn == NULL) {
+        return NGX_ERROR;
+    }
+
+    sn->node.key = hash;
+    sn->str = cd->name;
+
+    ngx_rbtree_insert(&cf->cycle->config_dump_rbtree, &sn->node);
+
+    return NGX_OK;
+}
+
+
 // 解析配置，参数filename可以是空
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 {
     char             *rv;
-    u_char           *p;
-    off_t             size;
     ngx_fd_t          fd;
     ngx_int_t         rc;
-    ngx_buf_t         buf, *tbuf;
+    ngx_buf_t         buf;
     ngx_conf_file_t  *prev, conf_file;
-    ngx_conf_dump_t  *cd;
     enum {
         parse_file = 0,
         parse_block,
@@ -195,28 +252,9 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 #endif
            )
         {
-            p = ngx_pstrdup(cf->cycle->pool, filename);
-            if (p == NULL) {
+            if (ngx_conf_add_dump(cf, filename) != NGX_OK) {
                 goto failed;
             }
-
-            size = ngx_file_size(&cf->conf_file->file.info);
-
-            tbuf = ngx_create_temp_buf(cf->cycle->pool, (size_t) size);
-            if (tbuf == NULL) {
-                goto failed;
-            }
-
-            cd = ngx_array_push(&cf->cycle->config_dump);
-            if (cd == NULL) {
-                goto failed;
-            }
-
-            cd->name.len = filename->len;
-            cd->name.data = p;
-            cd->buffer = tbuf;
-
-            cf->conf_file->dump = tbuf;
 
         } else {
             cf->conf_file->dump = NULL;
@@ -1427,7 +1465,7 @@ ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_OK;
     }
 
-    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                        "invalid value \"%s\"", value[1].data);
 
     return NGX_CONF_ERROR;
@@ -1469,7 +1507,7 @@ ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (mask[m].name.len == 0) {
-            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid value \"%s\"", value[i].data);
 
             return NGX_CONF_ERROR;
