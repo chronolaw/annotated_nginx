@@ -10,8 +10,8 @@
 #define _NGINX_H_INCLUDED_
 
 
-#define nginx_version      1010003
-#define NGINX_VERSION      "1.10.3"
+#define nginx_version      1012000
+#define NGINX_VERSION      "1.12.0"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 // nginx 1.7之后添加--build=Name选项
