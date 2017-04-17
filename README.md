@@ -20,7 +20,7 @@ Nginx1.12已经发布，即将逐步更新master分支，详细注解。
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
 
 # 当前状态
-nginx 1.10.3
+nginx 1.12.0迁移中……
 
 # Git分支
 分支    |说明   |注释
