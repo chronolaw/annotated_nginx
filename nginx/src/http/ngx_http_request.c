@@ -248,6 +248,10 @@ ngx_http_header_t  ngx_http_headers_in[] = {
                  offsetof(ngx_http_headers_in_t, content_length),
                  ngx_http_process_unique_header_line },
 
+    { ngx_string("Content-Range"),
+                 offsetof(ngx_http_headers_in_t, content_range),
+                 ngx_http_process_unique_header_line },
+
     { ngx_string("Content-Type"),
                  offsetof(ngx_http_headers_in_t, content_type),
                  ngx_http_process_header_line },
@@ -800,7 +804,7 @@ ngx_http_create_request(ngx_connection_t *c)
     ngx_set_connection_log(r->connection, clcf->error_log);
 
     // 设置读取缓冲区，暂不深究
-    r->header_in = hc->nbusy ? hc->busy[0] : c->buffer;
+    r->header_in = hc->busy ? hc->busy->buf : c->buffer;
 
     // 初始化响应头链表
     if (ngx_list_init(&r->headers_out.headers, r->pool, 20,
@@ -1161,6 +1165,8 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     ngx_set_connection_log(c, clcf->error_log);
 
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
+
+    c->ssl->buffer_size = sscf->buffer_size;
 
     if (sscf->ssl.ctx) {
         SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);
@@ -1821,6 +1827,7 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 {
     u_char                    *old, *new;
     ngx_buf_t                 *b;
+    ngx_chain_t               *cl;
     ngx_http_connection_t     *hc;
     ngx_http_core_srv_conf_t  *cscf;
 
@@ -1850,8 +1857,11 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
     hc = r->http_connection;
 
-    if (hc->nfree) {
-        b = hc->free[--hc->nfree];
+    if (hc->free) {
+        cl = hc->free;
+        hc->free = cl->next;
+
+        b = cl->buf;
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http large header free: %p %uz",
@@ -1859,19 +1869,18 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
     } else if (hc->nbusy < cscf->large_client_header_buffers.num) {
 
-        if (hc->busy == NULL) {
-            hc->busy = ngx_palloc(r->connection->pool,
-                  cscf->large_client_header_buffers.num * sizeof(ngx_buf_t *));
-            if (hc->busy == NULL) {
-                return NGX_ERROR;
-            }
-        }
-
         b = ngx_create_temp_buf(r->connection->pool,
                                 cscf->large_client_header_buffers.size);
         if (b == NULL) {
             return NGX_ERROR;
         }
+
+        cl = ngx_alloc_chain_link(r->connection->pool);
+        if (cl == NULL) {
+            return NGX_ERROR;
+        }
+
+        cl->buf = b;
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http large header alloc: %p %uz",
@@ -1881,7 +1890,9 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
         return NGX_DECLINED;
     }
 
-    hc->busy[hc->nbusy++] = b;
+    cl->next = hc->busy;
+    hc->busy = cl;
+    hc->nbusy++;
 
     if (r->state == 0) {
         /*
@@ -2509,7 +2520,7 @@ ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
         if (sscf->verify) {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                           "client attempted to request the server name "
-                          "different from that one was negotiated");
+                          "different from the one that was negotiated");
             ngx_http_finalize_request(r, NGX_HTTP_MISDIRECTED_REQUEST);
             return NGX_ERROR;
         }
@@ -2643,6 +2654,11 @@ ngx_http_request_handler(ngx_event_t *ev)
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http run request: \"%V?%V\"", &r->uri, &r->args);
+
+    if (ev->delayed && ev->timedout) {
+        ev->delayed = 0;
+        ev->timedout = 0;
+    }
 
     // 有写事件就调用请求里的write_event_handler
     if (ev->write) {
@@ -3263,7 +3279,7 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 static void
 ngx_http_writer(ngx_http_request_t *r)
 {
-    int                        rc;
+    ngx_int_t                  rc;
     ngx_event_t               *wev;
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
@@ -3279,34 +3295,41 @@ ngx_http_writer(ngx_http_request_t *r)
 
     // 检查写事件是否已经超时
     if (wev->timedout) {
-        // delayed表示限速
-        // 如果不限速那么就结束请求
-        if (!wev->delayed) {
-            ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
-                          "client timed out");
-            c->timedout = 1;
+        // 1.12.0删除了下面的代码
+        //
+        //// delayed表示限速
+        //// 如果不限速那么就结束请求
+        //if (!wev->delayed) {
+        //    ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
+        //                  "client timed out");
+        //    c->timedout = 1;
 
-            ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
-            return;
-        }
+        //    ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+        //    return;
+        //}
 
-        // 限速，超时就不处理，暂时不发送数据
+        //// 限速，超时就不处理，暂时不发送数据
 
-        // 清除超时标志位
-        wev->timedout = 0;
-        wev->delayed = 0;
+        //// 清除超时标志位
+        //wev->timedout = 0;
+        //wev->delayed = 0;
 
-        // 再次加上超时检查
-        if (!wev->ready) {
-            ngx_add_timer(wev, clcf->send_timeout);
+        //// 再次加上超时检查
+        //if (!wev->ready) {
+        //    ngx_add_timer(wev, clcf->send_timeout);
 
-            if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
-                ngx_http_close_request(r, 0);
-            }
+        //    if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
+        //        ngx_http_close_request(r, 0);
+        //    }
 
-            return;
-        }
+        //    return;
+        //}
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
+                      "client timed out");
+        c->timedout = 1;
 
+        ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+        return;
     }
 
     // 没有超时， 但限速
@@ -3314,6 +3337,10 @@ ngx_http_writer(ngx_http_request_t *r)
     if (wev->delayed || r->aio) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, wev->log, 0,
                        "http writer delayed");
+
+        if (!wev->delayed) {
+            ngx_add_timer(wev, clcf->send_timeout);
+        }
 
         if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
             ngx_http_close_request(r, 0);
@@ -3333,7 +3360,7 @@ ngx_http_writer(ngx_http_request_t *r)
     rc = ngx_http_output_filter(r, NULL);
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http writer output filter: %d, \"%V?%V\"",
+                   "http writer output filter: %i, \"%V?%V\"",
                    rc, &r->uri, &r->args);
 
     // 出错直接结束请求
@@ -3450,8 +3477,12 @@ ngx_http_test_reading(ngx_http_request_t *r)
 
 #if (NGX_HAVE_EPOLLRDHUP)
 
-    if ((ngx_event_flags & NGX_USE_EPOLL_EVENT) && rev->pending_eof) {
+    if ((ngx_event_flags & NGX_USE_EPOLL_EVENT) && ngx_use_epoll_rdhup) {
         socklen_t  len;
+
+        if (!rev->pending_eof) {
+            return;
+        }
 
         rev->eof = 1;
         c->error = 1;
@@ -3528,12 +3559,11 @@ static void
 ngx_http_set_keepalive(ngx_http_request_t *r)
 {
     int                        tcp_nodelay;
-    ngx_int_t                  i;
     ngx_buf_t                 *b, *f;
+    ngx_chain_t               *cl, *ln;
     ngx_event_t               *rev, *wev;
     ngx_connection_t          *c;
     ngx_http_connection_t     *hc;
-    ngx_http_core_srv_conf_t  *cscf;
     ngx_http_core_loc_conf_t  *clcf;
 
     // 从请求里获得连接和读事件
@@ -3576,26 +3606,33 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
              * Now we would move the large header buffers to the free list.
              */
 
-            cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+            for (cl = hc->busy; cl; /* void */) {
+                ln = cl;
+                cl = cl->next;
 
-            if (hc->free == NULL) {
-                hc->free = ngx_palloc(c->pool,
-                  cscf->large_client_header_buffers.num * sizeof(ngx_buf_t *));
-
-                if (hc->free == NULL) {
-                    ngx_http_close_request(r, 0);
-                    return;
+                if (ln->buf == b) {
+                    ngx_free_chain(c->pool, ln);
+                    continue;
                 }
-            }
 
-            for (i = 0; i < hc->nbusy - 1; i++) {
-                f = hc->busy[i];
-                hc->free[hc->nfree++] = f;
+                f = ln->buf;
                 f->pos = f->start;
                 f->last = f->start;
+
+                ln->next = hc->free;
+                hc->free = ln;
             }
 
-            hc->busy[0] = b;
+            cl = ngx_alloc_chain_link(c->pool);
+            if (cl == NULL) {
+                ngx_http_close_request(r, 0);
+                return;
+            }
+
+            cl->buf = b;
+            cl->next = NULL;
+
+            hc->busy = cl;
             hc->nbusy = 1;
         }
     }
@@ -3674,27 +3711,32 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         b->last = b->start;
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc free: %p %i",
-                   hc->free, hc->nfree);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc free: %p",
+                   hc->free);
 
     if (hc->free) {
-        for (i = 0; i < hc->nfree; i++) {
-            ngx_pfree(c->pool, hc->free[i]->start);
-            hc->free[i] = NULL;
+        for (cl = hc->free; cl; /* void */) {
+            ln = cl;
+            cl = cl->next;
+            ngx_pfree(c->pool, ln->buf->start);
+            ngx_free_chain(c->pool, ln);
         }
 
-        hc->nfree = 0;
+        hc->free = NULL;
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc busy: %p %i",
                    hc->busy, hc->nbusy);
 
     if (hc->busy) {
-        for (i = 0; i < hc->nbusy; i++) {
-            ngx_pfree(c->pool, hc->busy[i]->start);
-            hc->busy[i] = NULL;
+        for (cl = hc->busy; cl; /* void */) {
+            ln = cl;
+            cl = cl->next;
+            ngx_pfree(c->pool, ln->buf->start);
+            ngx_free_chain(c->pool, ln);
         }
 
+        hc->busy = NULL;
         hc->nbusy = 0;
     }
 

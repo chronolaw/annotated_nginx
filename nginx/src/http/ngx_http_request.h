@@ -81,7 +81,9 @@
 /* unused                                  1 */
 #define NGX_HTTP_SUBREQUEST_IN_MEMORY      2
 #define NGX_HTTP_SUBREQUEST_WAITED         4
-#define NGX_HTTP_LOG_UNSAFE                8
+#define NGX_HTTP_SUBREQUEST_CLONE          8
+
+#define NGX_HTTP_LOG_UNSAFE                1
 
 
 // http状态码，如200、302、404
@@ -116,6 +118,7 @@
 #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
 #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
 #define NGX_HTTP_MISDIRECTED_REQUEST       421
+#define NGX_HTTP_TOO_MANY_REQUESTS         429
 
 
 /* Our own HTTP codes */
@@ -225,6 +228,7 @@ typedef struct {
     ngx_table_elt_t                  *user_agent;
     ngx_table_elt_t                  *referer;
     ngx_table_elt_t                  *content_length;
+    ngx_table_elt_t                  *content_range;
     ngx_table_elt_t                  *content_type;
 
     ngx_table_elt_t                  *range;
@@ -354,9 +358,7 @@ typedef struct {
     // 在读取过程中会不断变化，最终为0
     off_t                             rest;
 
-#if (NGX_HTTP_V2)
     off_t                             received;
-#endif
 
     // 空闲节点链表，优化用，避免再向内存池要节点
     ngx_chain_t                      *free;
@@ -385,25 +387,30 @@ typedef struct {
     // server{}里的配置数组
     ngx_http_conf_ctx_t              *conf_ctx;
 
-#if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
+#if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_str_t                        *ssl_servername;
 #if (NGX_PCRE)
     ngx_http_regex_t                 *ssl_servername_regex;
 #endif
 #endif
 
+    // 1.11.11之前
+    // ngx_buf_t                       **busy;
+    // ngx_int_t                         nbusy;
+    //
     // 正在使用的缓冲区数组，nbusy表示数组长度
     // 收到的数据都放在这个数组里
-    ngx_buf_t                       **busy;
+    ngx_chain_t                      *busy;
     ngx_int_t                         nbusy;
 
+    // 1.11.11之前
+    // ngx_buf_t                       **free;
+    // ngx_int_t                         nfree;
+    //
     // 未使用的缓冲区数组，nfree表示数组长度
-    ngx_buf_t                       **free;
-    ngx_int_t                         nfree;
+    ngx_chain_t                      *free;
 
-#if (NGX_HTTP_SSL)
     unsigned                          ssl:1;
-#endif
 
     // listen指令是否使用了proxy_protocol参数
     unsigned                          proxy_protocol:1;
@@ -628,9 +635,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        err_status;
 
     ngx_http_connection_t            *http_connection;
-#if (NGX_HTTP_V2)
     ngx_http_v2_stream_t             *stream;
-#endif
 
     // 记录错误日志时可以调用的函数
     // 在ngx_http_log_error里调用
@@ -706,6 +711,7 @@ struct ngx_http_request_s {
 
 #if (NGX_HTTP_CACHE)
     unsigned                          cached:1;
+    unsigned                          cache_updater:1;
 #endif
 
 #if (NGX_HTTP_GZIP)
@@ -779,11 +785,11 @@ struct ngx_http_request_s {
     unsigned                          subrequest_ranges:1;
     unsigned                          single_range:1;
     unsigned                          disable_not_modified:1;
-
-#if (NGX_STAT_STUB)
     unsigned                          stat_reading:1;
     unsigned                          stat_writing:1;
-#endif
+    unsigned                          stat_processing:1;
+
+    unsigned                          health_check:1;
 
     /* used to parse HTTP headers */
 
