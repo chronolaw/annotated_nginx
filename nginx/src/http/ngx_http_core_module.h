@@ -21,6 +21,8 @@
 
 #if (NGX_THREADS)
 #include <ngx_thread_pool.h>
+#elif (NGX_COMPAT)
+typedef struct ngx_thread_pool_s  ngx_thread_pool_t;
 #endif
 
 
@@ -59,6 +61,11 @@
 #define NGX_HTTP_KEEPALIVE_DISABLE_SAFARI  0x0008
 
 
+#define NGX_HTTP_SERVER_TOKENS_OFF      0
+#define NGX_HTTP_SERVER_TOKENS_ON       1
+#define NGX_HTTP_SERVER_TOKENS_BUILD    2
+
+
 // 存储location的红黑树节点
 typedef struct ngx_http_location_tree_node_s  ngx_http_location_tree_node_t;
 
@@ -73,17 +80,7 @@ typedef struct {
     // socket地址，使用union适应各种情形
     // 主要使用的是u.sockaddr
     // 1.11.x改为在ngx_inet.h里定义的ngx_sockaddr_t，简化了代码
-    union {
-        struct sockaddr        sockaddr;
-        struct sockaddr_in     sockaddr_in;
-#if (NGX_HAVE_INET6)
-        struct sockaddr_in6    sockaddr_in6;
-#endif
-#if (NGX_HAVE_UNIX_DOMAIN)
-        struct sockaddr_un     sockaddr_un;
-#endif
-        u_char                 sockaddr_data[NGX_SOCKADDRLEN];
-    } u;
+    ngx_sockaddr_t             sockaddr;
 
     // socket地址长度
     socklen_t                  socklen;
@@ -92,18 +89,16 @@ typedef struct {
     unsigned                   default_server:1;
     unsigned                   bind:1;
     unsigned                   wildcard:1;
-#if (NGX_HTTP_SSL)
     unsigned                   ssl:1;
-#endif
-#if (NGX_HTTP_V2)
     unsigned                   http2:1;
-#endif
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+#if (NGX_HAVE_INET6)
     unsigned                   ipv6only:1;
 #endif
-#if (NGX_HAVE_REUSEPORT)
+
+    // 延后accept连接特性，由内核处理有数据的连接，提高性能
+    unsigned                   deferred_accept:1;
+
     unsigned                   reuseport:1;
-#endif
     unsigned                   so_keepalive:2;
     unsigned                   proxy_protocol:1;
 
@@ -130,11 +125,6 @@ typedef struct {
 
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
     char                      *accept_filter;
-#endif
-
-    // 延后accept连接特性，由内核处理有数据的连接，提高性能
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
-    ngx_uint_t                 deferred_accept;
 #endif
 
     u_char                     addr[NGX_SOCKADDR_STRLEN + 1];
@@ -234,7 +224,9 @@ typedef struct {
     ngx_hash_t                 variables_hash;
 
     // 存储http里定义的所有变量
-    ngx_array_t                variables;       /* ngx_http_variable_t */
+    ngx_array_t                variables;         /* ngx_http_variable_t */
+    ngx_array_t                prefix_variables;  /* ngx_http_variable_t */
+
     ngx_uint_t                 ncaptures;
 
     // server散列表设置
@@ -325,12 +317,8 @@ struct ngx_http_addr_conf_s {
 
     ngx_http_virtual_names_t  *virtual_names;
 
-#if (NGX_HTTP_SSL)
     unsigned                   ssl:1;
-#endif
-#if (NGX_HTTP_V2)
     unsigned                   http2:1;
-#endif
     unsigned                   proxy_protocol:1;
 };
 
@@ -423,9 +411,7 @@ struct ngx_http_core_loc_conf_s {
     unsigned      auto_redirect:1;
 #if (NGX_HTTP_GZIP)
     unsigned      gzip_disable_msie6:2;
-#if (NGX_HTTP_DEGRADATION)
     unsigned      gzip_disable_degradation:2;
-#endif
 #endif
 
     ngx_http_location_tree_node_t   *static_locations;
@@ -522,6 +508,7 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    tcp_nopush;              /* tcp_nopush */
     ngx_flag_t    tcp_nodelay;             /* tcp_nodelay */
     ngx_flag_t    reset_timedout_connection; /* reset_timedout_connection */
+    ngx_flag_t    absolute_redirect;       /* absolute_redirect */
     ngx_flag_t    server_name_in_redirect; /* server_name_in_redirect */
     ngx_flag_t    port_in_redirect;        /* port_in_redirect */
     ngx_flag_t    msie_padding;            /* msie_padding */
@@ -532,7 +519,7 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    log_subrequest;          /* log_subrequest */
 
     ngx_flag_t    recursive_error_pages;   /* recursive_error_pages */
-    ngx_flag_t    server_tokens;           /* server_tokens */
+    ngx_uint_t    server_tokens;           /* server_tokens */
     ngx_flag_t    chunked_transfer_encoding; /* chunked_transfer_encoding */
     ngx_flag_t    etag;                    /* etag */
 
@@ -547,7 +534,7 @@ struct ngx_http_core_loc_conf_s {
 #endif
 #endif
 
-#if (NGX_THREADS)
+#if (NGX_THREADS || NGX_COMPAT)
     ngx_thread_pool_t         *thread_pool;
     ngx_http_complex_value_t  *thread_pool_value;
 #endif
