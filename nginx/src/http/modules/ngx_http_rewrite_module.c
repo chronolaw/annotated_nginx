@@ -921,7 +921,9 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value[1].data++;
 
     // Nginx变量机制的核心函数，创建一个命名的变量访问对象
-    v = ngx_http_add_variable(cf, &value[1], NGX_HTTP_VAR_CHANGEABLE);
+    // 1.11.10增加weak标志位
+    v = ngx_http_add_variable(cf, &value[1],
+                              NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_WEAK);
     if (v == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -932,16 +934,19 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 1.11.10删除了下面的代码
+    //if (v->get_handler == NULL
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "http_", 5) != 0
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "sent_http_", 10) != 0
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "upstream_http_", 14) != 0
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "cookie_", 7) != 0
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "upstream_cookie_", 16)
+    //       != 0
+    //    && ngx_strncasecmp(value[1].data, (u_char *) "arg_", 4) != 0)
+
     // 不是需要临时计算的http等变量
-    if (v->get_handler == NULL
-        && ngx_strncasecmp(value[1].data, (u_char *) "http_", 5) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "sent_http_", 10) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "upstream_http_", 14) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "cookie_", 7) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "upstream_cookie_", 16)
-           != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "arg_", 4) != 0)
-    {
+    if (v->get_handler == NULL) {
+
         // 设置get handler
         v->get_handler = ngx_http_rewrite_var;
 

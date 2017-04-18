@@ -137,10 +137,6 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
     ngx_http_v2_out_frame_t   *frame;
     ngx_http_core_loc_conf_t  *clcf;
     ngx_http_core_srv_conf_t  *cscf;
-    struct sockaddr_in        *sin;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6       *sin6;
-#endif
     u_char                     addr[NGX_SOCKADDR_STRLEN];
 
     static const u_char nginx[5] = "\x84\xaa\x63\x55\xe7";
@@ -151,6 +147,10 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     static size_t nginx_ver_len = ngx_http_v2_literal_size(NGINX_VER);
     static u_char nginx_ver[ngx_http_v2_literal_size(NGINX_VER)];
+
+    static size_t nginx_ver_build_len =
+                                  ngx_http_v2_literal_size(NGINX_VER_BUILD);
+    static u_char nginx_ver_build[ngx_http_v2_literal_size(NGINX_VER_BUILD)];
 
     if (!r->stream) {
         return ngx_http_next_header_filter(r);
@@ -236,7 +236,16 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->headers_out.server == NULL) {
-        len += 1 + (clcf->server_tokens ? nginx_ver_len : sizeof(nginx));
+
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+            len += 1 + nginx_ver_len;
+
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+            len += 1 + nginx_ver_build_len;
+
+        } else {
+            len += 1 + sizeof(nginx);
+        }
     }
 
     if (r->headers_out.date == NULL) {
@@ -267,7 +276,9 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     if (r->headers_out.location && r->headers_out.location->value.len) {
 
-        if (r->headers_out.location->value.data[0] == '/') {
+        if (r->headers_out.location->value.data[0] == '/'
+            && clcf->absolute_redirect)
+        {
             if (clcf->server_name_in_redirect) {
                 cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
                 host = cscf->server_name;
@@ -284,24 +295,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
                 }
             }
 
-            switch (fc->local_sockaddr->sa_family) {
-
-#if (NGX_HAVE_INET6)
-            case AF_INET6:
-                sin6 = (struct sockaddr_in6 *) fc->local_sockaddr;
-                port = ntohs(sin6->sin6_port);
-                break;
-#endif
-#if (NGX_HAVE_UNIX_DOMAIN)
-            case AF_UNIX:
-                port = 0;
-                break;
-#endif
-            default: /* AF_INET */
-                sin = (struct sockaddr_in *) fc->local_sockaddr;
-                port = ntohs(sin->sin_port);
-                break;
-            }
+            port = ngx_inet_get_port(fc->local_sockaddr);
 
             location.len = sizeof("https://") - 1 + host.len
                            + r->headers_out.location->value.len;
@@ -439,13 +433,25 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
     }
 
     if (r->headers_out.server == NULL) {
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
-                       "http2 output header: \"server: %s\"",
-                       clcf->server_tokens ? NGINX_VER : "nginx");
+
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                           "http2 output header: \"server: %s\"",
+                           NGINX_VER);
+
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                           "http2 output header: \"server: %s\"",
+                           NGINX_VER_BUILD);
+
+        } else {
+            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                           "http2 output header: \"server: nginx\"");
+        }
 
         *pos++ = ngx_http_v2_inc_indexed(NGX_HTTP_V2_SERVER_INDEX);
 
-        if (clcf->server_tokens) {
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
             if (nginx_ver[0] == '\0') {
                 p = ngx_http_v2_write_value(nginx_ver, (u_char *) NGINX_VER,
                                             sizeof(NGINX_VER) - 1, tmp);
@@ -453,6 +459,16 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
             }
 
             pos = ngx_cpymem(pos, nginx_ver, nginx_ver_len);
+
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+            if (nginx_ver_build[0] == '\0') {
+                p = ngx_http_v2_write_value(nginx_ver_build,
+                                            (u_char *) NGINX_VER_BUILD,
+                                            sizeof(NGINX_VER_BUILD) - 1, tmp);
+                nginx_ver_build_len = p - nginx_ver_build;
+            }
+
+            pos = ngx_cpymem(pos, nginx_ver_build, nginx_ver_build_len);
 
         } else {
             pos = ngx_cpymem(pos, nginx, sizeof(nginx));
@@ -753,6 +769,8 @@ ngx_http_v2_create_headers_frame(ngx_http_request_t *r, u_char *pos,
         rest -= frame_size;
 
         if (rest) {
+            frame->length += NGX_HTTP_V2_FRAME_HEADER_SIZE;
+
             type = NGX_HTTP_V2_CONTINUATION_FRAME;
             flags = NGX_HTTP_V2_NO_FLAG;
             continue;
@@ -999,11 +1017,10 @@ static ngx_http_v2_out_frame_t *
 ngx_http_v2_filter_get_data_frame(ngx_http_v2_stream_t *stream,
     size_t len, ngx_chain_t *first, ngx_chain_t *last)
 {
-    u_char                      flags;
-    ngx_buf_t                  *buf;
-    ngx_chain_t                *cl;
+    u_char                    flags;
+    ngx_buf_t                *buf;
+    ngx_chain_t              *cl;
     ngx_http_v2_out_frame_t  *frame;
-
 
     frame = stream->free_frames;
 
@@ -1032,7 +1049,7 @@ ngx_http_v2_filter_get_data_frame(ngx_http_v2_stream_t *stream,
 
     buf = cl->buf;
 
-    if (!buf->start) {
+    if (buf->start == NULL) {
         buf->start = ngx_palloc(stream->request->pool,
                                 NGX_HTTP_V2_FRAME_HEADER_SIZE);
         if (buf->start == NULL) {
@@ -1101,6 +1118,10 @@ static ngx_inline ngx_int_t
 ngx_http_v2_flow_control(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_stream_t *stream)
 {
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
+                   "http2:%ui available windows: conn:%uz stream:%z",
+                   stream->node->id, h2c->send_window, stream->send_window);
+
     if (stream->send_window <= 0) {
         stream->exhausted = 1;
         return NGX_DECLINED;
@@ -1190,6 +1211,9 @@ ngx_http_v2_headers_frame_handler(ngx_http_v2_connection_t *h2c,
                    "http2:%ui HEADERS frame %p was sent",
                    stream->node->id, frame);
 
+    stream->request->header_size += NGX_HTTP_V2_FRAME_HEADER_SIZE
+                                    + frame->length;
+
     ngx_http_v2_handle_frame(stream, frame);
 
     ngx_http_v2_handle_stream(h2c, stream);
@@ -1207,7 +1231,6 @@ ngx_http_v2_data_frame_handler(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_stream_t  *stream;
 
     stream = frame->stream;
-
     cl = frame->first;
 
     if (cl->buf->tag == (ngx_buf_tag_t) &ngx_http_v2_module) {
