@@ -47,6 +47,8 @@ typedef ngx_int_t (*ngx_http_get_variable_pt) (ngx_http_request_t *r,
 #define NGX_HTTP_VAR_NOCACHEABLE  2
 #define NGX_HTTP_VAR_INDEXED      4
 #define NGX_HTTP_VAR_NOHASH       8
+#define NGX_HTTP_VAR_WEAK         16
+#define NGX_HTTP_VAR_PREFIX       32
 
 
 // 为变量值的读写增加了一个间接层
