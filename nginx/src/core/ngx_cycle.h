@@ -94,6 +94,7 @@ struct ngx_cycle_s {
 
     // 复用连接对象队列
     ngx_queue_t               reusable_connections_queue;
+    ngx_uint_t                reusable_connections_n;
 
     // 监听的端口数组, in ngx_connection.h
     // 主要成员: fd,backlog,rcvbuf,sndbuf
@@ -104,6 +105,8 @@ struct ngx_cycle_s {
 
     // dump config用
     ngx_array_t               config_dump;
+    ngx_rbtree_t              config_dump_rbtree;
+    ngx_rbtree_node_t         config_dump_sentinel;
 
     // 打开的文件
     ngx_list_t                open_files;
@@ -166,6 +169,7 @@ typedef struct {
 
      //调用time_update的时间分辨率，毫秒，在event模块里使用
     ngx_msec_t                timer_resolution;
+    ngx_msec_t                shutdown_timeout;
 
     ngx_int_t                 worker_processes;     //worker进程的数量
     ngx_int_t                 debug_points;         //是否使用debug point
@@ -230,6 +234,7 @@ ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
 ngx_cpuset_t *ngx_get_cpu_affinity(ngx_uint_t n);
 ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag);
+void ngx_set_shutdown_timer(ngx_cycle_t *cycle);
 
 
 // nginx生命周期使用的超重要对象
