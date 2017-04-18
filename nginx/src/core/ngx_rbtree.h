@@ -96,6 +96,10 @@ void ngx_rbtree_insert_value(ngx_rbtree_node_t *root, ngx_rbtree_node_t *node,
 void ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *root,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
+// 1.11.11新增，可以用来遍历红黑树
+ngx_rbtree_node_t *ngx_rbtree_next(ngx_rbtree_t *tree,
+    ngx_rbtree_node_t *node);
+
 
 // 简单的函数宏，检查颜色
 #define ngx_rbt_red(node)               ((node)->color = 1)

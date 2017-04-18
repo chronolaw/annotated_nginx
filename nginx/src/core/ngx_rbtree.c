@@ -32,7 +32,7 @@ ngx_rbtree_insert(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
     /* a binary tree insert */
 
     // 最初root和sentinel实际上是同一个指针
-    root = (ngx_rbtree_node_t **) &tree->root;
+    root = &tree->root;
     sentinel = tree->sentinel;
 
     // 两者相同，空树
@@ -177,7 +177,7 @@ ngx_rbtree_delete(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 
     /* a binary tree delete */
 
-    root = (ngx_rbtree_node_t **) &tree->root;
+    root = &tree->root;
     sentinel = tree->sentinel;
 
     if (node->left == sentinel) {
@@ -393,4 +393,34 @@ ngx_rbtree_right_rotate(ngx_rbtree_node_t **root, ngx_rbtree_node_t *sentinel,
 
     temp->right = node;
     node->parent = temp;
+}
+
+
+// 1.11.11新增，可以用来遍历红黑树
+ngx_rbtree_node_t *
+ngx_rbtree_next(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
+{
+    ngx_rbtree_node_t  *root, *sentinel, *parent;
+
+    sentinel = tree->sentinel;
+
+    if (node->right != sentinel) {
+        return ngx_rbtree_min(node->right, sentinel);
+    }
+
+    root = tree->root;
+
+    for ( ;; ) {
+        parent = node->parent;
+
+        if (node == root) {
+            return NULL;
+        }
+
+        if (node == parent->left) {
+            return parent;
+        }
+
+        node = parent;
+    }
 }
