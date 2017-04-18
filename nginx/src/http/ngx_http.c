@@ -589,7 +589,11 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     use_access = cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.nelts ? 1 : 0;
 
     // 基本的四个模块数量
-    n = use_rewrite + use_access + cmcf->try_files + 1 /* find config phase */;
+    // 1.12.0调整了代码格式
+    n = 1                  /* find config phase */
+        + use_rewrite      /* post rewrite phase */
+        + use_access       /* post access phase */
+        + cmcf->try_files;
 
     // 统计所有的handler模块数量，但不含log阶段，注意！
     for (i = 0; i < NGX_HTTP_LOG_PHASE; i++) {
@@ -1312,12 +1316,8 @@ ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     in_port_t                   p;
     ngx_uint_t                  i;
     struct sockaddr            *sa;
-    struct sockaddr_in         *sin;
     ngx_http_conf_port_t       *port;
     ngx_http_core_main_conf_t  *cmcf;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6        *sin6;
-#endif
 
     // 获取http core模块的main_conf，只有一个
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
@@ -1330,28 +1330,8 @@ ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
         }
     }
 
-    sa = &lsopt->u.sockaddr;
-
-    switch (sa->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = &lsopt->u.sockaddr_in6;
-        p = sin6->sin6_port;
-        break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-        p = 0;
-        break;
-#endif
-
-    default: /* AF_INET */
-        sin = &lsopt->u.sockaddr_in;
-        p = sin->sin_port;
-        break;
-    }
+    sa = &lsopt->sockaddr.sockaddr;
+    p = ngx_inet_get_port(sa);
 
     port = cmcf->ports->elts;
     for (i = 0; i < cmcf->ports->nelts; i++) {
@@ -1384,14 +1364,8 @@ static ngx_int_t
 ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     ngx_http_conf_port_t *port, ngx_http_listen_opt_t *lsopt)
 {
-    u_char                *p;
-    size_t                 len, off;
     ngx_uint_t             i, default_server, proxy_protocol;
-    struct sockaddr       *sa;
     ngx_http_conf_addr_t  *addr;
-#if (NGX_HAVE_UNIX_DOMAIN)
-    struct sockaddr_un    *saun;
-#endif
 #if (NGX_HTTP_SSL)
     ngx_uint_t             ssl;
 #endif
@@ -1404,37 +1378,15 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
      * may fill some fields in inherited sockaddr struct's
      */
 
-    sa = &lsopt->u.sockaddr;
-
-    switch (sa->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        off = offsetof(struct sockaddr_in6, sin6_addr);
-        len = 16;
-        break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-        off = offsetof(struct sockaddr_un, sun_path);
-        len = sizeof(saun->sun_path);
-        break;
-#endif
-
-    default: /* AF_INET */
-        off = offsetof(struct sockaddr_in, sin_addr);
-        len = 4;
-        break;
-    }
-
-    p = lsopt->u.sockaddr_data + off;
-
     addr = port->addrs.elts;
 
     for (i = 0; i < port->addrs.nelts; i++) {
 
-        if (ngx_memcmp(p, addr[i].opt.u.sockaddr_data + off, len) != 0) {
+        if (ngx_cmp_sockaddr(&lsopt->sockaddr.sockaddr, lsopt->socklen,
+                             &addr[i].opt.sockaddr.sockaddr,
+                             addr[i].opt.socklen, 0)
+            != NGX_OK)
+        {
             continue;
         }
 
@@ -1938,7 +1890,8 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
 
     // in core/ngx_connection.c
     // 添加到cycle的监听端口数组
-    ls = ngx_create_listening(cf, &addr->opt.u.sockaddr, addr->opt.socklen);
+    ls = ngx_create_listening(cf, &addr->opt.sockaddr.sockaddr,
+                              addr->opt.socklen);
     if (ls == NULL) {
         return NULL;
     }
@@ -1992,7 +1945,7 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
     ls->deferred_accept = addr->opt.deferred_accept;
 #endif
 
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+#if (NGX_HAVE_INET6)
     ls->ipv6only = addr->opt.ipv6only;
 #endif
 
@@ -2033,7 +1986,7 @@ ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
 
     for (i = 0; i < hport->naddrs; i++) {
 
-        sin = &addr[i].opt.u.sockaddr_in;
+        sin = &addr[i].opt.sockaddr.sockaddr_in;
         addrs[i].addr = sin->sin_addr.s_addr;
         addrs[i].conf.default_server = addr[i].default_server;
 #if (NGX_HTTP_SSL)
@@ -2098,7 +2051,7 @@ ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
 
     for (i = 0; i < hport->naddrs; i++) {
 
-        sin6 = &addr[i].opt.u.sockaddr_in6;
+        sin6 = &addr[i].opt.sockaddr.sockaddr_in6;
         addrs6[i].addr6 = sin6->sin6_addr;
         addrs6[i].conf.default_server = addr[i].default_server;
 #if (NGX_HTTP_SSL)
