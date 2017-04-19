@@ -4,13 +4,11 @@ Annotated Nginx Source（中文）
 # 简介
 Nginx源码分析，注解代码，帮助学习Nginx。
 
-当前正在由1.10.3迁移至1.12.0稳定版。
-
 Nginx1.10增加了动态模块、http2、reuseport。
 
 Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
 
-Nginx1.12已经发布，即将逐步更新master分支，详细注解。
+Nginx1.12已经发布，已更新master分支。
 
 请参考：
 * [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
@@ -20,12 +18,12 @@ Nginx1.12已经发布，即将逐步更新master分支，详细注解。
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
 
 # 当前状态
-nginx 1.12.0迁移中……
+nginx 1.12.0
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx稳定版1.10.3|有
+master  | nginx稳定版1.12.0|有
 upgrade | nginx稳定版1.10.3|无
 mainline| nginx开发版1.11.13|无
 
