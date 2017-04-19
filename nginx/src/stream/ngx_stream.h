@@ -193,13 +193,25 @@ typedef struct {
 // typedef ngx_int_t (*ngx_stream_access_pt)(ngx_stream_session_t *s);
 
 // 1.11.5开始使用phase概念，类似http
+// 目前只有7个phase，但每个阶段都可以使用
 typedef enum {
+    // 刚accept建立连接后
     NGX_STREAM_POST_ACCEPT_PHASE = 0,
+
     NGX_STREAM_PREACCESS_PHASE,
+
+    // 访问控制阶段
     NGX_STREAM_ACCESS_PHASE,
+
     NGX_STREAM_SSL_PHASE,
+
+    // 这个阶段可以预读部分数据，解析格式，如sni
     NGX_STREAM_PREREAD_PHASE,
+
+    // 内容产生阶段，只能有一个handler
     NGX_STREAM_CONTENT_PHASE,
+
+    // 日志阶段
     NGX_STREAM_LOG_PHASE
 } ngx_stream_phases;
 
@@ -209,12 +221,15 @@ typedef struct ngx_stream_phase_handler_s  ngx_stream_phase_handler_t;
 typedef ngx_int_t (*ngx_stream_phase_handler_pt)(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph);
 
+// 标准的phase handler函数原型
+typedef ngx_int_t (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
+
 // 重要！处理tcp的回调函数原型，相当于http里的content handler
 // 与ngx_stream_access_pt很像，但没有返回值
-typedef ngx_int_t (*ngx_stream_handler_pt)(ngx_stream_session_t *s);
 typedef void (*ngx_stream_content_handler_pt)(ngx_stream_session_t *s);
 
 
+// 阶段引擎数组里的元素，包括checker和handler
 struct ngx_stream_phase_handler_s {
     ngx_stream_phase_handler_pt    checker;
     ngx_stream_handler_pt          handler;
@@ -222,6 +237,7 @@ struct ngx_stream_phase_handler_s {
 };
 
 
+// 阶段引擎数组
 typedef struct {
     ngx_stream_phase_handler_t    *handlers;
 } ngx_stream_phase_engine_t;
@@ -271,6 +287,7 @@ typedef struct {
 
     ngx_hash_keys_arrays_t        *variables_keys;
 
+    // stream模块的handler都添加在这里
     ngx_stream_phase_t             phases[NGX_STREAM_LOG_PHASE + 1];
 } ngx_stream_core_main_conf_t;
 
@@ -302,6 +319,7 @@ typedef struct {
     // 使用nodelay特性
     ngx_flag_t                     tcp_nodelay;
 
+    // 预读相关的设置
     size_t                         preread_buffer_size;
     ngx_msec_t                     preread_timeout;
 
@@ -362,6 +380,7 @@ struct ngx_stream_session_s {
     u_char                        *captures_data;
 #endif
 
+    // 阶段引擎运行时的游标，记录当前的运行位置
     ngx_int_t                      phase_handler;
     ngx_uint_t                     status;
 
