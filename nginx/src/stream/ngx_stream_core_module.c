@@ -13,8 +13,12 @@
 #include <ngx_stream.h>
 
 
+static ngx_int_t ngx_stream_core_preconfiguration(ngx_conf_t *cf);
+
 // 主要初始化配置结构体里的servers、listen数组
 static void *ngx_stream_core_create_main_conf(ngx_conf_t *cf);
+
+static char *ngx_stream_core_init_main_conf(ngx_conf_t *cf, void *conf);
 
 // 创建stream模块的srv配置，记录server{}块定义所在的文件和行号
 static void *ngx_stream_core_create_srv_conf(ngx_conf_t *cf);
@@ -38,11 +42,27 @@ static char *ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
 // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
 static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 
 
 // stream_core模块的指令，主要是server、listen
 // 与http_core类似
 static ngx_command_t  ngx_stream_core_commands[] = {
+
+    { ngx_string("variables_hash_max_size"),
+      NGX_STREAM_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_STREAM_MAIN_CONF_OFFSET,
+      offsetof(ngx_stream_core_main_conf_t, variables_hash_max_size),
+      NULL },
+
+    { ngx_string("variables_hash_bucket_size"),
+      NGX_STREAM_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_STREAM_MAIN_CONF_OFFSET,
+      offsetof(ngx_stream_core_main_conf_t, variables_hash_bucket_size),
+      NULL },
 
     // 定义一个tcpserver
     { ngx_string("server"),
@@ -72,6 +92,27 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       0,
       NULL },
 
+    { ngx_string("resolver"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
+      ngx_stream_core_resolver,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("resolver_timeout"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_core_srv_conf_t, resolver_timeout),
+      NULL },
+
+    { ngx_string("proxy_protocol_timeout"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_core_srv_conf_t, proxy_protocol_timeout),
+      NULL },
+
     // 可以在stream_main里出现，用于合并配置
     // 默认开启(=1)
     { ngx_string("tcp_nodelay"),
@@ -81,16 +122,31 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       offsetof(ngx_stream_core_srv_conf_t, tcp_nodelay),
       NULL },
 
+    { ngx_string("preread_buffer_size"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_core_srv_conf_t, preread_buffer_size),
+      NULL },
+
+    { ngx_string("preread_timeout"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_core_srv_conf_t, preread_timeout),
+      NULL },
+
       ngx_null_command
 };
 
 
 static ngx_stream_module_t  ngx_stream_core_module_ctx = {
+    ngx_stream_core_preconfiguration,      /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
     // 主要初始化配置结构体里的servers、listen数组
     ngx_stream_core_create_main_conf,      /* create main configuration */
-    NULL,                                  /* init main configuration */
+    ngx_stream_core_init_main_conf,        /* init main configuration */
 
     // 创建stream模块的srv配置，记录server{}块定义所在的文件和行号
     ngx_stream_core_create_srv_conf,       /* create server configuration */
@@ -114,6 +170,221 @@ ngx_module_t  ngx_stream_core_module = {
     NULL,                                  /* exit master */
     NGX_MODULE_V1_PADDING
 };
+
+
+void
+ngx_stream_core_run_phases(ngx_stream_session_t *s)
+{
+    ngx_int_t                     rc;
+    ngx_stream_phase_handler_t   *ph;
+    ngx_stream_core_main_conf_t  *cmcf;
+
+    cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
+
+    ph = cmcf->phase_engine.handlers;
+
+    while (ph[s->phase_handler].checker) {
+
+        rc = ph[s->phase_handler].checker(s, &ph[s->phase_handler]);
+
+        if (rc == NGX_OK) {
+            return;
+        }
+    }
+}
+
+
+ngx_int_t
+ngx_stream_core_generic_phase(ngx_stream_session_t *s,
+    ngx_stream_phase_handler_t *ph)
+{
+    ngx_int_t  rc;
+
+    /*
+     * generic phase checker,
+     * used by all phases, except for preread and content
+     */
+
+    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+                   "generic phase: %ui", s->phase_handler);
+
+    rc = ph->handler(s);
+
+    if (rc == NGX_OK) {
+        s->phase_handler = ph->next;
+        return NGX_AGAIN;
+    }
+
+    if (rc == NGX_DECLINED) {
+        s->phase_handler++;
+        return NGX_AGAIN;
+    }
+
+    if (rc == NGX_AGAIN || rc == NGX_DONE) {
+        return NGX_OK;
+    }
+
+    if (rc == NGX_ERROR) {
+        rc = NGX_STREAM_INTERNAL_SERVER_ERROR;
+    }
+
+    ngx_stream_finalize_session(s, rc);
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_stream_core_preread_phase(ngx_stream_session_t *s,
+    ngx_stream_phase_handler_t *ph)
+{
+    size_t                       size;
+    ssize_t                      n;
+    ngx_int_t                    rc;
+    ngx_connection_t            *c;
+    ngx_stream_core_srv_conf_t  *cscf;
+
+    c = s->connection;
+
+    c->log->action = "prereading client data";
+
+    cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
+
+    if (c->read->timedout) {
+        rc = NGX_STREAM_OK;
+
+    } else if (c->read->timer_set) {
+        rc = NGX_AGAIN;
+
+    } else {
+        rc = ph->handler(s);
+    }
+
+    while (rc == NGX_AGAIN) {
+
+        if (c->buffer == NULL) {
+            c->buffer = ngx_create_temp_buf(c->pool, cscf->preread_buffer_size);
+            if (c->buffer == NULL) {
+                rc = NGX_ERROR;
+                break;
+            }
+        }
+
+        size = c->buffer->end - c->buffer->last;
+
+        if (size == 0) {
+            ngx_log_error(NGX_LOG_ERR, c->log, 0, "preread buffer full");
+            rc = NGX_STREAM_BAD_REQUEST;
+            break;
+        }
+
+        if (c->read->eof) {
+            rc = NGX_STREAM_OK;
+            break;
+        }
+
+        if (!c->read->ready) {
+            if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                rc = NGX_ERROR;
+                break;
+            }
+
+            if (!c->read->timer_set) {
+                ngx_add_timer(c->read, cscf->preread_timeout);
+            }
+
+            c->read->handler = ngx_stream_session_handler;
+
+            return NGX_OK;
+        }
+
+        n = c->recv(c, c->buffer->last, size);
+
+        if (n == NGX_ERROR) {
+            rc = NGX_STREAM_OK;
+            break;
+        }
+
+        if (n > 0) {
+            c->buffer->last += n;
+        }
+
+        rc = ph->handler(s);
+    }
+
+    if (c->read->timer_set) {
+        ngx_del_timer(c->read);
+    }
+
+    if (rc == NGX_OK) {
+        s->phase_handler = ph->next;
+        return NGX_AGAIN;
+    }
+
+    if (rc == NGX_DECLINED) {
+        s->phase_handler++;
+        return NGX_AGAIN;
+    }
+
+    if (rc == NGX_DONE) {
+        return NGX_OK;
+    }
+
+    if (rc == NGX_ERROR) {
+        rc = NGX_STREAM_INTERNAL_SERVER_ERROR;
+    }
+
+    ngx_stream_finalize_session(s, rc);
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_stream_core_content_phase(ngx_stream_session_t *s,
+    ngx_stream_phase_handler_t *ph)
+{
+    int                          tcp_nodelay;
+    ngx_connection_t            *c;
+    ngx_stream_core_srv_conf_t  *cscf;
+
+    c = s->connection;
+
+    c->log->action = NULL;
+
+    cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
+
+    if (c->type == SOCK_STREAM
+        && cscf->tcp_nodelay
+        && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET)
+    {
+        ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "tcp_nodelay");
+
+        tcp_nodelay = 1;
+
+        if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
+                       (const void *) &tcp_nodelay, sizeof(int)) == -1)
+        {
+            ngx_connection_error(c, ngx_socket_errno,
+                                 "setsockopt(TCP_NODELAY) failed");
+            ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+            return NGX_OK;
+        }
+
+        c->tcp_nodelay = NGX_TCP_NODELAY_SET;
+    }
+
+    cscf->handler(s);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_stream_core_preconfiguration(ngx_conf_t *cf)
+{
+    return ngx_stream_variables_add_core_vars(cf);
+}
 
 
 // 主要初始化配置结构体里的servers、listen数组
@@ -140,7 +411,29 @@ ngx_stream_core_create_main_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    cmcf->variables_hash_max_size = NGX_CONF_UNSET_UINT;
+    cmcf->variables_hash_bucket_size = NGX_CONF_UNSET_UINT;
+
     return cmcf;
+}
+
+
+static char *
+ngx_stream_core_init_main_conf(ngx_conf_t *cf, void *conf)
+{
+    ngx_stream_core_main_conf_t *cmcf = conf;
+
+    ngx_conf_init_uint_value(cmcf->variables_hash_max_size, 1024);
+    ngx_conf_init_uint_value(cmcf->variables_hash_bucket_size, 64);
+
+    cmcf->variables_hash_bucket_size =
+               ngx_align(cmcf->variables_hash_bucket_size, ngx_cacheline_size);
+
+    if (cmcf->ncaptures) {
+        cmcf->ncaptures = (cmcf->ncaptures + 1) * 3;
+    }
+
+    return NGX_CONF_OK;
 }
 
 
@@ -164,7 +457,11 @@ ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
 
     cscf->file_name = cf->conf_file->file.name.data;
     cscf->line = cf->conf_file->line;
+    cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
+    cscf->proxy_protocol_timeout = NGX_CONF_UNSET_MSEC;
     cscf->tcp_nodelay = NGX_CONF_UNSET;
+    cscf->preread_buffer_size = NGX_CONF_UNSET_SIZE;
+    cscf->preread_timeout = NGX_CONF_UNSET_MSEC;
 
     return cscf;
 }
@@ -178,6 +475,27 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_stream_core_srv_conf_t *prev = parent;
     ngx_stream_core_srv_conf_t *conf = child;
+
+    ngx_conf_merge_msec_value(conf->resolver_timeout,
+                              prev->resolver_timeout, 30000);
+
+    if (conf->resolver == NULL) {
+
+        if (prev->resolver == NULL) {
+
+            /*
+             * create dummy resolver in stream {} context
+             * to inherit it in all servers
+             */
+
+            prev->resolver = ngx_resolver_create(cf, NULL, 0);
+            if (prev->resolver == NULL) {
+                return NGX_CONF_ERROR;
+            }
+        }
+
+        conf->resolver = prev->resolver;
+    }
 
     // 每个server块必须有一个处理handler，否则报错
     if (conf->handler == NULL) {
@@ -195,8 +513,17 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+    ngx_conf_merge_msec_value(conf->proxy_protocol_timeout,
+                              prev->proxy_protocol_timeout, 30000);
+
     // 默认tcp_nodelay=1
     ngx_conf_merge_value(conf->tcp_nodelay, prev->tcp_nodelay, 1);
+
+    ngx_conf_merge_size_value(conf->preread_buffer_size,
+                              prev->preread_buffer_size, 16384);
+
+    ngx_conf_merge_msec_value(conf->preread_timeout,
+                              prev->preread_timeout, 30000);
 
     return NGX_CONF_OK;
 }
@@ -312,6 +639,13 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 恢复之前保存的解析上下文
     *cf = pcf;
 
+    if (rv == NGX_CONF_OK && !cscf->listen) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "no \"listen\" is defined for server in %s:%ui",
+                      cscf->file_name, cscf->line);
+        return NGX_CONF_ERROR;
+    }
+
     return rv;
 }
 
@@ -323,18 +657,15 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    size_t                        len, off;
-    in_port_t                     port;
+    ngx_stream_core_srv_conf_t  *cscf = conf;
+
     ngx_str_t                    *value;
     ngx_url_t                     u;
     ngx_uint_t                    i, backlog;
-    struct sockaddr              *sa;
-    struct sockaddr_in           *sin;
-    ngx_stream_listen_t          *ls;
+    ngx_stream_listen_t          *ls, *als;
     ngx_stream_core_main_conf_t  *cmcf;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6          *sin6;
-#endif
+
+    cscf->listen = 1;
 
     // 获取指令后的参数数组
     value = cf->args->elts;
@@ -362,64 +693,6 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 获取stream core模块的main_conf，只有一个
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
 
-    // 准备添加监听端口
-    ls = cmcf->listen.elts;
-
-    // 遍历已经添加的端口，如果重复则报错
-    for (i = 0; i < cmcf->listen.nelts; i++) {
-
-        // 这里的u是一个union
-        sa = &ls[i].u.sockaddr;
-
-        if (sa->sa_family != u.family) {
-            continue;
-        }
-
-        // 根据ipv4/ipv6/unix，计算off/port等信息
-        switch (sa->sa_family) {
-
-#if (NGX_HAVE_INET6)
-        case AF_INET6:
-            off = offsetof(struct sockaddr_in6, sin6_addr);
-            len = 16;
-            sin6 = &ls[i].u.sockaddr_in6;
-            port = sin6->sin6_port;
-            break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-        case AF_UNIX:
-            off = offsetof(struct sockaddr_un, sun_path);
-            len = sizeof(((struct sockaddr_un *) sa)->sun_path);
-            port = 0;
-            break;
-#endif
-
-        default: /* AF_INET */
-            off = offsetof(struct sockaddr_in, sin_addr);
-            len = 4;
-            sin = &ls[i].u.sockaddr_in;
-            port = sin->sin_port;
-            break;
-        }
-
-        // 比较socket地址
-        if (ngx_memcmp(ls[i].u.sockaddr_data + off, u.sockaddr + off, len)
-            != 0)
-        {
-            continue;
-        }
-
-        // 比较端口
-        if (port != u.port) {
-            continue;
-        }
-
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "duplicate \"%V\" address and port pair", &u.url);
-        return NGX_CONF_ERROR;
-    }
-
     // 向数组里添加一个ngx_stream_listen_t结构体
     // 注意是在cmcf里
     ls = ngx_array_push(&cmcf->listen);
@@ -430,7 +703,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_memzero(ls, sizeof(ngx_stream_listen_t));
 
     // 拷贝ip地址
-    ngx_memcpy(&ls->u.sockaddr, u.sockaddr, u.socklen);
+    ngx_memcpy(&ls->sockaddr.sockaddr, &u.sockaddr, u.socklen);
 
     // 从ngx_url_t里拷贝信息
     ls->socklen = u.socklen;
@@ -442,7 +715,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 也就是监听端口关联了定义listen的server{}
     ls->ctx = cf->ctx;
 
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+#if (NGX_HAVE_INET6)
     ls->ipv6only = 1;
 #endif
 
@@ -483,11 +756,10 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (ngx_strncmp(value[i].data, "ipv6only=o", 10) == 0) {
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+            size_t  len;
             u_char  buf[NGX_SOCKADDR_STRLEN];
 
-            sa = &ls->u.sockaddr;
-
-            if (sa->sa_family == AF_INET6) {
+            if (ls->sockaddr.sockaddr.sa_family == AF_INET6) {
 
                 if (ngx_strcmp(&value[i].data[10], "n") == 0) {
                     ls->ipv6only = 1;
@@ -505,7 +777,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 ls->bind = 1;
 
             } else {
-                len = ngx_sock_ntop(sa, ls->socklen, buf,
+                len = ngx_sock_ntop(&ls->sockaddr.sockaddr, ls->socklen, buf,
                                     NGX_SOCKADDR_STRLEN, 1);
 
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -638,6 +910,11 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
         }
 
+        if (ngx_strcmp(value[i].data, "proxy_protocol") == 0) {
+            ls->proxy_protocol = 1;
+            continue;
+        }
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the invalid \"%V\" parameter", &value[i]);
         return NGX_CONF_ERROR;
@@ -658,6 +935,51 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ls->so_keepalive) {
             return "\"so_keepalive\" parameter is incompatible with \"udp\"";
         }
+
+        if (ls->proxy_protocol) {
+            return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
+        }
+    }
+
+    als = cmcf->listen.elts;
+
+    for (i = 0; i < cmcf->listen.nelts - 1; i++) {
+        if (ls->type != als[i].type) {
+            continue;
+        }
+
+        if (ngx_cmp_sockaddr(&als[i].sockaddr.sockaddr, als[i].socklen,
+                             &ls->sockaddr.sockaddr, ls->socklen, 1)
+            != NGX_OK)
+        {
+            continue;
+        }
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "duplicate \"%V\" address and port pair", &u.url);
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_stream_core_srv_conf_t  *cscf = conf;
+
+    ngx_str_t  *value;
+
+    if (cscf->resolver) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    cscf->resolver = ngx_resolver_create(cf, &value[1], cf->args->nelts - 1);
+    if (cscf->resolver == NULL) {
+        return NGX_CONF_ERROR;
     }
 
     return NGX_CONF_OK;
