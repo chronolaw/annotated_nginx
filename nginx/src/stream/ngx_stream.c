@@ -27,6 +27,11 @@
 // 设置有连接发生时的回调函数ngx_stream_init_connection
 static char *ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+static ngx_int_t ngx_stream_init_phases(ngx_conf_t *cf,
+    ngx_stream_core_main_conf_t *cmcf);
+static ngx_int_t ngx_stream_init_phase_handlers(ngx_conf_t *cf,
+    ngx_stream_core_main_conf_t *cmcf);
+
 // 把监听结构体添加进ports数组
 // 多个相同的监听端口用一个数组元素，在addrs.opt里保存
 static ngx_int_t ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
@@ -53,6 +58,10 @@ static ngx_int_t ngx_stream_cmp_conf_addrs(const void *one, const void *two);
 // 计数器，得到所有的stream模块数量
 // 1.9.11后改用cycle里的变量
 ngx_uint_t  ngx_stream_max_module;
+
+
+// 1.11.5，过滤机制
+ngx_stream_filter_pt  ngx_stream_top_filter;
 
 
 // stream模块只有一个指令，解析stream{}配置块，与events类似
@@ -220,8 +229,6 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 
-    /* parse inside the stream{} block */
-
     // 初始的解析环境已经准备好，下面开始解析stream{}配置
 
     // 暂存当前的解析上下文
@@ -231,6 +238,23 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 之前的ctx是cycle->conf_ctx
     // 此时ctx是ngx_stream_conf_ctx_t指针，里面存储了配置数组
     cf->ctx = ctx;
+
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
+            continue;
+        }
+
+        module = cf->cycle->modules[m]->ctx;
+
+        if (module->preconfiguration) {
+            if (module->preconfiguration(cf) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+
+    /* parse inside the stream{} block */
 
     // 设定之后解析的模块类型必须是stream
     cf->module_type = NGX_STREAM_MODULE;
@@ -307,6 +331,10 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (ngx_stream_init_phases(cf, cmcf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     // 配置解析完毕，调用模块的postconfiguration
     for (m = 0; cf->cycle->modules[m]; m++) {
         if (cf->cycle->modules[m]->type != NGX_STREAM_MODULE) {
@@ -323,9 +351,16 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (ngx_stream_variables_init_vars(cf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     // 最后恢复之前保存的解析上下文
     *cf = pcf;
 
+    if (ngx_stream_init_phase_handlers(cf, cmcf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
 
     // 初始化一个动态数组，准备存储监听端口
     if (ngx_array_init(&ports, cf->temp_pool, 4, sizeof(ngx_stream_conf_port_t))
@@ -357,44 +392,129 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 // 把监听结构体添加进ports数组
 // 多个相同的监听端口用一个数组元素，在addrs.opt里保存
 static ngx_int_t
+ngx_stream_init_phases(ngx_conf_t *cf, ngx_stream_core_main_conf_t *cmcf)
+{
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_POST_ACCEPT_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_PREACCESS_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_ACCESS_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_SSL_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_PREREAD_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&cmcf->phases[NGX_STREAM_LOG_PHASE].handlers,
+                       cf->pool, 1, sizeof(ngx_stream_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_stream_init_phase_handlers(ngx_conf_t *cf,
+    ngx_stream_core_main_conf_t *cmcf)
+{
+    ngx_int_t                     j;
+    ngx_uint_t                    i, n;
+    ngx_stream_handler_pt        *h;
+    ngx_stream_phase_handler_t   *ph;
+    ngx_stream_phase_handler_pt   checker;
+
+    n = 1 /* content phase */;
+
+    for (i = 0; i < NGX_STREAM_LOG_PHASE; i++) {
+        n += cmcf->phases[i].handlers.nelts;
+    }
+
+    ph = ngx_pcalloc(cf->pool,
+                     n * sizeof(ngx_stream_phase_handler_t) + sizeof(void *));
+    if (ph == NULL) {
+        return NGX_ERROR;
+    }
+
+    cmcf->phase_engine.handlers = ph;
+    n = 0;
+
+    for (i = 0; i < NGX_STREAM_LOG_PHASE; i++) {
+        h = cmcf->phases[i].handlers.elts;
+
+        switch (i) {
+
+        case NGX_STREAM_PREREAD_PHASE:
+            checker = ngx_stream_core_preread_phase;
+            break;
+
+        case NGX_STREAM_CONTENT_PHASE:
+            ph->checker = ngx_stream_core_content_phase;
+            n++;
+            ph++;
+
+            continue;
+
+        default:
+            checker = ngx_stream_core_generic_phase;
+        }
+
+        n += cmcf->phases[i].handlers.nelts;
+
+        for (j = cmcf->phases[i].handlers.nelts - 1; j >= 0; j--) {
+            ph->checker = checker;
+            ph->handler = h[j];
+            ph->next = n;
+            ph++;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     ngx_stream_listen_t *listen)
 {
     in_port_t                p;
     ngx_uint_t               i;
     struct sockaddr         *sa;
-    struct sockaddr_in      *sin;
     ngx_stream_conf_port_t  *port;
     ngx_stream_conf_addr_t  *addr;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6     *sin6;
-#endif
 
     // 得到监听端口结构体里的socket地址
-    sa = &listen->u.sockaddr;
+    sa = &listen->sockaddr.sockaddr;
 
     // 得到监听端口结构体里的端口
     // 1.11.x后使用函数ngx_inet_get_port
-    switch (sa->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = &listen->u.sockaddr_in6;
-        p = sin6->sin6_port;
-        break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-        p = 0;
-        break;
-#endif
-
-    default: /* AF_INET */
-        sin = &listen->u.sockaddr_in;
-        p = sin->sin_port;
-        break;
-    }
+    p = ngx_inet_get_port(sa);
 
     // 判断端口是否已经添加过了
     // 因为可能多个server都用listen监听同一个端口
@@ -505,7 +625,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             // 添加到cycle的监听端口数组，只是添加，没有其他动作
             // 这里的ls是ngx_listening_t
-            ls = ngx_create_listening(cf, &addr[i].opt.u.sockaddr,
+            ls = ngx_create_listening(cf, &addr[i].opt.sockaddr.sockaddr,
                                       addr[i].opt.socklen);
             if (ls == NULL) {
                 return NGX_CONF_ERROR;
@@ -549,7 +669,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             ls->keepcnt = addr[i].opt.tcp_keepcnt;
 #endif
 
-#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+#if (NGX_HAVE_INET6)
             ls->ipv6only = addr[i].opt.ipv6only;
 #endif
 
@@ -628,7 +748,7 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     for (i = 0; i < stport->naddrs; i++) {
 
         // 从ngx_stream_listen_t里得到ip地址
-        sin = &addr[i].opt.u.sockaddr_in;
+        sin = &addr[i].opt.sockaddr.sockaddr_in;
 
         // 拷贝到数组里
         addrs[i].addr = sin->sin_addr.s_addr;
@@ -640,11 +760,12 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
 #if (NGX_STREAM_SSL)
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
+        addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
         // socket地址转换为字符串
         // 参数1表示字符串里含有端口，即xxxx:port
-        len = ngx_sock_ntop(&addr[i].opt.u.sockaddr, addr[i].opt.socklen, buf,
-                            NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         // 分配内存，准备拷贝地址字符串
         p = ngx_pnalloc(cf->pool, len);
@@ -687,16 +808,17 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
 
     for (i = 0; i < stport->naddrs; i++) {
 
-        sin6 = &addr[i].opt.u.sockaddr_in6;
+        sin6 = &addr[i].opt.sockaddr.sockaddr_in6;
         addrs6[i].addr6 = sin6->sin6_addr;
 
         addrs6[i].conf.ctx = addr[i].opt.ctx;
 #if (NGX_STREAM_SSL)
         addrs6[i].conf.ssl = addr[i].opt.ssl;
 #endif
+        addrs6[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
-        len = ngx_sock_ntop(&addr[i].opt.u.sockaddr, addr[i].opt.socklen, buf,
-                            NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
