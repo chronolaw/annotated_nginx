@@ -157,7 +157,6 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
 #endif
 
->>>>>>> upgrade
             if ((size_t) n < size
                 && !(ngx_event_flags & NGX_USE_GREEDY_EVENT))
             {
