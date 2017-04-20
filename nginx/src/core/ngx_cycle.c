@@ -2,6 +2,7 @@
 //
 // * ngx_init_cycle
 // * ngx_signal_process
+// * ngx_set_shutdown_timer
 
 /*
  * Copyright (C) Igor Sysoev
@@ -30,7 +31,12 @@ volatile ngx_cycle_t  *ngx_cycle;
 ngx_array_t            ngx_old_cycles;
 
 static ngx_pool_t     *ngx_temp_pool;
+
 static ngx_event_t     ngx_cleaner_event;
+
+// 关闭worker进程的超时时间使用
+// 独立的一个event对象
+// 在ngx_set_shutdown_timer()里
 static ngx_event_t     ngx_shutdown_event;
 
 // 用于main，检测配置文件的标识量
@@ -1432,24 +1438,35 @@ ngx_clean_old_cycles(ngx_event_t *ev)
 }
 
 
+// 设置关闭worker进程的超时时间
+// 使用独立的event对象 ngx_shutdown_event
 void
 ngx_set_shutdown_timer(ngx_cycle_t *cycle)
 {
     ngx_core_conf_t  *ccf;
 
+    // 取核心配置，用里面的shutdown_timeout
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 有超时时间才加定时器，否则不会有超时关闭，而是一直等待
     if (ccf->shutdown_timeout) {
+
+        // 设置定时器的调用函数
         ngx_shutdown_event.handler = ngx_shutdown_timer_handler;
+
         ngx_shutdown_event.data = cycle;
         ngx_shutdown_event.log = cycle->log;
+
+        // 关键是可以取消的！！
         ngx_shutdown_event.cancelable = 1;
 
+        // 加入定时器红黑树，时间到就会执行下面的ngx_shutdown_timer_handler
         ngx_add_timer(&ngx_shutdown_event, ccf->shutdown_timeout);
     }
 }
 
 
+// 设置了shutdown_timeout后就到时间就会执行
 static void
 ngx_shutdown_timer_handler(ngx_event_t *ev)
 {
@@ -1457,12 +1474,16 @@ ngx_shutdown_timer_handler(ngx_event_t *ev)
     ngx_cycle_t       *cycle;
     ngx_connection_t  *c;
 
+    // cycle对象存储在ev->data里
     cycle = ev->data;
 
+    // 从cycle里获取连接池，即所有正在处理的连接
     c = cycle->connections;
 
+    // 逐个检查每个连接
     for (i = 0; i < cycle->connection_n; i++) {
 
+        // 已经关闭，无读事件，是监听事件，则不处理
         if (c[i].fd == (ngx_socket_t) -1
             || c[i].read == NULL
             || c[i].read->accept
@@ -1472,12 +1493,19 @@ ngx_shutdown_timer_handler(ngx_event_t *ev)
             continue;
         }
 
+        // 只处理收发数据的连接
+        // 即通常意义上Nginx的连接
+
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
                        "*%uA shutdown timeout", c[i].number);
 
+        // 设置标志位，强制标记为关闭且出错
         c[i].close = 1;
         c[i].error = 1;
 
+        // 调用读事件的handler
+        // handler里通常都会检查close和error标志位
+        // 这样就会关闭连接
         c[i].read->handler(c[i].read);
-    }
+    }   //循环处理了所有活跃的连接，最后都因为close和error而关闭
 }

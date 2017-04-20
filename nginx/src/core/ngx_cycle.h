@@ -167,8 +167,10 @@ typedef struct {
     ngx_flag_t                daemon;       //守护进程是否启用
     ngx_flag_t                master;       //master/worker进程机制是否启用
 
-     //调用time_update的时间分辨率，毫秒，在event模块里使用
+    //调用time_update的时间分辨率，毫秒，在event模块里使用
     ngx_msec_t                timer_resolution;
+
+    // 1.11.11新增，worker进程关闭的超时时间，默认永远等待
     ngx_msec_t                shutdown_timeout;
 
     ngx_int_t                 worker_processes;     //worker进程的数量
@@ -193,6 +195,7 @@ typedef struct {
     ngx_uid_t                 user;
     ngx_gid_t                 group;
 
+    // core dump的目录
     ngx_str_t                 working_directory;
 
     // 用于实现共享锁，linux下无意义
@@ -234,6 +237,8 @@ ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
 ngx_cpuset_t *ngx_get_cpu_affinity(ngx_uint_t n);
 ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag);
+
+// 设置关闭worker进程的超时时间
 void ngx_set_shutdown_timer(ngx_cycle_t *cycle);
 
 
