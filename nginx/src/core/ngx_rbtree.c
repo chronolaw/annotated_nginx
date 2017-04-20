@@ -402,11 +402,16 @@ ngx_rbtree_next(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 {
     ngx_rbtree_node_t  *root, *sentinel, *parent;
 
+    // 哨兵节点
     sentinel = tree->sentinel;
 
+    // 有右子树，则是右边最小的节点
     if (node->right != sentinel) {
         return ngx_rbtree_min(node->right, sentinel);
     }
+
+    // 无右子树
+    // 需要用父节点上溯
 
     root = tree->root;
 

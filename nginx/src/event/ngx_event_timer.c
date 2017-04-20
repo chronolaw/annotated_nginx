@@ -164,6 +164,7 @@ ngx_event_no_timers_left(void)
     // 开始顺序遍历红黑树
     for (node = ngx_rbtree_min(root, sentinel);
          node;
+         // 注意调用了红黑树的next函数，正序遍历
          node = ngx_rbtree_next(&ngx_event_timer_rbtree, node))
     {
         // 通过offsetof获得事件对象
