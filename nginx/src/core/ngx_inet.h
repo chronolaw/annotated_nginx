@@ -1,4 +1,6 @@
 // annotated by chrono since 2016
+//
+// * ngx_sockaddr_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -37,6 +39,7 @@
 #define NGX_SOCKADDRLEN       sizeof(ngx_sockaddr_t)
 
 
+// 联合体，支持ipv4/ipv6等
 typedef union {
     struct sockaddr           sockaddr;
     struct sockaddr_in        sockaddr_in;
@@ -123,6 +126,9 @@ size_t ngx_inet6_ntop(u_char *p, u_char *text, size_t len);
 #endif
 
 // socket地址转换为字符串
+// port是个标志量，是否输出端口号，不是实际的端口值
+// 支持ipv4/v6，不需要再调用ntoa函数了
+// 返回的是字符串长度
 size_t ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text,
     size_t len, ngx_uint_t port);
 
@@ -149,7 +155,11 @@ ngx_int_t ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u);
 ngx_int_t ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u);
 ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
     struct sockaddr *sa2, socklen_t slen2, ngx_uint_t cmp_port);
+
+// 1.11.x 新增
+// 获取socket结构体里的端口
 in_port_t ngx_inet_get_port(struct sockaddr *sa);
+
 void ngx_inet_set_port(struct sockaddr *sa, in_port_t port);
 
 
