@@ -64,6 +64,8 @@ typedef struct {
     // 将要转发的上游服务器集群
     // 定义为一个upstream{}
     ngx_stream_upstream_srv_conf_t  *upstream;
+
+    // proxy_pass支持复杂变量
     ngx_stream_complex_value_t      *upstream_value;
 } ngx_stream_proxy_srv_conf_t;
 
@@ -462,9 +464,16 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         return;
     }
 
+    // 连接的类型，tcp or udp
     u->peer.type = c->type;
+
+    // 开始连接后端的时间
+    // 准备开始连接，设置开始时间，秒数，没有毫秒
     u->start_sec = ngx_time();
 
+    // 连接的读写事件都设置为ngx_stream_proxy_downstream_handler
+    // 注意这个连接是客户端发起的连接，即下游
+    // 当客户端连接可读或可写时就会调用ngx_stream_proxy_downstream_handler
     c->write->handler = ngx_stream_proxy_downstream_handler;
     c->read->handler = ngx_stream_proxy_downstream_handler;
 
@@ -475,6 +484,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         return;
     }
 
+    // 如果是tcp连接，那么创建一个缓冲区，用来接收数据
     if (c->type == SOCK_STREAM) {
         p = ngx_pnalloc(c->pool, pscf->buffer_size);
         if (p == NULL) {
@@ -482,16 +492,24 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
             return;
         }
 
+        // 注意是给下游使用的缓冲区
         u->downstream_buf.start = p;
         u->downstream_buf.end = p + pscf->buffer_size;
         u->downstream_buf.pos = p;
         u->downstream_buf.last = p;
 
+        // 连接可读，表示客户端有数据发过来
+        // 加入到&ngx_posted_events
+        // 稍后由ngx_stream_proxy_downstream_handler来处理
         if (c->read->ready) {
             ngx_post_event(c->read, &ngx_posted_events);
         }
     }
 
+    // udp不需要，始终用一个固定大小的数组接收数据
+
+    // proxy_pass支持复杂变量
+    // 如果使用了"proxy_pass $xxx"，那么就要解析复杂变量
     if (pscf->upstream_value) {
         if (ngx_stream_proxy_eval(s, pscf) != NGX_OK) {
             ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
@@ -499,6 +517,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         }
     }
 
+    // 检查proxy_pass的目标地址
     if (u->resolved == NULL) {
 
         uscf = pscf->upstream;
@@ -627,18 +646,17 @@ found:
 
     //u->proxy_protocol = pscf->proxy_protocol;
 
-    // 准备开始连接，设置开始时间，秒数，没有毫秒
-    //u->start_sec = ngx_time();
-
-    // 连接的读写事件都设置为ngx_stream_proxy_downstream_handler
-    // 注意这个连接是客户端发起的连接，即下游
-    //c->write->handler = ngx_stream_proxy_downstream_handler;
-    //c->read->handler = ngx_stream_proxy_downstream_handler;
-
+    // 最后启动连接
+    // 使用ngx_peer_connection_t连接上游服务器
+    // 连接失败，需要尝试下一个上游server
+    // 连接成功要调用init初始化上游
+    // ngx_stream_proxy_connect(s);
     ngx_stream_proxy_connect(s);
 }
 
 
+// proxy_pass支持复杂变量
+// 如果使用了"proxy_pass $xxx"，那么就要解析复杂变量
 static ngx_int_t
 ngx_stream_proxy_eval(ngx_stream_session_t *s,
     ngx_stream_proxy_srv_conf_t *pscf)
@@ -650,12 +668,6 @@ ngx_stream_proxy_eval(ngx_stream_session_t *s,
     if (ngx_stream_complex_value(s, pscf->upstream_value, &host) != NGX_OK) {
         return NGX_ERROR;
     }
-
-    // 缓冲区，给下游用
-    //p = ngx_pnalloc(c->pool, pscf->buffer_size);
-    //if (p == NULL) {
-    //    ngx_stream_proxy_finalize(s, NGX_ERROR);
-    //    return;
 
     ngx_memzero(&url, sizeof(ngx_url_t));
 
@@ -728,12 +740,6 @@ ngx_stream_proxy_set_local(ngx_stream_session_t *s, ngx_stream_upstream_t *u,
     if (addr == NULL) {
         return NGX_ERROR;
     }
-
-    // 最后启动连接
-    // 使用ngx_peer_connection_t连接上游服务器
-    // 连接失败，需要尝试下一个上游server
-    // 连接成功要调用init初始化上游
-    // ngx_stream_proxy_connect(s);
 
     rc = ngx_parse_addr_port(s->connection->pool, addr, val.data, val.len);
     if (rc == NGX_ERROR) {
