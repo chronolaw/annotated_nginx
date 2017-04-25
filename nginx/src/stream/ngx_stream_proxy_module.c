@@ -797,8 +797,12 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
 
     ngx_memzero(u->state, sizeof(ngx_stream_upstream_state_t));
 
+    // 这两个值置为-1，表示未初始化
     u->state->connect_time = (ngx_msec_t) -1;
     u->state->first_byte_time = (ngx_msec_t) -1;
+
+    // 用来计算响应时间，保存当前的毫秒值
+    // 之后连接成功后就会两者相减
     u->state->response_time = ngx_current_msec;
 
     // 连接上游
@@ -821,6 +825,7 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
 
     u->state->peer = u->peer.name;
 
+    // 所有上游都busy
     if (rc == NGX_BUSY) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "no live upstreams");
         ngx_stream_proxy_finalize(s, NGX_STREAM_BAD_GATEWAY);
@@ -835,6 +840,8 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
 
     /* rc == NGX_OK || rc == NGX_AGAIN || rc == NGX_DONE */
 
+    // 连接“成功”，again/done表示正在连接过程中
+
     pc = u->peer.connection;
 
     pc->data = s;
@@ -844,6 +851,9 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
     pc->write->log = c->log;
 
     // 连接成功
+    // 分配供上游读取数据的缓冲区
+    // 修改上游读写事件，不再测试连接，改为ngx_stream_proxy_upstream_handler
+    // 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
     if (rc != NGX_AGAIN) {
         ngx_stream_proxy_init_upstream(s);
         return;
@@ -953,6 +963,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         }
     }
 
+    // 计算连接使用的时间，毫秒值
     u->state->connect_time = ngx_current_msec - u->state->response_time;
 
     if (u->peer.notify) {
@@ -962,7 +973,9 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 
     c->log->action = "proxying connection";
 
+    // 检查给上游使用的缓冲区
     if (u->upstream_buf.start == NULL) {
+
         // 分配供上游读取数据的缓冲区
         p = ngx_pnalloc(c->pool, pscf->buffer_size);
         if (p == NULL) {
@@ -976,6 +989,8 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         u->upstream_buf.last = p;
     }
 
+    // 此时u里面上下游都有缓冲区了
+
     // udp处理
     // if (c->type == SOCK_DGRAM) {
     //     // 使用客户端连接的buffer计算收到的字节数
@@ -985,23 +1000,30 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     //     // downstream_buf直接就是客户端连接的buffer
     //     u->downstream_buf = *c->buffer;
 
+
+    // 客户端里已经发来了一些数据
     if (c->buffer && c->buffer->pos < c->buffer->last) {
         ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
                        "stream proxy add preread buffer: %uz",
                        c->buffer->last - c->buffer->pos);
 
+        // 拿一个链表节点
         cl = ngx_chain_get_free_buf(c->pool, &u->free);
         if (cl == NULL) {
             ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
             return;
         }
 
+        // 把连接的缓冲区关联到链表节点里
         *cl->buf = *c->buffer;
 
         cl->buf->tag = (ngx_buf_tag_t) &ngx_stream_proxy_module;
         cl->buf->flush = 1;
+
+        // udp特殊处理，直接是最后一块数据，所以Nginx暂不支持udp会话
         cl->buf->last_buf = (c->type == SOCK_DGRAM);
 
+        // 把数据挂到upstream_out里，要发给上游
         cl->next = u->upstream_out;
         u->upstream_out = cl;
     }
