@@ -650,7 +650,6 @@ found:
     // 使用ngx_peer_connection_t连接上游服务器
     // 连接失败，需要尝试下一个上游server
     // 连接成功要调用init初始化上游
-    // ngx_stream_proxy_connect(s);
     ngx_stream_proxy_connect(s);
 }
 
@@ -1399,9 +1398,6 @@ ngx_stream_proxy_downstream_handler(ngx_event_t *ev)
 }
 
 
-// 连接成功之后的事件处理函数
-// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
-// 即从上游读数据
 static void
 ngx_stream_proxy_resolve_handler(ngx_resolver_ctx_t *ctx)
 {
@@ -1467,10 +1463,17 @@ ngx_stream_proxy_resolve_handler(ngx_resolver_ctx_t *ctx)
         u->peer.tries = pscf->next_upstream_tries;
     }
 
+    // 连接上游
+    // 使用ngx_peer_connection_t连接上游服务器
+    // 连接失败，需要尝试下一个上游server
+    // 连接成功要调用init初始化上游
     ngx_stream_proxy_connect(s);
 }
 
 
+// 连接成功之后的事件处理函数
+// 实际是ngx_stream_proxy_process_connection(ev, !ev->write);
+// 即从上游读数据
 static void
 ngx_stream_proxy_upstream_handler(ngx_event_t *ev)
 {
@@ -1702,11 +1705,15 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 
     // 根据上下游状态决定来源和目标
     // 以及缓冲区、限速等
+    // 注意使用的缓冲区指针
     if (from_upstream) {
         // 数据下行
         src = pc;
         dst = c;
+
+        // 缓冲区是upstream_buf，即上游来的数据
         b = &u->upstream_buf;
+
         limit_rate = pscf->download_rate;
         received = &u->received;
         out = &u->downstream_out;
@@ -1717,7 +1724,9 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         src = c;
         dst = pc;
 
-        // udp:downstream_buf直接就是客户端连接的buffer
+        // 缓冲区是downstream_buf，即下游来的数据
+        // 早期downstream_buf直接就是客户端连接的buffer
+        // 现在是一个正常分配的buffer
         b = &u->downstream_buf;
 
         limit_rate = pscf->upload_rate;
@@ -1735,6 +1744,8 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 
             // 条件是有数据，且dst连接是可写的
             if (*out || *busy || dst->buffered) {
+
+                // 调用filter过滤链表，过滤数据最后发出去
                 rc = ngx_stream_top_filter(s, *out, from_upstream);
 
                 if (rc == NGX_ERROR) {
@@ -1747,6 +1758,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                     return;
                 }
 
+                // 调整缓冲区链表，节约内存使用
                 ngx_chain_update_chains(c->pool, &u->free, busy, out,
                                       (ngx_buf_tag_t) &ngx_stream_proxy_module);
 
@@ -1788,12 +1800,14 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
             n = src->recv(src, b->last, size);
 
             // nginx 1.11.x代码不同，只判断NGX_AGAIN
+
             // 如果不可读，或者已经读完
             // break结束for循环
             if (n == NGX_AGAIN) {
                 break;
             }
 
+            // 出错，标记为eof
             if (n == NGX_ERROR) {
                 if (c->type == SOCK_DGRAM && u->received == 0) {
                     ngx_stream_proxy_next_upstream(s);
@@ -1832,8 +1846,10 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                     src->read->eof = 1;
                 }
 
+                // 找到链表末尾
                 for (ll = out; *ll; ll = &(*ll)->next) { /* void */ }
 
+                // 把读到的数据挂到链表末尾
                 cl = ngx_chain_get_free_buf(c->pool, &u->free);
                 if (cl == NULL) {
                     ngx_stream_proxy_finalize(s,
@@ -1869,6 +1885,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
     }   // for循环结束
 
     // 这时应该是src已经读完，数据也发送完
+    // 读取出错也会有eof标志
     if (src->read->eof && dst && (dst->read->eof || !dst->buffered)) {
         handler = c->log->handler;
         c->log->handler = NULL;
@@ -1889,6 +1906,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         return;
     }
 
+    // 如果eof就要关闭读事件
     flags = src->read->eof ? NGX_CLOSE_EVENT : 0;
 
     if (!src->shared && ngx_handle_read_event(src->read, flags) != NGX_OK) {
@@ -1971,6 +1989,10 @@ ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
         u->peer.connection = NULL;
     }
 
+    // 连接上游
+    // 使用ngx_peer_connection_t连接上游服务器
+    // 连接失败，需要尝试下一个上游server
+    // 连接成功要调用init初始化上游
     ngx_stream_proxy_connect(s);
 }
 
