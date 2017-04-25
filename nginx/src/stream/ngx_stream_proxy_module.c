@@ -28,6 +28,7 @@ typedef struct {
 } ngx_stream_upstream_local_t;
 
 
+// proxy_pass的各种配置参数，比较容易理解
 typedef struct {
     ngx_msec_t                       connect_timeout;
     ngx_msec_t                       timeout;
@@ -134,6 +135,7 @@ static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc);
 static u_char *ngx_stream_proxy_log_error(ngx_log_t *log, u_char *buf,
     size_t len);
 
+// 配置结构体相关函数，比较简单
 static void *ngx_stream_proxy_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_stream_proxy_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -179,8 +181,10 @@ static ngx_conf_deprecated_t  ngx_conf_deprecated_proxy_upstream_buffer = {
 };
 
 
+// proxy模块定义的各种指令
 static ngx_command_t  ngx_stream_proxy_commands[] = {
 
+    // 关键指令， 设置处理handler，在init建立连接之后会调用
     { ngx_string("proxy_pass"),
       NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
       ngx_stream_proxy_pass,
@@ -378,6 +382,7 @@ static ngx_command_t  ngx_stream_proxy_commands[] = {
 };
 
 
+// 没有main配置，都在server{}里
 static ngx_stream_module_t  ngx_stream_proxy_module_ctx = {
     NULL,                                  /* preconfiguration */
     NULL,                                  /* postconfiguration */
@@ -390,6 +395,7 @@ static ngx_stream_module_t  ngx_stream_proxy_module_ctx = {
 };
 
 
+// 模块功能集成定义
 ngx_module_t  ngx_stream_proxy_module = {
     NGX_MODULE_V1,
     &ngx_stream_proxy_module_ctx,          /* module context */
