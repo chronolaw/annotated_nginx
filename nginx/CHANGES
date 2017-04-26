@@ -1,4 +1,27 @@
 
+Changes with nginx 1.13.0                                        25 Apr 2017
+
+    *) Change: SSL renegotiation is now allowed on backend connections.
+
+    *) Feature: the "rcvbuf" and "sndbuf" parameters of the "listen"
+       directives of the mail proxy and stream modules.
+
+    *) Feature: the "return" and "error_page" directives can now be used to
+       return 308 redirections.
+       Thanks to Simon Leblanc.
+
+    *) Feature: the "TLSv1.3" parameter of the "ssl_protocols" directive.
+
+    *) Feature: when logging signals nginx now logs PID of the process which
+       sent the signal.
+
+    *) Bugfix: in memory allocation error handling.
+
+    *) Bugfix: if a server in the stream module listened on a wildcard
+       address, the source address of a response UDP datagram could differ
+       from the original datagram destination address.
+
+
 Changes with nginx 1.11.13                                       04 Apr 2017
 
     *) Feature: the "http_429" parameter of the "proxy_next_upstream",
