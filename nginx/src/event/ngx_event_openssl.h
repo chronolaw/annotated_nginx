@@ -54,6 +54,11 @@
 #define ngx_ssl_conn_t          SSL
 
 
+#if (OPENSSL_VERSION_NUMBER < 0x10002000L)
+#define SSL_is_server(s)        (s)->server
+#endif
+
+
 struct ngx_ssl_s {
     SSL_CTX                    *ctx;
     ngx_log_t                  *log;
@@ -131,6 +136,7 @@ typedef struct {
 #define NGX_SSL_TLSv1    0x0008
 #define NGX_SSL_TLSv1_1  0x0010
 #define NGX_SSL_TLSv1_2  0x0020
+#define NGX_SSL_TLSv1_3  0x0040
 
 
 #define NGX_SSL_BUFFER   1

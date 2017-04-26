@@ -323,6 +323,12 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_2);
     }
 #endif
+#ifdef SSL_OP_NO_TLSv1_3
+    SSL_CTX_clear_options(ssl->ctx, SSL_OP_NO_TLSv1_3);
+    if (!(protocols & NGX_SSL_TLSv1_3)) {
+        SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_3);
+    }
+#endif
 
 #ifdef SSL_OP_NO_COMPRESSION
     SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_COMPRESSION);
@@ -831,7 +837,9 @@ ngx_ssl_info_callback(const ngx_ssl_conn_t *ssl_conn, int where, int ret)
     BIO               *rbio, *wbio;
     ngx_connection_t  *c;
 
-    if (where & SSL_CB_HANDSHAKE_START) {
+    if ((where & SSL_CB_HANDSHAKE_START)
+        && SSL_is_server((ngx_ssl_conn_t *) ssl_conn))
+    {
         c = ngx_ssl_get_connection((ngx_ssl_conn_t *) ssl_conn);
 
         if (c->ssl->handshaked) {
@@ -1082,7 +1090,7 @@ ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name)
      * maximum interoperability.
      */
 
-#ifdef SSL_CTRL_SET_CURVES_LIST
+#if (defined SSL_CTX_set1_curves_list || defined SSL_CTRL_SET_CURVES_LIST)
 
     /*
      * OpenSSL 1.0.2+ allows configuring a curve list instead of a single
