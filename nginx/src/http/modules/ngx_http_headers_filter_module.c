@@ -173,6 +173,7 @@ ngx_http_headers_filter(ngx_http_request_t *r)
     case NGX_HTTP_SEE_OTHER:
     case NGX_HTTP_NOT_MODIFIED:
     case NGX_HTTP_TEMPORARY_REDIRECT:
+    case NGX_HTTP_PERMANENT_REDIRECT:
         safe_status = 1;
         break;
 
@@ -270,11 +271,6 @@ ngx_http_set_expires(ngx_http_request_t *r, ngx_http_headers_conf_t *conf)
             return NGX_ERROR;
         }
 
-        ccp = ngx_array_push(&r->headers_out.cache_control);
-        if (ccp == NULL) {
-            return NGX_ERROR;
-        }
-
         cc = ngx_list_push(&r->headers_out.headers);
         if (cc == NULL) {
             return NGX_ERROR;
@@ -282,6 +278,12 @@ ngx_http_set_expires(ngx_http_request_t *r, ngx_http_headers_conf_t *conf)
 
         cc->hash = 1;
         ngx_str_set(&cc->key, "Cache-Control");
+
+        ccp = ngx_array_push(&r->headers_out.cache_control);
+        if (ccp == NULL) {
+            return NGX_ERROR;
+        }
+
         *ccp = cc;
 
     } else {
@@ -469,11 +471,6 @@ ngx_http_add_cache_control(ngx_http_request_t *r, ngx_http_header_val_t *hv,
         }
     }
 
-    ccp = ngx_array_push(&r->headers_out.cache_control);
-    if (ccp == NULL) {
-        return NGX_ERROR;
-    }
-
     cc = ngx_list_push(&r->headers_out.headers);
     if (cc == NULL) {
         return NGX_ERROR;
@@ -482,6 +479,11 @@ ngx_http_add_cache_control(ngx_http_request_t *r, ngx_http_header_val_t *hv,
     cc->hash = 1;
     ngx_str_set(&cc->key, "Cache-Control");
     cc->value = *value;
+
+    ccp = ngx_array_push(&r->headers_out.cache_control);
+    if (ccp == NULL) {
+        return NGX_ERROR;
+    }
 
     *ccp = cc;
 
