@@ -20,6 +20,10 @@ typedef struct {
     int     signo;
     char   *signame;
     char   *name;
+
+    // 1.13.0 变动了函数接口，形式是
+    // void  (*handler)(int signo, siginfo_t *siginfo, void *ucontext);
+    // 可以多获取一些信号的信息
     void  (*handler)(int signo);
 } ngx_signal_t;
 
@@ -27,6 +31,9 @@ typedef struct {
 
 static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);
 
+// 1.13.0 变动了函数接口
+// static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
+//
 // 处理unix信号
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
@@ -363,6 +370,9 @@ ngx_init_signals(ngx_log_t *log)
 }
 
 
+// 1.13.0 变动了函数接口
+// static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
+//
 // 处理unix信号
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
