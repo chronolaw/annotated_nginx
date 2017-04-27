@@ -396,6 +396,7 @@ ngx_event_accept(ngx_event_t *ev)
 }
 
 
+// 仅支持unix
 #if !(NGX_WIN32)
 
 // 1.10新增函数，接受udp连接的handler
@@ -526,10 +527,11 @@ ngx_event_recvmsg(ngx_event_t *ev)
         }
 #endif
 
+        // 负载均衡的阈值
         ngx_accept_disabled = ngx_cycle->connection_n / 8
                               - ngx_cycle->free_connection_n;
 
-        // 接收数据成功，获取一个新的连接
+        // 接收数据成功，从连接池里获取一个新的连接
         c = ngx_get_connection(lc->fd, ev->log);
         if (c == NULL) {
             return;
@@ -546,6 +548,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_active, 1);
 #endif
 
+        // 为连接创建内存池
         c->pool = ngx_create_pool(ls->pool_size, ev->log);
         if (c->pool == NULL) {
             ngx_close_accepted_connection(c);
@@ -666,6 +669,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         }
 
         // 把之前收到的数据拷贝到连接里的缓冲区
+        // 注意这里，有数据拷贝的成本
         c->buffer->last = ngx_cpymem(c->buffer->last, buffer, n);
 
         // 设置读写事件
@@ -693,6 +697,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_handled, 1);
 #endif
 
+        // 拷贝客户端地址字符串
         if (ls->addr_ntop) {
             c->addr_text.data = ngx_pnalloc(c->pool, ls->addr_text_max_len);
             if (c->addr_text.data == NULL) {
@@ -733,7 +738,6 @@ ngx_event_recvmsg(ngx_event_t *ev)
         log->handler = NULL;
 
         // 接受连接，收到请求的回调函数
-        // 在http模块里是http.c:ngx_http_init_connection
         // stream模块里是ngx_stream_init_connection
         ls->handler(c);
 
