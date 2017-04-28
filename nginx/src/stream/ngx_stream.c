@@ -27,8 +27,13 @@
 // 设置有连接发生时的回调函数ngx_stream_init_connection
 static char *ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+// 初始化stream的handler数组
+// 注意只有6个，content handler只有一个，不需要数组
 static ngx_int_t ngx_stream_init_phases(ngx_conf_t *cf,
     ngx_stream_core_main_conf_t *cmcf);
+
+// 在配置解析的过程中stream模块把handler添加进了数组
+// 此函数整理数组，填入引擎数组
 static ngx_int_t ngx_stream_init_phase_handlers(ngx_conf_t *cf,
     ngx_stream_core_main_conf_t *cmcf);
 
@@ -358,6 +363,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 最后恢复之前保存的解析上下文
     *cf = pcf;
 
+    // 在配置解析的过程中stream模块把handler添加进了数组
+    // 此函数整理数组，填入引擎数组
     if (ngx_stream_init_phase_handlers(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -389,8 +396,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-// 把监听结构体添加进ports数组
-// 多个相同的监听端口用一个数组元素，在addrs.opt里保存
+// 初始化stream的handler数组
+// 注意只有6个，content handler只有一个，不需要数组
 static ngx_int_t
 ngx_stream_init_phases(ngx_conf_t *cf, ngx_stream_core_main_conf_t *cmcf)
 {
@@ -440,6 +447,8 @@ ngx_stream_init_phases(ngx_conf_t *cf, ngx_stream_core_main_conf_t *cmcf)
 }
 
 
+// 在配置解析的过程中stream模块把handler添加进了数组
+// 此函数整理数组，填入引擎数组
 static ngx_int_t
 ngx_stream_init_phase_handlers(ngx_conf_t *cf,
     ngx_stream_core_main_conf_t *cmcf)
@@ -450,12 +459,15 @@ ngx_stream_init_phase_handlers(ngx_conf_t *cf,
     ngx_stream_phase_handler_t   *ph;
     ngx_stream_phase_handler_pt   checker;
 
+    // n至少是1，因为每一个server必须有一个content handler
     n = 1 /* content phase */;
 
+    // 计算所有handler的数量
     for (i = 0; i < NGX_STREAM_LOG_PHASE; i++) {
         n += cmcf->phases[i].handlers.nelts;
     }
 
+    // 内存池创建数组
     ph = ngx_pcalloc(cf->pool,
                      n * sizeof(ngx_stream_phase_handler_t) + sizeof(void *));
     if (ph == NULL) {
@@ -465,6 +477,8 @@ ngx_stream_init_phase_handlers(ngx_conf_t *cf,
     cmcf->phase_engine.handlers = ph;
     n = 0;
 
+    // 遍历handler数组，填入引擎
+    // 不同的阶段使用不同的checker
     for (i = 0; i < NGX_STREAM_LOG_PHASE; i++) {
         h = cmcf->phases[i].handlers.elts;
 
@@ -499,6 +513,8 @@ ngx_stream_init_phase_handlers(ngx_conf_t *cf,
 }
 
 
+// 把监听结构体添加进ports数组
+// 多个相同的监听端口用一个数组元素，在addrs.opt里保存
 static ngx_int_t
 ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     ngx_stream_listen_t *listen)
