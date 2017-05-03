@@ -336,6 +336,8 @@ ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    // 初始化stream的handler数组
+    // 注意只有6个，content handler只有一个，不需要数组
     if (ngx_stream_init_phases(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
