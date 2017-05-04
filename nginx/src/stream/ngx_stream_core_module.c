@@ -13,6 +13,7 @@
 #include <ngx_stream.h>
 
 
+// 目前仅初始化了一些stream框架内置变量
 static ngx_int_t ngx_stream_core_preconfiguration(ngx_conf_t *cf);
 
 // 主要初始化配置结构体里的servers、listen数组
@@ -39,9 +40,11 @@ static char *ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
 
 // 解析stream/server{}里的listen指令，监听tcp端口
 // 遍历已经添加的端口，如果重复则报错
-// 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
+// 检查其他参数，如bind/backlog等
+// 1.13.0加入sndbuf/rcvbuf
 static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
 static char *ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -78,7 +81,8 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
       // 解析stream/server[]里的listen指令，监听tcp端口
       // 遍历已经添加的端口，如果重复则报错
-      // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
+      // 检查其他参数，如bind/backlog等
+      // 1.13.0加入sndbuf/rcvbuf
       ngx_stream_core_listen,
       NGX_STREAM_SRV_CONF_OFFSET,
       0,
@@ -141,7 +145,9 @@ static ngx_command_t  ngx_stream_core_commands[] = {
 
 
 static ngx_stream_module_t  ngx_stream_core_module_ctx = {
+    // 目前仅初始化了一些stream框架内置变量
     ngx_stream_core_preconfiguration,      /* preconfiguration */
+
     NULL,                                  /* postconfiguration */
 
     // 主要初始化配置结构体里的servers、listen数组
@@ -380,6 +386,7 @@ ngx_stream_core_content_phase(ngx_stream_session_t *s,
 }
 
 
+// 目前仅初始化了一些stream框架内置变量
 static ngx_int_t
 ngx_stream_core_preconfiguration(ngx_conf_t *cf)
 {
@@ -653,7 +660,8 @@ ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 // 解析stream/server{}里的listen指令，监听tcp端口
 // 遍历已经添加的端口，如果重复则报错
 // 向cmcf->listen数组里添加一个ngx_stream_listen_t结构体
-// 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
+// 检查其他参数，如bind/backlog等
+// 1.13.0加入sndbuf/rcvbuf
 static char *
 ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
