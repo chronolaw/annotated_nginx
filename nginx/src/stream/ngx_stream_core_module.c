@@ -178,6 +178,8 @@ ngx_module_t  ngx_stream_core_module = {
 };
 
 
+// 启动引擎数组处理请求
+// 从phase_handler的位置开始调用模块处理
 void
 ngx_stream_core_run_phases(ngx_stream_session_t *s)
 {
@@ -185,14 +187,25 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
     ngx_stream_phase_handler_t   *ph;
     ngx_stream_core_main_conf_t  *cmcf;
 
+    // 得到core main配置
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
 
+    // 获取引擎里的handler数组
     ph = cmcf->phase_engine.handlers;
 
+    // 从phase_handler的位置开始调用模块处理
+    // 外部请求的引擎数组起始序号是0，从头执行引擎数组,即先从Post accept开始
     while (ph[s->phase_handler].checker) {
 
+        // 调用引擎数组里的checker
         rc = ph[s->phase_handler].checker(s, &ph[s->phase_handler]);
 
+        // checker会检查handler的返回值
+        // 如果handler返回again/done那么就返回ok
+        // 退出引擎数组的处理
+        //
+        // 如果checker返回again，那么继续在引擎数组里执行
+        // 模块由s->phase_handler指定，可能会有阶段的跳跃
         if (rc == NGX_OK) {
             return;
         }
