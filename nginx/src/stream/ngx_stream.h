@@ -230,6 +230,8 @@ typedef void (*ngx_stream_content_handler_pt)(ngx_stream_session_t *s);
 
 
 // 阶段引擎数组里的元素，包括checker和handler
+// checker调用handler
+// next用于阶段跳转
 struct ngx_stream_phase_handler_s {
     ngx_stream_phase_handler_pt    checker;
     ngx_stream_handler_pt          handler;
@@ -243,6 +245,7 @@ typedef struct {
 } ngx_stream_phase_engine_t;
 
 
+// 存储stream模块的处理handler函数
 typedef struct {
     ngx_array_t                    handlers;
 } ngx_stream_phase_t;
@@ -382,6 +385,8 @@ struct ngx_stream_session_s {
 
     // 阶段引擎运行时的游标，记录当前的运行位置
     ngx_int_t                      phase_handler;
+
+    // 处理的结果状态，通常是200，发生错误则可能是403/500等
     ngx_uint_t                     status;
 
     unsigned                       ssl:1;
@@ -474,7 +479,10 @@ typedef struct {
 #define NGX_STREAM_WRITE_BUFFERED  0x10
 
 
+// 启动引擎数组处理请求
+// 从phase_handler的位置开始调用模块处理
 void ngx_stream_core_run_phases(ngx_stream_session_t *s);
+
 ngx_int_t ngx_stream_core_generic_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph);
 ngx_int_t ngx_stream_core_preread_phase(ngx_stream_session_t *s,
@@ -491,6 +499,7 @@ ngx_int_t ngx_stream_core_content_phase(ngx_stream_session_t *s,
 // 调用handler，处理tcp数据，收发等等
 void ngx_stream_init_connection(ngx_connection_t *c);
 
+// 读事件处理函数，执行处理引擎
 void ngx_stream_session_handler(ngx_event_t *rev);
 
 // nginx 1.11.4新增
@@ -513,10 +522,13 @@ extern ngx_uint_t    ngx_stream_max_module;
 extern ngx_module_t  ngx_stream_core_module;
 
 
+// 过滤函数原型，参数from_upstream标记数据的方向
+// 可以同时过滤上行和下行的数据，内部自行区分处理
 typedef ngx_int_t (*ngx_stream_filter_pt)(ngx_stream_session_t *s,
     ngx_chain_t *chain, ngx_uint_t from_upstream);
 
 
+// 过滤函数链表头指针
 extern ngx_stream_filter_pt  ngx_stream_top_filter;
 
 

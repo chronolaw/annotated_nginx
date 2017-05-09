@@ -326,6 +326,7 @@ ngx_stream_proxy_protocol_handler(ngx_event_t *rev)
 }
 
 
+// 读事件处理函数，执行处理引擎
 void
 ngx_stream_session_handler(ngx_event_t *rev)
 {
