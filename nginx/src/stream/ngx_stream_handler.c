@@ -340,17 +340,20 @@ ngx_stream_session_handler(ngx_event_t *rev)
 }
 
 
-// 关闭stream连接，销毁线程池
+// 关闭stream连接，销毁内存池
 void
 ngx_stream_finalize_session(ngx_stream_session_t *s, ngx_uint_t rc)
 {
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
                    "finalize stream session: %i", rc);
 
+    // 返回值设置为status，例如200/500等
     s->status = rc;
 
+    // 记录日志
     ngx_stream_log_session(s);
 
+    // 关闭连接，释放连接
     ngx_stream_close_connection(s->connection);
 }
 

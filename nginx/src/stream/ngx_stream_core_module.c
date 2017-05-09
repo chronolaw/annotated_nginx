@@ -213,6 +213,7 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
 }
 
 
+// 处理post_accept/preaccess/access/ssl/log等阶段
 ngx_int_t
 ngx_stream_core_generic_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph)
@@ -227,28 +228,43 @@ ngx_stream_core_generic_phase(ngx_stream_session_t *s,
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
                    "generic phase: %ui", s->phase_handler);
 
+    // 执行模块的handler函数
     rc = ph->handler(s);
 
+    // 检查处理结果
+
+    // 如果OK，那么跳过本阶段其他模块
+    // 进入下一个阶段继续处理
+    // 返回again，引擎继续运行
     if (rc == NGX_OK) {
         s->phase_handler = ph->next;
         return NGX_AGAIN;
     }
 
+    // 返回declined，模块未能处理
+    // 本阶段下一个模块继续处理，也可能进入下一个阶段
+    // 返回again，引擎继续运行
     if (rc == NGX_DECLINED) {
         s->phase_handler++;
         return NGX_AGAIN;
     }
 
+    // again/done，模块暂时无法继续处理
+    // 返回ok，退出引擎，下次有事件触发时继续运行
     if (rc == NGX_AGAIN || rc == NGX_DONE) {
         return NGX_OK;
     }
 
+    // 出错，设置为500错误
     if (rc == NGX_ERROR) {
         rc = NGX_STREAM_INTERNAL_SERVER_ERROR;
     }
 
+    // 结束回话
+    // 关闭stream连接，销毁内存池
     ngx_stream_finalize_session(s, rc);
 
+    // ok也会退出引擎，但不会再有事件触发了
     return NGX_OK;
 }
 
