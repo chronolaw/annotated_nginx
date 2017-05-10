@@ -18,7 +18,10 @@
 // 调用handler，处理tcp数据，收发等等
 //static void ngx_stream_init_session(ngx_connection_t *c);
 
+// 记录日志，执行所有的log模块，不关心返回值
 static void ngx_stream_log_session(ngx_stream_session_t *s);
+
+// 关闭回话，之前的版本是非static的
 static void ngx_stream_close_connection(ngx_connection_t *c);
 
 // 用于记录日志的handler，在log里使用
@@ -358,6 +361,7 @@ ngx_stream_finalize_session(ngx_stream_session_t *s, ngx_uint_t rc)
 }
 
 
+// 记录日志，执行所有的log模块，不关心返回值
 static void
 ngx_stream_log_session(ngx_stream_session_t *s)
 {
@@ -367,9 +371,11 @@ ngx_stream_log_session(ngx_stream_session_t *s)
 
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
 
+    // 获取log模块数组和长度
     log_handler = cmcf->phases[NGX_STREAM_LOG_PHASE].handlers.elts;
     n = cmcf->phases[NGX_STREAM_LOG_PHASE].handlers.nelts;
 
+    // 执行所有的log模块，不关心返回值
     for (i = 0; i < n; i++) {
         log_handler[i](s);
     }
