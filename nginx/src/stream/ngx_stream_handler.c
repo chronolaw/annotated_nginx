@@ -21,7 +21,7 @@
 // 记录日志，执行所有的log模块，不关心返回值
 static void ngx_stream_log_session(ngx_stream_session_t *s);
 
-// 关闭回话，之前的版本是非static的
+// 关闭会话，之前的版本是非static的
 static void ngx_stream_close_connection(ngx_connection_t *c);
 
 // 用于记录日志的handler，在log里使用
@@ -382,6 +382,7 @@ ngx_stream_log_session(ngx_stream_session_t *s)
 }
 
 
+// 关闭会话，之前的版本是非static的
 static void
 ngx_stream_close_connection(ngx_connection_t *c)
 {
