@@ -199,6 +199,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     // 但配置参数每个server可以不同
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
 
+    // 会话的变量值数组
     s->variables = ngx_pcalloc(s->connection->pool,
                                cmcf->variables.nelts
                                * sizeof(ngx_stream_variable_value_t));
@@ -208,11 +209,15 @@ ngx_stream_init_connection(ngx_connection_t *c)
         return;
     }
 
+    // 会话的开始时间
     tp = ngx_timeofday();
     s->start_sec = tp->sec;
     s->start_msec = tp->msec;
 
+    // 连接上的读事件
     rev = c->read;
+
+    // 读事件处理函数，执行处理引擎
     rev->handler = ngx_stream_session_handler;
 
     if (addr_conf->proxy_protocol) {
@@ -232,23 +237,27 @@ ngx_stream_init_connection(ngx_connection_t *c)
         }
     }
 
+    // 如果使用负载均衡功能，暂时不处理读时间
+    // 而是加入延后队列，在accept之后再处理
     if (ngx_use_accept_mutex) {
         ngx_post_event(rev, &ngx_posted_events);
         return;
     }
 
+    // 通常我们都关闭负载均衡，所以直接处理读事件
+    // 即启动处理引擎
+
     // 创建ctx数组，用于存储模块的ctx数据
     // 调用handler，处理tcp数据，收发等等
+    // 1.11.5之后不再使用，改用ngx_stream_core_run_phases
     //ngx_stream_init_session(c);
 
     // 调用handler，处理tcp数据，收发等等
+    // 读事件处理函数，执行处理引擎
     rev->handler(rev);
 }
 
 
-// 创建ctx数组，用于存储模块的ctx数据
-// 调用handler，处理tcp数据，收发等等
-// 1.11.5之后不再使用，改用ngx_stream_core_run_phases
 static void
 ngx_stream_proxy_protocol_handler(ngx_event_t *rev)
 {
@@ -336,9 +345,11 @@ ngx_stream_session_handler(ngx_event_t *rev)
     ngx_connection_t      *c;
     ngx_stream_session_t  *s;
 
+    // 从读事件获取连接和回话
     c = rev->data;
     s = c->data;
 
+    // 按阶段执行处理引擎，调用各个模块的handler
     ngx_stream_core_run_phases(s);
 }
 
