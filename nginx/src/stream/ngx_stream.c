@@ -486,21 +486,27 @@ ngx_stream_init_phase_handlers(ngx_conf_t *cf,
 
         switch (i) {
 
+        // preread阶段使用ngx_stream_core_preread_phase
         case NGX_STREAM_PREREAD_PHASE:
             checker = ngx_stream_core_preread_phase;
             break;
 
+        // content阶段使用ngx_stream_core_content_phase
         case NGX_STREAM_CONTENT_PHASE:
             ph->checker = ngx_stream_core_content_phase;
+
+            // content只能有一个handler，所以直接加1，跳过后面的代码
             n++;
             ph++;
 
             continue;
 
+        // 其他的post_accept/access等阶段都使用ngx_stream_core_generic_phase
         default:
             checker = ngx_stream_core_generic_phase;
         }
 
+        // 计算此阶段的所有handler数量
         n += cmcf->phases[i].handlers.nelts;
 
         for (j = cmcf->phases[i].handlers.nelts - 1; j >= 0; j--) {
