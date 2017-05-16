@@ -15,6 +15,9 @@
 #include <nginx.h>
 
 
+// 1.11.10新增，处理前缀变量
+// 在数组里查找是否已经有变量
+// 有则返回，否则添加进数组
 static ngx_http_variable_t *ngx_http_add_prefix_variable(ngx_conf_t *cf,
     ngx_str_t *name, ngx_uint_t flags);
 
@@ -484,6 +487,8 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
 
 
 // 1.11.10新增，处理前缀变量
+// 在数组里查找是否已经有变量
+// 有则返回，否则添加进数组
 static ngx_http_variable_t *
 ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
 {
@@ -493,6 +498,8 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
 
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
+    // 在数组里查找是否已经有变量
+    // 有则返回，否则添加进数组
     v = cmcf->prefix_variables.elts;
     for (i = 0; i < cmcf->prefix_variables.nelts; i++) {
         if (name->len != v[i].name.len
@@ -509,10 +516,13 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
             return NULL;
         }
 
+        // 标志位去掉weak
         v->flags &= flags | ~NGX_HTTP_VAR_WEAK;
 
         return v;
     }
+
+    // 数组里没有，则添加进数组
 
     v = ngx_array_push(&cmcf->prefix_variables);
     if (v == NULL) {
@@ -525,6 +535,7 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
         return NULL;
     }
 
+    // 名字小写化
     ngx_strlow(v->name.data, name->data, name->len);
 
     v->set_handler = NULL;
@@ -749,6 +760,8 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         ngx_http_variable_depth++;
         return NULL;
     }
+
+    // 没找到，可能是http、arg等前缀的变量
 
     vv = ngx_palloc(r->pool, sizeof(ngx_http_variable_value_t));
     if (vv == NULL) {
