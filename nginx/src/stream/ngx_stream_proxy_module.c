@@ -477,6 +477,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
     c->write->handler = ngx_stream_proxy_downstream_handler;
     c->read->handler = ngx_stream_proxy_downstream_handler;
 
+    // 使用数组，可能会连接多个上游服务器
     s->upstream_states = ngx_array_create(c->pool, 1,
                                           sizeof(ngx_stream_upstream_state_t));
     if (s->upstream_states == NULL) {
@@ -784,10 +785,12 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
     u->connected = 0;
     u->proxy_protocol = pscf->proxy_protocol;
 
+    // 何时会执行这个？
     if (u->state) {
         u->state->response_time = ngx_current_msec - u->state->response_time;
     }
 
+    // 把一个上游的状态添加进会话的数组
     u->state = ngx_array_push(s->upstream_states);
     if (u->state == NULL) {
         ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
