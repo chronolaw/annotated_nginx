@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_stream_core_listen
+// * ngx_stream_core_run_phases
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -375,6 +376,7 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
 }
 
 
+// 比较简单，运行content handler
 ngx_int_t
 ngx_stream_core_content_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph)
@@ -387,8 +389,10 @@ ngx_stream_core_content_phase(ngx_stream_session_t *s,
 
     c->log->action = NULL;
 
+    // 取server配置
     cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
 
+    // tcp协议则设置nodelay
     if (c->type == SOCK_STREAM
         && cscf->tcp_nodelay
         && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET)
@@ -409,8 +413,11 @@ ngx_stream_core_content_phase(ngx_stream_session_t *s,
         c->tcp_nodelay = NGX_TCP_NODELAY_SET;
     }
 
+    // 执行content handler
     cscf->handler(s);
 
+    // 返回OK，引擎结束
+    // 但可能在handler里设置了读写事件，还会再次进入此函数继续处理
     return NGX_OK;
 }
 
