@@ -208,6 +208,10 @@ typedef enum {
     // 这个阶段可以预读部分数据，解析格式，如sni
     NGX_STREAM_PREREAD_PHASE,
 
+    // 应该加一个新的阶段，preread之后的处理
+    // NGX_STREAM_POST_READ_PHASE,
+    // 相关函数：ngx_stream_init_phases
+
     // 内容产生阶段，只能有一个handler
     NGX_STREAM_CONTENT_PHASE,
 
