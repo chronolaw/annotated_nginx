@@ -72,6 +72,9 @@ static char *ngx_http_client_errors[] = {
     /* NGX_HTTP_PARSE_INVALID_REQUEST */
     "client sent invalid request",
 
+    /* NGX_HTTP_PARSE_INVALID_VERSION */
+    "client sent invalid version",
+
     /* NGX_HTTP_PARSE_INVALID_09_METHOD */
     "client sent invalid method in HTTP/0.9 request"
 };
@@ -620,14 +623,15 @@ ngx_http_create_request(ngx_connection_t *c)
 static void
 ngx_http_ssl_handshake(ngx_event_t *rev)
 {
-    u_char                   *p, buf[NGX_PROXY_PROTOCOL_MAX_HEADER + 1];
-    size_t                    size;
-    ssize_t                   n;
-    ngx_err_t                 err;
-    ngx_int_t                 rc;
-    ngx_connection_t         *c;
-    ngx_http_connection_t    *hc;
-    ngx_http_ssl_srv_conf_t  *sscf;
+    u_char                    *p, buf[NGX_PROXY_PROTOCOL_MAX_HEADER + 1];
+    size_t                     size;
+    ssize_t                    n;
+    ngx_err_t                  err;
+    ngx_int_t                  rc;
+    ngx_connection_t          *c;
+    ngx_http_connection_t     *hc;
+    ngx_http_ssl_srv_conf_t   *sscf;
+    ngx_http_core_loc_conf_t  *clcf;
 
     c = rev->data;
     hc = c->data;
@@ -708,6 +712,14 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         if (buf[0] & 0x80 /* SSLv2 */ || buf[0] == 0x16 /* SSLv3/TLSv1 */) {
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, rev->log, 0,
                            "https ssl handshake: 0x%02Xd", buf[0]);
+
+            clcf = ngx_http_get_module_loc_conf(hc->conf_ctx,
+                                                ngx_http_core_module);
+
+            if (clcf->tcp_nodelay && ngx_tcp_nodelay(c) != NGX_OK) {
+                ngx_http_close_connection(c);
+                return;
+            }
 
             sscf = ngx_http_get_module_srv_conf(hc->conf_ctx,
                                                 ngx_http_ssl_module);
@@ -1036,7 +1048,14 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             ngx_log_error(NGX_LOG_INFO, c->log, 0,
                           ngx_http_client_errors[rc - NGX_HTTP_CLIENT_ERROR]);
-            ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+
+            if (rc == NGX_HTTP_PARSE_INVALID_VERSION) {
+                ngx_http_finalize_request(r, NGX_HTTP_VERSION_NOT_SUPPORTED);
+
+            } else {
+                ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+            }
+
             return;
         }
 
@@ -2312,10 +2331,6 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             return;
         }
 
-        if (r->main->blocked) {
-            r->write_event_handler = ngx_http_request_finalizer;
-        }
-
         ngx_http_terminate_request(r, rc);
         return;
     }
@@ -2347,6 +2362,26 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 
     if (r != r->main) {
+        clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+        if (r->background) {
+            if (!r->logged) {
+                if (clcf->log_subrequest) {
+                    ngx_http_log_request(r);
+                }
+
+                r->logged = 1;
+
+            } else {
+                ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                              "subrequest: \"%V?%V\" logged again",
+                              &r->uri, &r->args);
+            }
+
+            r->done = 1;
+            ngx_http_finalize_connection(r);
+            return;
+        }
 
         if (r->buffered || r->postponed) {
 
@@ -2364,9 +2399,6 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             r->main->count--;
 
             if (!r->logged) {
-
-                clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
                 if (clcf->log_subrequest) {
                     ngx_http_log_request(r);
                 }
@@ -2413,7 +2445,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
-    if (r->buffered || c->buffered || r->postponed || r->blocked) {
+    if (r->buffered || c->buffered || r->postponed) {
 
         if (ngx_http_set_write_handler(r) != NGX_OK) {
             ngx_http_terminate_request(r, 0);
@@ -2430,6 +2462,8 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 
     r->done = 1;
+
+    r->read_event_handler = ngx_http_block_reading;
     r->write_event_handler = ngx_http_request_empty_handler;
 
     if (!r->post_action) {
@@ -2492,6 +2526,8 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
     if (mr->write_event_handler) {
 
         if (mr->blocked) {
+            r->connection->error = 1;
+            r->write_event_handler = ngx_http_request_finalizer;
             return;
         }
 
@@ -2547,6 +2583,8 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
         ngx_http_close_request(r, 0);
         return;
     }
+
+    r = r->main;
 
     if (r->reading_body) {
         r->keepalive = 0;
@@ -3030,30 +3068,9 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         tcp_nodelay = 1;
     }
 
-    if (tcp_nodelay
-        && clcf->tcp_nodelay
-        && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET)
-    {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "tcp_nodelay");
-
-        if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
-                       (const void *) &tcp_nodelay, sizeof(int))
-            == -1)
-        {
-#if (NGX_SOLARIS)
-            /* Solaris returns EINVAL if a socket has been shut down */
-            c->log_error = NGX_ERROR_IGNORE_EINVAL;
-#endif
-
-            ngx_connection_error(c, ngx_socket_errno,
-                                 "setsockopt(TCP_NODELAY) failed");
-
-            c->log_error = NGX_ERROR_INFO;
-            ngx_http_close_connection(c);
-            return;
-        }
-
-        c->tcp_nodelay = NGX_TCP_NODELAY_SET;
+    if (tcp_nodelay && clcf->tcp_nodelay && ngx_tcp_nodelay(c) != NGX_OK) {
+        ngx_http_close_connection(c);
+        return;
     }
 
 #if 0
