@@ -23,7 +23,7 @@ nginx 1.12.0
 --------|-------|-----
 master  | nginx稳定版1.12.0|有
 upgrade | nginx稳定版1.12.0|无
-mainline| nginx开发版1.13.0|无
+mainline| nginx开发版1.13.1|无
 
 # 已注解
 
