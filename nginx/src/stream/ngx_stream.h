@@ -198,14 +198,17 @@ typedef enum {
     // 刚accept建立连接后
     NGX_STREAM_POST_ACCEPT_PHASE = 0,
 
+    // = 1
     NGX_STREAM_PREACCESS_PHASE,
 
-    // 访问控制阶段
+    // 访问控制阶段, = 2
     NGX_STREAM_ACCESS_PHASE,
 
+    // = 3
     NGX_STREAM_SSL_PHASE,
 
     // 这个阶段可以预读部分数据，解析格式，如sni
+    // = 4
     NGX_STREAM_PREREAD_PHASE,
 
     // 应该加一个新的阶段，preread之后的处理
@@ -213,9 +216,11 @@ typedef enum {
     // 相关函数：ngx_stream_init_phases
 
     // 内容产生阶段，只能有一个handler
+    // = 5
     NGX_STREAM_CONTENT_PHASE,
 
     // 日志阶段
+    // = 6
     NGX_STREAM_LOG_PHASE
 } ngx_stream_phases;
 
