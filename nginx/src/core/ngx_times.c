@@ -55,6 +55,11 @@ static ngx_int_t         cached_gmtoff;
 // 缓存的时间值，共64个
 static ngx_time_t        cached_time[NGX_TIME_SLOTS];
 
+// 利用这些nginx已经格式化好的时间日期字符串
+// 可以实现$year/$month/$day等新变量
+// 只要用ngx_str_t指定字符串的位置即可，几乎没有成本
+// 但需要注意这些都是gmt时间，不是本地时间
+// 如果要用本地时间则需要调用ngx_localtime，或者使用gmtoff
 static u_char            cached_err_log_time[NGX_TIME_SLOTS]
                                     [sizeof("1970/09/28 12:00:00")];
 static u_char            cached_http_time[NGX_TIME_SLOTS]
