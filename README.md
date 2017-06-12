@@ -9,7 +9,7 @@ Nginx1.10增加了动态模块、http2、reuseport。
 Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
 
 请参考：
-* [《Nginx模块开发指南：使用C++11和Boost程序库》](http://item.jd.com/11785180.html)
+* [《Nginx完全开发指南：使用C/C++和OpenResty》](http://item.jd.com/12082107.html)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
 * [openresty_dev](https://github.com/chronolaw/openresty_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
