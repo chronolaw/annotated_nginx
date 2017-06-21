@@ -248,6 +248,9 @@ struct ngx_connection_s {
     ngx_str_t           proxy_protocol_addr;
     in_port_t           proxy_protocol_port;
 
+    // 给https协议用的成员
+    // 定义在event/ngx_event_openssl.h
+    // 里面包装了OpenSSL的一些定义
 #if (NGX_SSL || NGX_COMPAT)
     ngx_ssl_connection_t  *ssl;
 #endif
