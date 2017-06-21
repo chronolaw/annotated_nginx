@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// OpenSSL函数调用可见OpenSSL网站
+// https://www.openssl.org/docs/
 
 /*
  * Copyright (C) Igor Sysoev
@@ -30,6 +34,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
+// 使用OpenSSL
 #define NGX_SSL_NAME     "OpenSSL"
 
 
@@ -39,6 +44,7 @@
 #endif
 
 
+// 返回ssl的版本号字符串
 #if (OPENSSL_VERSION_NUMBER >= 0x10100001L)
 
 #define ngx_ssl_version()       OpenSSL_version(OPENSSL_VERSION)
@@ -50,7 +56,10 @@
 #endif
 
 
+// 重定义OpenSSL的会话结构
 #define ngx_ssl_session_t       SSL_SESSION
+
+// 重定义OpenSSL
 #define ngx_ssl_conn_t          SSL
 
 
@@ -61,6 +70,7 @@ struct ngx_ssl_s {
 };
 
 
+// 是ngx_connection_t的成员，处理ssl
 struct ngx_ssl_connection_s {
     ngx_ssl_conn_t             *connection;
     SSL_CTX                    *session_ctx;
