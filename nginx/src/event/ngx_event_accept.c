@@ -76,6 +76,8 @@ ngx_event_accept(ngx_event_t *ev)
     lc = ev->data;
 
     // 事件对应的监听端口对象
+    // 这里是一个关键，连接->事件->监听端口
+    // 决定了要进入stream还是http子系统
     ls = lc->listening;
 
     // 此时还没有数据可读
@@ -579,8 +581,12 @@ ngx_event_recvmsg(ngx_event_t *ev)
         c->log = log;
         c->pool->log = log;
 
-        // 监听端口和服务器地址
+        // 监听端口
+        // c->listening里包含了server配置等关键信息
+        // 决定了如何处理这个连接
         c->listening = ls;
+
+        // 服务器地址
         c->local_sockaddr = ls->sockaddr;
         c->local_socklen = ls->socklen;
 
