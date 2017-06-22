@@ -486,10 +486,13 @@ ngx_http_init_connection(ngx_connection_t *c)
 
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
 
+    // sscf->enable对应指令ssl on，通常不使用
+    // hc->addr_conf->ssl对应listen xxx ssl
     if (sscf->enable || hc->addr_conf->ssl) {
 
         c->log->action = "SSL handshaking";
 
+        // 要求必须指定证书，否则报错
         if (hc->addr_conf->ssl && sscf->ssl.ctx == NULL) {
             ngx_log_error(NGX_LOG_ERR, c->log, 0,
                           "no \"ssl_certificate\" is defined "
@@ -500,6 +503,8 @@ ngx_http_init_connection(ngx_connection_t *c)
 
         hc->ssl = 1;
 
+        // ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
+        // 进入ssl握手处理，而不是直接读取http头
         rev->handler = ngx_http_ssl_handshake;
     }
     }
@@ -689,8 +694,12 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
     // listen指令是否使用了proxy_protocol参数
     if (hc->proxy_protocol) {
+        // 清除标志位
         hc->proxy_protocol = 0;
 
+        // 读取proxy_protocol定义的信息
+        // 好像只支持版本1的文本形式
+        // 见http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
         p = ngx_proxy_protocol_read(c, b->pos, b->last);
 
         if (p == NULL) {
@@ -698,8 +707,11 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
 
+        // 消费已经读取的proxy protocol数据
         b->pos = p;
 
+        // 如果缓冲区空，那么等待下次读事件
+        // 否则后续的是正常的http头
         if (b->pos == b->last) {
             c->log->action = "waiting for request";
             b->pos = b->start;
@@ -911,18 +923,25 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
     ngx_http_connection_t    *hc;
     ngx_http_ssl_srv_conf_t  *sscf;
 
+    // 连接可读，即客户端发来了数据
+
+    // 取连接对象
     c = rev->data;
+
+    // 取配置信息
     hc = c->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
                    "http check ssl handshake");
 
+    // 检查超时
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         ngx_http_close_connection(c);
         return;
     }
 
+    // 连接已经关闭
     if (c->close) {
         ngx_http_close_connection(c);
         return;
@@ -930,13 +949,19 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
 
     size = hc->proxy_protocol ? sizeof(buf) : 1;
 
+    // 读取数据
+    // 通常只读取1个字节
     n = recv(c->fd, (char *) buf, size, MSG_PEEK);
 
     err = ngx_socket_errno;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, rev->log, 0, "http recv(): %z", n);
 
+    // 检查错误码
     if (n == -1) {
+
+        // again表示数据未准备好
+        // 需要加入epoll监控再次等待读事件
         if (err == NGX_EAGAIN) {
             rev->ready = 0;
 
@@ -952,6 +977,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             return;
         }
 
+        // 其他的错误码都视为失败
         ngx_connection_error(c, err, "recv() failed");
         ngx_http_close_connection(c);
 
@@ -961,6 +987,8 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
     if (hc->proxy_protocol) {
         hc->proxy_protocol = 0;
 
+        // 读取proxy_protocol定义的信息
+        // 见http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
         p = ngx_proxy_protocol_read(c, buf, buf + n);
 
         if (p == NULL) {
@@ -986,6 +1014,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         buf[0] = *p;
     }
 
+    // 读取了一个字节，是ssl的版本号
     if (n == 1) {
         if (buf[0] & 0x80 /* SSLv2 */ || buf[0] == 0x16 /* SSLv3/TLSv1 */) {
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, rev->log, 0,
@@ -994,6 +1023,8 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             sscf = ngx_http_get_module_srv_conf(hc->conf_ctx,
                                                 ngx_http_ssl_module);
 
+            // 创建ssl连接对象
+            // 在event/ngx_event_openssl.c
             if (ngx_ssl_create_connection(&sscf->ssl, c, NGX_SSL_BUFFER)
                 != NGX_OK)
             {
@@ -1001,8 +1032,11 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
+            // 开始握手
+            // 在event/ngx_event_openssl.c
             rc = ngx_ssl_handshake(c);
 
+            // again说明数据不足，要加handler等待数据
             if (rc == NGX_AGAIN) {
 
                 if (!rev->timer_set) {
@@ -1020,10 +1054,13 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             return;
         }
 
+        // 不是ssl，就是普通的http
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0, "plain http");
 
         c->log->action = "waiting for request";
 
+        // 修改读事件handler，开始读取http头
+        // https也就可以兼容http
         rev->handler = ngx_http_wait_request_handler;
         ngx_http_wait_request_handler(rev);
 

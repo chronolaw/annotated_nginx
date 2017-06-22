@@ -1,3 +1,5 @@
+// annotated by chrono since 2017
+//
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -9,6 +11,9 @@
 #include <ngx_core.h>
 
 
+// 读取proxy_protocol定义的信息
+// 好像只支持版本1的文本形式
+// 见http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
 u_char *
 ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
 {
@@ -69,6 +74,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         return NULL;
     }
 
+    // 拷贝地址字符串
     ngx_memcpy(c->proxy_protocol_addr.data, addr, len);
     c->proxy_protocol_addr.len = len;
 
@@ -102,6 +108,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         goto invalid;
     }
 
+    // 得到端口
     c->proxy_protocol_port = (in_port_t) n;
 
     ngx_log_debug2(NGX_LOG_DEBUG_CORE, c->log, 0,
