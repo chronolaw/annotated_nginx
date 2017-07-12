@@ -1,4 +1,11 @@
 
+Changes with nginx 1.12.1                                        11 Jul 2017
+
+    *) Security: a specially crafted request might result in an integer
+       overflow and incorrect processing of ranges in the range filter,
+       potentially resulting in sensitive information leak (CVE-2017-7529).
+
+
 Changes with nginx 1.12.0                                        12 Apr 2017
 
     *) 1.12.x stable branch.
