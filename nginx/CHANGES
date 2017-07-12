@@ -1,4 +1,11 @@
 
+Changes with nginx 1.13.3                                        11 Jul 2017
+
+    *) Security: a specially crafted request might result in an integer
+       overflow and incorrect processing of ranges in the range filter,
+       potentially resulting in sensitive information leak (CVE-2017-7529).
+
+
 Changes with nginx 1.13.2                                        27 Jun 2017
 
     *) Change: nginx now returns 200 instead of 416 when a range starting
