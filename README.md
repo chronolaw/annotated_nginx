@@ -21,7 +21,7 @@ nginx 1.12.0
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx稳定版1.12.0|有
+master  | nginx稳定版1.12.1|有
 upgrade | nginx稳定版1.12.0|无
 mainline| nginx开发版1.13.2|无
 
