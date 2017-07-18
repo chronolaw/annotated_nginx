@@ -119,9 +119,18 @@ struct ngx_stream_upstream_srv_conf_s {
 
 typedef struct {
     ngx_msec_t                         response_time;
+
+    // 与后端服务器建立连接的时间
     ngx_msec_t                         connect_time;
+
+    // 收到后端服务器数据的时间
     ngx_msec_t                         first_byte_time;
+
+
+    // 收发的字节数，与ngx_stream_upstream_t.peer.connection->sent相同
     off_t                              bytes_sent;
+
+    // 收发的字节数，与ngx_stream_upstream_t里的received相同
     off_t                              bytes_received;
 
     ngx_str_t                         *peer;
