@@ -120,10 +120,10 @@ struct ngx_stream_upstream_srv_conf_s {
 typedef struct {
     ngx_msec_t                         response_time;
 
-    // 与后端服务器建立连接的时间
+    // 与后端服务器建立连接的时间，注意是毫秒
     ngx_msec_t                         connect_time;
 
-    // 收到后端服务器数据的时间
+    // 收到后端服务器数据的时间，注意是毫秒
     ngx_msec_t                         first_byte_time;
 
 
