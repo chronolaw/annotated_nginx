@@ -226,6 +226,7 @@ struct ngx_connection_s {
 
     // 连接上已经发送的字节数
     // ngx_send.c里发送数据成功后增加
+    // 在32位系统里最大4G，可以定义宏_FILE_OFFSET_BITS=64
     off_t               sent;
 
     // 用于记录日志的log
