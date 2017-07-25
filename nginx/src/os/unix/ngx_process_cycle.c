@@ -65,6 +65,7 @@ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 ngx_uint_t    ngx_process;
 
 // nginx 1.9.x增加新全局变量ngx_worker，即进程id号
+// 从0开始计数，至ccf->worker_processes
 ngx_uint_t    ngx_worker;
 
 // 记录master/worker进程的pid
