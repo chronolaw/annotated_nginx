@@ -16,13 +16,13 @@ Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
 
 # 当前状态
-nginx 1.12.0
+nginx 1.12.1
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
 master  | nginx稳定版1.12.1|有
-upgrade | nginx稳定版1.12.0|无
+upgrade | nginx稳定版1.12.1|无
 mainline| nginx开发版1.13.3|无
 
 # 已注解
