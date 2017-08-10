@@ -137,6 +137,7 @@ typedef struct {
 // 这样可以避免数组过大
 typedef enum {
     // 读取并解析完http头后，即将开始读取body
+    // 目前仅有一个模块ngx_http_realip_module
     NGX_HTTP_POST_READ_PHASE = 0,
 
     // 在server阶段重写url
@@ -160,7 +161,9 @@ typedef enum {
     // 此阶段用户不可介入
     NGX_HTTP_POST_ACCESS_PHASE,
 
-    // 此阶段用户不可介入
+    // 1.13.3之前此阶段用户不可介入
+    // 1.13.4后改为NGX_HTTP_PRECONTENT_PHASE
+    // 用户可以在此阶段添加模块，在产生内容前做一些处理
     NGX_HTTP_TRY_FILES_PHASE,
 
     // 最常用的阶段，产生http内容，响应客户端请求
