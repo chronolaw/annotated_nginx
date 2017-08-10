@@ -1,4 +1,24 @@
 
+Changes with nginx 1.13.4                                        08 Aug 2017
+
+    *) Feature: the ngx_http_mirror_module.
+
+    *) Bugfix: client connections might be dropped during configuration
+       testing when using the "reuseport" parameter of the "listen"
+       directive on Linux.
+
+    *) Bugfix: request body might not be available in subrequests if it was
+       saved to a file and proxying was used.
+
+    *) Bugfix: cleaning cache based on the "max_size" parameter did not work
+       on Windows.
+
+    *) Bugfix: any shared memory allocation required 4096 bytes on Windows.
+
+    *) Bugfix: nginx worker might be terminated abnormally when using the
+       "zone" directive inside the "upstream" block on Windows.
+
+
 Changes with nginx 1.13.3                                        11 Jul 2017
 
     *) Security: a specially crafted request might result in an integer
