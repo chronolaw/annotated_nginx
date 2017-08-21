@@ -1506,6 +1506,8 @@ ngx_shutdown_timer_handler(ngx_event_t *ev)
         // 调用读事件的handler
         // handler里通常都会检查close和error标志位
         // 这样就会关闭连接
+        // 在stream子系统里是在函数ngx_stream_write_filter里检查
         c[i].read->handler(c[i].read);
+
     }   //循环处理了所有活跃的连接，最后都因为close和error而关闭
 }
