@@ -130,6 +130,7 @@ ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
 
 // 1.10新函数，专为reuseport使用
 // 拷贝了worker数量个的监听结构体
+// 在ngx_stream_optimize_servers等函数创建端口时调用
 ngx_int_t
 ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 {
@@ -172,6 +173,9 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 
         // 设置worker的序号
         // 被克隆的对象的worker是0
+        //
+        // worker的使用是在ngx_event.c:ngx_event_process_init
+        // 只有worker id是本worker的listen才会enable
         ls->worker = n;
     }
 

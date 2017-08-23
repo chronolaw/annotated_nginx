@@ -1054,6 +1054,10 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     for (i = 0; i < cycle->listening.nelts; i++) {
 
 #if (NGX_HAVE_REUSEPORT)
+        // 注意这里
+        // 只有worker id是本worker的listen才会enable
+        // 也就是说虽然克隆了多个listening，但只有一个会enable
+        // 即reuseport的端口只会在某个worker进程监听
         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
             continue;
         }
