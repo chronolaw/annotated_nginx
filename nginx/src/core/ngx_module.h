@@ -301,9 +301,13 @@ struct ngx_module_s {
     ngx_int_t           (*init_master)(ngx_log_t *log);
 
     // 在ngx_init_cycle里被调用
+    // 在master进程里，fork出worker子进程之前
+    // 做一些基本的初始化工作，数据会被子进程复制
     ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
 
     // 在ngx_single_process_cycle/ngx_worker_process_init里调用
+    // 在worker进程进入工作循环之前被调用
+    // 初始化每个子进程自己专用的数据
     ngx_int_t           (*init_process)(ngx_cycle_t *cycle);
 
     // init_thread目前nginx不会调用
