@@ -1,4 +1,19 @@
 
+Changes with nginx 1.13.5                                        05 Sep 2017
+
+    *) Feature: the $ssl_client_escaped_cert variable.
+
+    *) Bugfix: the "ssl_session_ticket_key" directive and the "include"
+       parameter of the "geo" directive did not work on Windows.
+
+    *) Bugfix: incorrect response length was returned on 32-bit platforms
+       when requesting more than 4 gigabytes with multiple ranges.
+
+    *) Bugfix: the "expires modified" directive and processing of the
+       "If-Range" request header line did not use the response last
+       modification time if proxying without caching was used.
+
+
 Changes with nginx 1.13.4                                        08 Aug 2017
 
     *) Feature: the ngx_http_mirror_module.
