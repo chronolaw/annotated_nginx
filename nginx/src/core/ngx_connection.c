@@ -474,7 +474,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
 
-            // 检查是否已经设置的标志位
+            // 检查是否已经设置的标志位，只是用在inherited的时候，见注释
             // 在init_cycle里设置
             if (ls[i].add_reuseport) {
 
@@ -541,6 +541,8 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
+            // 设置SO_REUSEPORT选项
+            // 这样多个进程可以打开相同的端口，由内核负责负载均衡
 #if (NGX_HAVE_REUSEPORT)
 
             if (ls[i].reuseport) {
