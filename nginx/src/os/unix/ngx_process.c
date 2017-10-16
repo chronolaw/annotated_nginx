@@ -69,11 +69,15 @@ ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 // 命令行-s参数关联数组
 // 所有信号都用ngx_signal_handler处理
 ngx_signal_t  signals[] = {
+    // #define NGX_RECONFIGURE_SIGNAL   HUP
+    // 即sighup
     { ngx_signal_value(NGX_RECONFIGURE_SIGNAL),
       "SIG" ngx_value(NGX_RECONFIGURE_SIGNAL),
       "reload",
       ngx_signal_handler },
 
+    // #define NGX_REOPEN_SIGNAL        USR1
+    // 即sigusr1
     { ngx_signal_value(NGX_REOPEN_SIGNAL),
       "SIG" ngx_value(NGX_REOPEN_SIGNAL),
       "reopen",
@@ -84,11 +88,15 @@ ngx_signal_t  signals[] = {
       "",
       ngx_signal_handler },
 
+    // #define NGX_TERMINATE_SIGNAL     TERM
+    // sigterm
     { ngx_signal_value(NGX_TERMINATE_SIGNAL),
       "SIG" ngx_value(NGX_TERMINATE_SIGNAL),
       "stop",
       ngx_signal_handler },
 
+    // #define NGX_SHUTDOWN_SIGNAL      QUIT
+    // sigquit
     { ngx_signal_value(NGX_SHUTDOWN_SIGNAL),
       "SIG" ngx_value(NGX_SHUTDOWN_SIGNAL),
       "quit",
