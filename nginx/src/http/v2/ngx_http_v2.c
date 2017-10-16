@@ -245,6 +245,8 @@ ngx_http_v2_init(ngx_event_t *rev)
 
     h2c->frame_size = NGX_HTTP_V2_DEFAULT_FRAME_SIZE;
 
+    h2c->table_update = 1;
+
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 
     h2c->pool = ngx_create_pool(h2scf->pool_size, h2c->connection->log);
@@ -746,7 +748,7 @@ ngx_http_v2_state_head(ngx_http_v2_connection_t *h2c, u_char *pos, u_char *end)
     type = ngx_http_v2_parse_type(head);
 
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
-                   "process http2 frame type:%ui f:%Xd l:%uz sid:%ui",
+                   "http2 frame type:%ui f:%Xd l:%uz sid:%ui",
                    type, h2c->state.flags, h2c->state.length, h2c->state.sid);
 
     if (type >= NGX_HTTP_V2_FRAME_STATES) {
@@ -1314,7 +1316,7 @@ ngx_http_v2_state_field_len(ngx_http_v2_connection_t *h2c, u_char *pos,
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
-                   "http2 hpack %s string length: %i",
+                   "http2 %s string, len:%i",
                    huff ? "encoded" : "raw", len);
 
     h2scf = ngx_http_get_module_srv_conf(h2c->http_connection->conf_ctx,
@@ -1569,7 +1571,7 @@ ngx_http_v2_state_process_header(ngx_http_v2_connection_t *h2c, u_char *pos,
 
         if (rc == NGX_OK) {
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http2 pseudo-header: \":%V: %V\"",
+                           "http2 header: \":%V: %V\"",
                            &header->name, &header->value);
 
             return ngx_http_v2_state_header_complete(h2c, pos, end);
@@ -1645,7 +1647,7 @@ ngx_http_v2_state_process_header(ngx_http_v2_connection_t *h2c, u_char *pos,
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http2 http header: \"%V: %V\"",
+                   "http2 header: \"%V: %V\"",
                    &header->name, &header->value);
 
     return ngx_http_v2_state_header_complete(h2c, pos, end);
@@ -3335,6 +3337,19 @@ ngx_http_v2_construct_request_line(ngx_http_request_t *r)
         || r->schema_start == NULL
         || r->unparsed_uri.len == 0)
     {
+        if (r->method_name.len == 0) {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "client sent no :method header");
+
+        } else if (r->schema_start == NULL) {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "client sent no :schema header");
+
+        } else {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "client sent no :path header");
+        }
+
         ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
         return NGX_ERROR;
     }
@@ -3360,7 +3375,7 @@ ngx_http_v2_construct_request_line(ngx_http_request_t *r)
     ngx_memcpy(p, ending, sizeof(ending));
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http2 http request line: \"%V\"", &r->request_line);
+                   "http2 request line: \"%V\"", &r->request_line);
 
     return NGX_OK;
 }
@@ -3574,11 +3589,6 @@ ngx_http_v2_read_request_body(ngx_http_request_t *r)
         rb->buf = ngx_create_temp_buf(r->pool, (size_t) len);
 
     } else {
-        if (stream->preread) {
-            /* enforce writing preread buffer to file */
-            r->request_body_in_file_only = 1;
-        }
-
         rb->buf = ngx_calloc_buf(r->pool);
 
         if (rb->buf != NULL) {
@@ -3678,6 +3688,8 @@ ngx_http_v2_process_request_body(ngx_http_request_t *r, u_char *pos,
         if (buf->sync) {
             buf->pos = buf->start = pos;
             buf->last = buf->end = pos + size;
+
+            r->request_body_in_file_only = 1;
 
         } else {
             if (size > (size_t) (buf->end - buf->last)) {

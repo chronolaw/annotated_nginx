@@ -1,4 +1,40 @@
 
+Changes with nginx 1.13.6                                        10 Oct 2017
+
+    *) Bugfix: switching to the next upstream server in the stream module
+       did not work when using the "ssl_preread" directive.
+
+    *) Bugfix: in the ngx_http_v2_module.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: nginx did not support dates after the year 2038 on 32-bit
+       platforms with 64-bit time_t.
+
+    *) Bugfix: in handling of dates prior to the year 1970 and after the
+       year 10000.
+
+    *) Bugfix: in the stream module timeouts waiting for UDP datagrams from
+       upstream servers were not logged or logged at the "info" level
+       instead of "error".
+
+    *) Bugfix: when using HTTP/2 nginx might return the 400 response without
+       logging the reason.
+
+    *) Bugfix: in processing of corrupted cache files.
+
+    *) Bugfix: cache control headers were ignored when caching errors
+       intercepted by error_page.
+
+    *) Bugfix: when using HTTP/2 client request body might be corrupted.
+
+    *) Bugfix: in handling of client addresses when using unix domain
+       sockets.
+
+    *) Bugfix: nginx hogged CPU when using the "hash ... consistent"
+       directive in the upstream block if large weights were used and all or
+       most of the servers were unavailable.
+
+
 Changes with nginx 1.13.5                                        05 Sep 2017
 
     *) Feature: the $ssl_client_escaped_cert variable.
