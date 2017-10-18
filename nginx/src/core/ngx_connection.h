@@ -30,9 +30,11 @@ struct ngx_listening_s {
     ngx_socket_t        fd;
 
     // sockaddr指针
+    // 本地监听端口的socketaddr，也是ngx_connection中的local_sockaddr
     struct sockaddr    *sockaddr;
 
     // sockaddr长度
+    // 本地监听端口的socketaddr，也是ngx_connection中的local_sockaddr
     socklen_t           socklen;    /* size of sockaddr */
 
     // addr_text的最大长度
@@ -222,6 +224,8 @@ struct ngx_connection_s {
     ngx_send_chain_pt   send_chain;
 
     // 连接对应的ngx_listening_t监听对象
+    // 通过这个指针可以获取到监听端口相关的信息
+    // 反过来可以操作修改监听端口
     ngx_listening_t    *listening;
 
     // 连接上已经发送的字节数
@@ -276,6 +280,7 @@ struct ngx_connection_s {
 
     // 处理的请求次数，在ngx_http_create_request里增加
     // 用来控制长连接里可处理的请求次数，指令keepalive_requests
+    // 在stream框架里暂未使用
     ngx_uint_t          requests;
 
     // 标志位，表示连接有数据缓冲待发送
@@ -306,6 +311,7 @@ struct ngx_connection_s {
 
     // tcp连接已经关闭
     // 可以回收复用
+    // 手动置这个标志位可以强制关闭连接
     unsigned            close:1;
 
     unsigned            shared:1;
