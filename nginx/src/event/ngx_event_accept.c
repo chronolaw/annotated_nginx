@@ -213,6 +213,10 @@ ngx_event_accept(ngx_event_t *ev)
             return;
         }
 
+        if (socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
+            socklen = sizeof(ngx_sockaddr_t);
+        }
+
         // 拷贝客户端sockaddr
         c->sockaddr = ngx_palloc(c->pool, socklen);
         if (c->sockaddr == NULL) {
@@ -307,7 +311,7 @@ ngx_event_accept(ngx_event_t *ev)
         // 否则需要自己再加读事件，当有数据来时才能读取
         if (ev->deferred_accept) {
             rev->ready = 1;
-#if (NGX_HAVE_KQUEUE)
+#if (NGX_HAVE_KQUEUE || NGX_HAVE_EPOLLRDHUP)
             rev->available = 1;
 #endif
         }
@@ -545,6 +549,10 @@ ngx_event_recvmsg(ngx_event_t *ev)
         // udp类型的连接
         c->type = SOCK_DGRAM;
         c->socklen = msg.msg_namelen;
+
+        if (c->socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
+            c->socklen = sizeof(ngx_sockaddr_t);
+        }
 
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_active, 1);

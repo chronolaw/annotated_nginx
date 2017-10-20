@@ -1,4 +1,26 @@
 
+Changes with nginx 1.12.2                                        17 Oct 2017
+
+    *) Bugfix: client SSL connections were immediately closed if deferred
+       accept and the "proxy_protocol" parameter of the "listen" directive
+       were used.
+
+    *) Bugfix: client connections might be dropped during configuration
+       testing when using the "reuseport" parameter of the "listen"
+       directive on Linux.
+
+    *) Bugfix: incorrect response length was returned on 32-bit platforms
+       when requesting more than 4 gigabytes with multiple ranges.
+
+    *) Bugfix: switching to the next upstream server in the stream module
+       did not work when using the "ssl_preread" directive.
+
+    *) Bugfix: when using HTTP/2 client request body might be corrupted.
+
+    *) Bugfix: in handling of client addresses when using unix domain
+       sockets.
+
+
 Changes with nginx 1.12.1                                        11 Jul 2017
 
     *) Security: a specially crafted request might result in an integer

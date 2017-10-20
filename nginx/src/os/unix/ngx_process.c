@@ -496,6 +496,8 @@ ngx_signal_handler(int signo)
             }
             ngx_debug_quit = 1;
 
+            /* fall through */
+
         // 优雅关闭, -s quit
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
             ngx_quit = 1;

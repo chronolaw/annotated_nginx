@@ -222,6 +222,10 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
             continue;
         }
 
+        if (ls[i].socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
+            ls[i].socklen = sizeof(ngx_sockaddr_t);
+        }
+
         switch (ls[i].sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -545,7 +549,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             // 这样多个进程可以打开相同的端口，由内核负责负载均衡
 #if (NGX_HAVE_REUSEPORT)
 
-            if (ls[i].reuseport) {
+            if (ls[i].reuseport && !ngx_test_config) {
                 int  reuseport;
 
                 reuseport = 1;
@@ -555,7 +559,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                     == -1)
                 {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  "setsockopt(SO_REUSEPORT) %V failed, ignored",
+                                  "setsockopt(SO_REUSEPORT) %V failed",
                                   &ls[i].addr_text);
 
                     if (ngx_close_socket(s) == -1) {
