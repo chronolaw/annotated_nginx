@@ -62,6 +62,9 @@
 
 // nginx自己的nil/none，表示无效值，在C语言里需要做强制类型转换，C++可以用模板
 // 除了这些-1，还有其他的类型转换，如pid、ngx_chain_t等等
+//
+// 这些unset通常用在初始化配置结构体的时候
+// 方便使用set_xxx_slot等函数
 #define NGX_CONF_UNSET       -1
 #define NGX_CONF_UNSET_UINT  (ngx_uint_t) -1
 #define NGX_CONF_UNSET_PTR   (void *) -1
@@ -248,9 +251,13 @@ struct ngx_conf_s {
     // 当前配置的cycle结构体，用于添加监听端口
     ngx_cycle_t          *cycle;
 
+    // 内存池，可以从这里分配内存
     ngx_pool_t           *pool;
+
     ngx_pool_t           *temp_pool;
     ngx_conf_file_t      *conf_file;
+
+    // 配置解析时使用的log对象
     ngx_log_t            *log;
 
     // 重要参数，解析时的上下文
