@@ -1192,6 +1192,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     wev = c->write;
 
     // 清空连接对象
+    // 注意这时fd、sent、type等字段、计数器、标志都变成了0
     ngx_memzero(c, sizeof(ngx_connection_t));
 
     // 恢复读写事件对象
