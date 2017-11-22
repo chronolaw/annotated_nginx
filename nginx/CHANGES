@@ -1,4 +1,28 @@
 
+Changes with nginx 1.13.7                                        21 Nov 2017
+
+    *) Bugfix: in the $upstream_status variable.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if a
+       backend returned a "101 Switching Protocols" response to a
+       subrequest.
+
+    *) Bugfix: a segmentation fault occurred in a master process if a shared
+       memory zone size was changed during a reconfiguration and the
+       reconfiguration failed.
+
+    *) Bugfix: in the ngx_http_fastcgi_module.
+
+    *) Bugfix: nginx returned the 500 error if parameters without variables
+       were specified in the "xslt_stylesheet" directive.
+
+    *) Workaround: "gzip filter failed to use preallocated memory" alerts
+       appeared in logs when using a zlib library variant from Intel.
+
+    *) Bugfix: the "worker_shutdown_timeout" directive did not work when
+       using mail proxy and when proxying WebSocket connections.
+
+
 Changes with nginx 1.13.6                                        10 Oct 2017
 
     *) Bugfix: switching to the next upstream server in the stream module
