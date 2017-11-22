@@ -185,6 +185,8 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 }
 
 
+// 根据传递过来的socket描述符，使用系统调用获取之前设置的参数
+// 填入ngx_listeing_t结构体
 ngx_int_t
 ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 {
@@ -205,15 +207,20 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
     int                        reuseport;
 #endif
 
+    // 遍历监听端口数组，里面应该有之前传递过来的socket
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+        // 监听端口的实际地址，先分配内存
         ls[i].sockaddr = ngx_palloc(cycle->pool, sizeof(ngx_sockaddr_t));
         if (ls[i].sockaddr == NULL) {
             return NGX_ERROR;
         }
 
+        // 地址内存的长度
         ls[i].socklen = sizeof(ngx_sockaddr_t);
+
+        // 系统调用，获取socket的地址
         if (getsockname(ls[i].fd, ls[i].sockaddr, &ls[i].socklen) == -1) {
             ngx_log_error(NGX_LOG_CRIT, cycle->log, ngx_socket_errno,
                           "getsockname() of the inherited "
@@ -222,10 +229,12 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
             continue;
         }
 
+        // 调整为正确的长度
         if (ls[i].socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
             ls[i].socklen = sizeof(ngx_sockaddr_t);
         }
 
+        // 接下来计算地址的文本形式
         switch (ls[i].sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)
@@ -255,11 +264,13 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
             continue;
         }
 
+        // 分配文本的内存
         ls[i].addr_text.data = ngx_pnalloc(cycle->pool, len);
         if (ls[i].addr_text.data == NULL) {
             return NGX_ERROR;
         }
 
+        // socket地址转换为字符串
         len = ngx_sock_ntop(ls[i].sockaddr, ls[i].socklen,
                             ls[i].addr_text.data, len, 1);
         if (len == 0) {
@@ -270,8 +281,10 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
         ls[i].backlog = NGX_LISTEN_BACKLOG;
 
+        // 逐个获取socket的各个参数
         olen = sizeof(int);
 
+        // type，即tcp或udp
         if (getsockopt(ls[i].fd, SOL_SOCKET, SO_TYPE, (void *) &ls[i].type,
                        &olen)
             == -1)
@@ -284,6 +297,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
         olen = sizeof(int);
 
+        // rcvbuf
         if (getsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF, (void *) &ls[i].rcvbuf,
                        &olen)
             == -1)
@@ -297,6 +311,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
         olen = sizeof(int);
 
+        // sndbuf
         if (getsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF, (void *) &ls[i].sndbuf,
                        &olen)
             == -1)
@@ -348,6 +363,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 #endif
 
+        // udp不检查下面的fastopen等参数
         if (ls[i].type != SOCK_STREAM) {
             continue;
         }
@@ -356,6 +372,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
         olen = sizeof(int);
 
+        // tcp专用的fastopen
         if (getsockopt(ls[i].fd, IPPROTO_TCP, TCP_FASTOPEN,
                        (void *) &ls[i].fastopen, &olen)
             == -1)
@@ -375,6 +392,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
 
+        // tcp专用的defered accept
         ngx_memzero(&af, sizeof(struct accept_filter_arg));
         olen = sizeof(struct accept_filter_arg);
 

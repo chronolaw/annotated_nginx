@@ -638,6 +638,8 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     for (p = inherited, v = p; *p; p++) {
         // 分隔符是:/;
         if (*p == ':' || *p == ';') {
+
+            // 把字符串转换成整数，即socket描述符
             s = ngx_atoi(v, p - v);
             if (s == NGX_ERROR) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
@@ -647,8 +649,10 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
                 break;
             }
 
+            // 跳过分隔符
             v = p + 1;
 
+            // 添加一个监听端口对象
             ls = ngx_array_push(&cycle->listening);
             if (ls == NULL) {
                 return NGX_ERROR;
@@ -656,6 +660,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 
             ngx_memzero(ls, sizeof(ngx_listening_t));
 
+            // 设置为刚获得的socket描述符
             ls->fd = (ngx_socket_t) s;
         }
     }
@@ -669,6 +674,8 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     ngx_inherited = 1;
 
     // in ngx_connection.c
+    // 根据传递过来的socket描述符，使用系统调用获取之前设置的参数
+    // 填入ngx_listeing_t结构体
     return ngx_set_inherited_sockets(cycle);
 }
 
