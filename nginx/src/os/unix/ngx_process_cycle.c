@@ -368,6 +368,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             live = 1;
         }
 
+        // sigusr1， 重新打开日志文件，用来rotate日志
         if (ngx_reopen) {
             ngx_reopen = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
@@ -376,12 +377,16 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                                         ngx_signal_value(NGX_REOPEN_SIGNAL));
         }
 
+        // 热更新nginx可执行文件
         if (ngx_change_binary) {
             ngx_change_binary = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "changing binary");
+
+            // 函数在core/nginx.c里
             ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv);
         }
 
+        // 停止监听端口
         if (ngx_noaccept) {
             ngx_noaccept = 0;
             ngx_noaccepting = 1;
