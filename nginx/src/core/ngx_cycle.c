@@ -577,6 +577,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     // 准备监听端口列表
     if (old_cycle->listening.nelts) {
+        // 使用 new binary，从环境变量传递了之前打开的socketfd
+        // 相关的函数是ngx_set_inherited_sockets/ngx_add_inherited_sockets
+
         ls = old_cycle->listening.elts;
         for (i = 0; i < old_cycle->listening.nelts; i++) {
             ls[i].remain = 0;
@@ -585,27 +588,36 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         nls = cycle->listening.elts;
         for (n = 0; n < cycle->listening.nelts; n++) {
 
+            // 找到之前已经打开监听的端口，直接填写socket描述符
             for (i = 0; i < old_cycle->listening.nelts; i++) {
+                // 如果之前获取参数出错就会是ignore
                 if (ls[i].ignore) {
                     continue;
                 }
 
+                // 循环开始前都不是remain
                 if (ls[i].remain) {
                     continue;
                 }
 
+                // 必须是相符的协议，tcp/udp
                 if (ls[i].type != nls[n].type) {
                     continue;
                 }
 
+                // 在cycle->listening里配置解析时已经有了此socket
                 if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
                                      ls[i].sockaddr, ls[i].socklen, 1)
                     == NGX_OK)
                 {
+                    // 直接替换之前打开的socket描述符
                     nls[n].fd = ls[i].fd;
                     nls[n].previous = &ls[i];
+
+                    // 置remain标记，已经找到，不需要再处理
                     ls[i].remain = 1;
 
+                    // backlog不同，要求启动监听，重新listen设置
                     if (ls[i].backlog != nls[n].backlog) {
                         nls[n].listen = 1;
                     }
@@ -654,7 +666,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
                     break;
                 }
-            }
+            }   // for old_cycle
 
             if (nls[n].fd == (ngx_socket_t) -1) {
                 nls[n].open = 1;
