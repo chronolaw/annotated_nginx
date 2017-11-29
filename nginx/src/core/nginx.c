@@ -186,6 +186,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, shutdown_timeout),
       NULL },
 
+    // coredump文件的存放路径
     { ngx_string("working_directory"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -300,6 +301,7 @@ main(int argc, char *const *argv)
     // 1.9.x改到ngx_show_version_info()
     if (ngx_show_version) {
 
+        // 显示帮助信息，1.10增加-T，可以dump整个配置文件
         ngx_show_version_info();
 
         // 1.9.x ngx_show_version_info()结束
@@ -465,8 +467,10 @@ main(int argc, char *const *argv)
     // 定义在ngx_cycle.c,
     // volatile ngx_cycle_t  *ngx_cycle;
     // nginx生命周期使用的超重要对象
+    // 指针切换到ngx_init_cycle()创建好的新对象
     ngx_cycle = cycle;
 
+    // ngx_init_cycle()里已经解析了配置文件
     // 检查core模块的配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
