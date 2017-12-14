@@ -1462,6 +1462,7 @@ ngx_close_idle_connections(ngx_cycle_t *cycle)
 }
 
 
+// 获取服务器的ip地址信息
 ngx_int_t
 ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     ngx_uint_t port)
@@ -1477,6 +1478,8 @@ ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
 
     addr = 0;
 
+    // 先检查c->local_socklen
+    // 即ls->sock_addr，监听端口的地址
     if (c->local_socklen) {
         switch (c->local_sockaddr->sa_family) {
 
@@ -1497,6 +1500,7 @@ ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
             break;
 #endif
 
+        // ipv4，转换为sockaddr_in
         default: /* AF_INET */
             sin = (struct sockaddr_in *) c->local_sockaddr;
             addr = sin->sin_addr.s_addr;
@@ -1504,29 +1508,35 @@ ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
         }
     }
 
+    // 地址为0，可能是未明确配置监听的ip
     if (addr == 0) {
 
         len = sizeof(ngx_sockaddr_t);
 
+        // 系统调用获取本地地址
         if (getsockname(c->fd, &sa.sockaddr, &len) == -1) {
             ngx_connection_error(c, ngx_socket_errno, "getsockname() failed");
             return NGX_ERROR;
         }
 
+        // 分配内存
         c->local_sockaddr = ngx_palloc(c->pool, len);
         if (c->local_sockaddr == NULL) {
             return NGX_ERROR;
         }
 
+        // 拷贝真正的服务器地址
         ngx_memcpy(c->local_sockaddr, &sa, len);
 
         c->local_socklen = len;
     }
 
+    // 不传入字符串则直接结束，节约计算
     if (s == NULL) {
         return NGX_OK;
     }
 
+    // 格式化地址字符串
     s->len = ngx_sock_ntop(c->local_sockaddr, c->local_socklen,
                            s->data, s->len, port);
 
