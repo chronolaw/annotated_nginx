@@ -101,6 +101,7 @@ struct ngx_listening_s {
     // 因为总是绑定，所以无意义
     unsigned            bound:1;       /* already bound */
 
+    // 从前一个nginx进程继承过来的
     unsigned            inherited:1;   /* inherited from previous process */
 
     // 总是无阻塞，暂无意义
@@ -261,6 +262,8 @@ struct ngx_connection_s {
 #endif
 
     // 本地监听端口的socketaddr，也就是listening中的sockaddr
+    // 有的时候local_sockaddr可能是0
+    // 需要调用ngx_connection_local_sockaddr才能获得真正的服务器地址
     struct sockaddr    *local_sockaddr;
     socklen_t           local_socklen;
 

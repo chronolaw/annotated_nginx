@@ -527,6 +527,9 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // 从前一个nginx进程继承过来的
+            // 已经打开，所以也不需要再处理
+            // 在ngx_set_inherited_sockets里操作
             if (ls[i].inherited) {
 
                 /* TODO: close on exit */
