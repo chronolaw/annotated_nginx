@@ -3533,7 +3533,7 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
 
         if (do_write) {
 
-            if (u->out_bufs || u->busy_bufs) {
+            if (u->out_bufs || u->busy_bufs || downstream->buffered) {
                 rc = ngx_http_output_filter(r, u->out_bufs);
 
                 if (rc == NGX_ERROR) {
@@ -6078,6 +6078,12 @@ ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     if (cf->args->nelts > 2) {
         if (ngx_strcmp(value[2].data, "transparent") == 0) {
 #if (NGX_HAVE_TRANSPARENT_PROXY)
+            ngx_core_conf_t  *ccf;
+
+            ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
+                                                   ngx_core_module);
+
+            ccf->transparent = 1;
             local->transparent = 1;
 #else
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
