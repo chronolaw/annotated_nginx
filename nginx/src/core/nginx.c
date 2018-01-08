@@ -622,7 +622,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     // 获取环境变量，NGINX_VAR定义在nginx.h，值是"NGINX"
     inherited = (u_char *) getenv(NGINX_VAR);
 
-    // 无变量则直接
+    // 无变量则直接退出函数
     if (inherited == NULL) {
         return NGX_OK;
     }
