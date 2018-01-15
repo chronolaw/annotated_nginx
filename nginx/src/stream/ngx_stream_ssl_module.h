@@ -14,7 +14,9 @@
 #include <ngx_stream.h>
 
 
+// ssl相关的各种配置
 typedef struct {
+    // 握手超时时间
     ngx_msec_t       handshake_timeout;
 
     ngx_flag_t       prefer_server_ciphers;
@@ -30,6 +32,7 @@ typedef struct {
 
     time_t           session_timeout;
 
+    // 可以使用多个证书或秘钥文件
     ngx_array_t     *certificates;
     ngx_array_t     *certificate_keys;
 

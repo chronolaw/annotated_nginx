@@ -1,5 +1,6 @@
 // annotated by chrono since 2018
 //
+// * ngx_stream_ssl_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -29,7 +30,9 @@ static ngx_int_t ngx_stream_ssl_static_variable(ngx_stream_session_t *s,
 static ngx_int_t ngx_stream_ssl_variable(ngx_stream_session_t *s,
     ngx_stream_variable_value_t *v, uintptr_t data);
 
+// 添加ssl相关的变量
 static ngx_int_t ngx_stream_ssl_add_variables(ngx_conf_t *cf);
+
 static void *ngx_stream_ssl_create_conf(ngx_conf_t *cf);
 static char *ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -38,6 +41,8 @@ static char *ngx_stream_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_stream_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 把ngx_stream_ssl_handler加入ssl阶段
 static ngx_int_t ngx_stream_ssl_init(ngx_conf_t *cf);
 
 
@@ -193,7 +198,10 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
 
 
 static ngx_stream_module_t  ngx_stream_ssl_module_ctx = {
+    // 添加ssl相关的变量
     ngx_stream_ssl_add_variables,          /* preconfiguration */
+
+    // 把ngx_stream_ssl_handler加入ssl阶段
     ngx_stream_ssl_init,                   /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -290,6 +298,7 @@ ngx_stream_ssl_handler(ngx_stream_session_t *s)
     ngx_connection_t       *c;
     ngx_stream_ssl_conf_t  *sslcf;
 
+    // 会话不使用ssl则直接退出
     if (!s->ssl) {
         return NGX_OK;
     }
@@ -298,6 +307,8 @@ ngx_stream_ssl_handler(ngx_stream_session_t *s)
 
     sslcf = ngx_stream_get_module_srv_conf(s, ngx_stream_ssl_module);
 
+    // c->ssl : ngx_ssl_connection_t
+    // 如果指针是null，则还没有开始ssl握手，需要开始握手
     if (c->ssl == NULL) {
         c->log->action = "SSL handshaking";
 
@@ -468,6 +479,7 @@ ngx_stream_ssl_variable(ngx_stream_session_t *s,
 }
 
 
+// 添加ssl相关的变量
 static ngx_int_t
 ngx_stream_ssl_add_variables(ngx_conf_t *cf)
 {
@@ -822,6 +834,7 @@ invalid:
 }
 
 
+// 把ngx_stream_ssl_handler加入ssl阶段
 static ngx_int_t
 ngx_stream_ssl_init(ngx_conf_t *cf)
 {
