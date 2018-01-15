@@ -155,6 +155,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     s->main_conf = addr_conf->ctx->main_conf;
     s->srv_conf = addr_conf->ctx->srv_conf;
 
+    // 设置会话是否使用ssl
 #if (NGX_STREAM_SSL)
     s->ssl = addr_conf->ssl;
 #endif

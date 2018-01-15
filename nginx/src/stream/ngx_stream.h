@@ -398,6 +398,8 @@ struct ngx_stream_session_s {
     // 处理的结果状态，通常是200，发生错误则可能是403/500等
     ngx_uint_t                     status;
 
+    // 会话是否启用ssl
+    // 在ngx_stream_init_connection里设置
     unsigned                       ssl:1;
 
     unsigned                       stat_processing:1;
