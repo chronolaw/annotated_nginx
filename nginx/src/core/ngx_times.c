@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// * ngx_time_update
 
 /*
  * Copyright (C) Igor Sysoev

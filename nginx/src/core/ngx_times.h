@@ -18,6 +18,10 @@
 typedef struct {
     time_t      sec;        //自epoch以来的秒数，即时间戳
     ngx_uint_t  msec;       //秒数后的小数部分，单位是毫秒
+
+    // 缺少微秒，可以像tengine一样加入一个新字段
+    // ngx_uint_t  usec;
+
     ngx_int_t   gmtoff;     //GMT时区偏移量，以分钟为单位
 } ngx_time_t;
 
