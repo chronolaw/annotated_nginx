@@ -200,7 +200,7 @@ typedef struct {
     ngx_table_elt_t                  *expect;
     ngx_table_elt_t                  *upgrade;
 
-#if (NGX_HTTP_GZIP)
+#if (NGX_HTTP_GZIP || NGX_HTTP_HEADERS)
     ngx_table_elt_t                  *accept_encoding;
     ngx_table_elt_t                  *via;
 #endif
@@ -279,6 +279,7 @@ typedef struct {
     ngx_uint_t                        content_type_hash;
 
     ngx_array_t                       cache_control;
+    ngx_array_t                       link;
 
     off_t                             content_length_n;
     off_t                             content_offset;

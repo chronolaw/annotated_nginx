@@ -284,9 +284,10 @@ static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
                  ngx_http_upstream_process_vary, 0,
                  ngx_http_upstream_copy_header_line, 0, 0 },
 
-    { ngx_string("X-Powered-By"),
+    { ngx_string("Link"),
                  ngx_http_upstream_ignore_header_line, 0,
-                 ngx_http_upstream_copy_header_line, 0, 0 },
+                 ngx_http_upstream_copy_multi_header_lines,
+                 offsetof(ngx_http_headers_out_t, link), 0 },
 
     { ngx_string("X-Accel-Expires"),
                  ngx_http_upstream_process_accel_expires, 0,
@@ -4374,8 +4375,7 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
 
     if (!u->header_sent
         || rc == NGX_HTTP_REQUEST_TIME_OUT
-        || rc == NGX_HTTP_CLIENT_CLOSED_REQUEST
-        || (u->pipe && u->pipe->downstream_error))
+        || rc == NGX_HTTP_CLIENT_CLOSED_REQUEST)
     {
         ngx_http_finalize_request(r, rc);
         return;
@@ -4388,7 +4388,9 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         flush = 1;
     }
 
-    if (r->header_only) {
+    if (r->header_only
+        || (u->pipe && u->pipe->downstream_error))
+    {
         ngx_http_finalize_request(r, rc);
         return;
     }

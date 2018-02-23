@@ -24,6 +24,8 @@
 #define NGX_HTTP_V2_MAX_FIELD                                                 \
     (127 + (1 << (NGX_HTTP_V2_INT_OCTETS - 1) * 7) - 1)
 
+#define NGX_HTTP_V2_STREAM_ID_SIZE       4
+
 #define NGX_HTTP_V2_FRAME_HEADER_SIZE    9
 
 /* frame types */
@@ -48,6 +50,8 @@
 
 #define NGX_HTTP_V2_MAX_WINDOW           ((1U << 31) - 1)
 #define NGX_HTTP_V2_DEFAULT_WINDOW       65535
+
+#define NGX_HTTP_V2_DEFAULT_WEIGHT       16
 
 
 typedef struct ngx_http_v2_connection_s   ngx_http_v2_connection_t;
@@ -116,6 +120,9 @@ struct ngx_http_v2_connection_s {
 
     ngx_uint_t                       processing;
 
+    ngx_uint_t                       pushing;
+    ngx_uint_t                       concurrent_pushes;
+
     size_t                           send_window;
     size_t                           recv_window;
     size_t                           init_window;
@@ -141,12 +148,14 @@ struct ngx_http_v2_connection_s {
     ngx_queue_t                      closed;
 
     ngx_uint_t                       last_sid;
+    ngx_uint_t                       last_push;
 
     unsigned                         closed_nodes:8;
     unsigned                         settings_ack:1;
     unsigned                         table_update:1;
     unsigned                         blocked:1;
     unsigned                         goaway:1;
+    unsigned                         push_disabled:1;
 };
 
 
@@ -187,8 +196,6 @@ struct ngx_http_v2_stream_s {
     ngx_queue_t                      queue;
 
     ngx_array_t                     *cookies;
-
-    size_t                           header_limit;
 
     ngx_pool_t                      *pool;
 
@@ -272,10 +279,12 @@ ngx_http_v2_queue_ordered_frame(ngx_http_v2_connection_t *h2c,
 
 
 void ngx_http_v2_init(ngx_event_t *rev);
-void ngx_http_v2_request_headers_init(void);
 
 ngx_int_t ngx_http_v2_read_request_body(ngx_http_request_t *r);
 ngx_int_t ngx_http_v2_read_unbuffered_request_body(ngx_http_request_t *r);
+
+ngx_http_v2_stream_t *ngx_http_v2_push_stream(ngx_http_v2_stream_t *parent,
+    ngx_str_t *path);
 
 void ngx_http_v2_close_stream(ngx_http_v2_stream_t *stream, ngx_int_t rc);
 

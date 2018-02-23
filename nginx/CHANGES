@@ -1,4 +1,21 @@
 
+Changes with nginx 1.13.9                                        20 Feb 2018
+
+    *) Feature: HTTP/2 server push support; the "http2_push" and
+       "http2_push_preload" directives.
+
+    *) Bugfix: "header already sent" alerts might appear in logs when using
+       cache; the bug had appeared in 1.9.13.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "ssl_verify_client" directive was used and no SSL certificate was
+       specified in a virtual server.
+
+    *) Bugfix: in the ngx_http_v2_module.
+
+    *) Bugfix: in the ngx_http_dav_module.
+
+
 Changes with nginx 1.13.8                                        26 Dec 2017
 
     *) Feature: now nginx automatically preserves the CAP_NET_RAW capability
