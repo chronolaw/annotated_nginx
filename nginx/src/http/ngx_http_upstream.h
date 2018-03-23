@@ -100,18 +100,36 @@ typedef struct {
 // 在upstream{}里的每个server指令相关的信息
 // 包括地址/权重/超时等等
 typedef struct {
+    // 服务器的名字
     ngx_str_t                        name;
+
+    // 服务器对应的地址数组，可能有多个ip地址
     ngx_addr_t                      *addrs;
+
+    // 服务器地址数组的长度，即个数
     ngx_uint_t                       naddrs;
+
+    // 权重
     ngx_uint_t                       weight;
+
+    // 允许的最大连接数
     ngx_uint_t                       max_conns;
+
+    // 允许的最大失败次数
     ngx_uint_t                       max_fails;
+
+    // 失败的时间区间
     time_t                           fail_timeout;
+
+    // 服务器的恢复时间
     ngx_msec_t                       slow_start;
 
     // 1.11.5新增slow_start、max_conns
 
+    // 是否下线
     unsigned                         down:1;
+
+    // 是否是备用服务器
     unsigned                         backup:1;
 
     NGX_COMPAT_BEGIN(6)
@@ -137,6 +155,8 @@ struct ngx_http_upstream_srv_conf_s {
     ngx_array_t                     *servers;  /* ngx_http_upstream_server_t */
 
     ngx_uint_t                       flags;
+
+    // upstream{}块的名字
     ngx_str_t                        host;
 
     // 在配置文件里的位置
@@ -144,6 +164,8 @@ struct ngx_http_upstream_srv_conf_s {
     ngx_uint_t                       line;
 
     in_port_t                        port;
+
+    // 通常来说upstream块名字里是没有端口号的
     ngx_uint_t                       no_port;  /* unsigned no_port:1 */
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
