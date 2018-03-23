@@ -2512,36 +2512,6 @@ ngx_http_fastcgi_non_buffered_filter(void *data, ssize_t bytes)
         break;
     }
 
-    /* provide continuous buffer for subrequests in memory */
-
-    if (r->subrequest_in_memory) {
-
-        cl = u->out_bufs;
-
-        if (cl) {
-            buf->pos = cl->buf->pos;
-        }
-
-        buf->last = buf->pos;
-
-        for (cl = u->out_bufs; cl; cl = cl->next) {
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http fastcgi in memory %p-%p %O",
-                           cl->buf->pos, cl->buf->last, ngx_buf_size(cl->buf));
-
-            if (buf->last == cl->buf->pos) {
-                buf->last = cl->buf->last;
-                continue;
-            }
-
-            buf->last = ngx_movemem(buf->last, cl->buf->pos,
-                                    cl->buf->last - cl->buf->pos);
-
-            cl->buf->pos = buf->last - (cl->buf->last - cl->buf->pos);
-            cl->buf->last = buf->last;
-        }
-    }
-
     return NGX_OK;
 }
 
@@ -2736,8 +2706,6 @@ ngx_http_fastcgi_create_loc_conf(ngx_conf_t *cf)
      *     conf->upstream.cache_methods = 0;
      *     conf->upstream.temp_path = NULL;
      *     conf->upstream.hide_headers_hash = { NULL, 0 };
-     *     conf->upstream.uri = { 0, NULL };
-     *     conf->upstream.location = NULL;
      *     conf->upstream.store_lengths = NULL;
      *     conf->upstream.store_values = NULL;
      *
