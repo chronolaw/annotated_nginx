@@ -1,4 +1,29 @@
 
+Changes with nginx 1.13.10                                       20 Mar 2018
+
+    *) Feature: the "set" parameter of the "include" SSI directive now
+       allows writing arbitrary responses to a variable; the
+       "subrequest_output_buffer_size" directive defines maximum response
+       size.
+
+    *) Feature: now nginx uses clock_gettime(CLOCK_MONOTONIC) if available,
+       to avoid timeouts being incorrectly triggered on system time changes.
+
+    *) Feature: the "escape=none" parameter of the "log_format" directive.
+       Thanks to Johannes Baiter and Calin Don.
+
+    *) Feature: the $ssl_preread_alpn_protocols variable in the
+       ngx_stream_ssl_preread_module.
+
+    *) Feature: the ngx_http_grpc_module.
+
+    *) Bugfix: in memory allocation error handling in the "geo" directive.
+
+    *) Bugfix: when using variables in the "auth_basic_user_file" directive
+       a null character might appear in logs.
+       Thanks to Vadim Filimonov.
+
+
 Changes with nginx 1.13.9                                        20 Feb 2018
 
     *) Feature: HTTP/2 server push support; the "http2_push" and
