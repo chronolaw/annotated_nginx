@@ -1,4 +1,16 @@
 
+Changes with nginx 1.13.11                                       03 Apr 2018
+
+    *) Feature: the "proxy_protocol" parameter of the "listen" directive now
+       supports the PROXY protocol version 2.
+
+    *) Bugfix: nginx could not be built with OpenSSL 1.1.1 statically on
+       Linux.
+
+    *) Bugfix: in the "http_404", "http_500", etc. parameters of the
+       "proxy_next_upstream" directive.
+
+
 Changes with nginx 1.13.10                                       20 Mar 2018
 
     *) Feature: the "set" parameter of the "include" SSI directive now
