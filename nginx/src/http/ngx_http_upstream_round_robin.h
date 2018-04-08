@@ -22,6 +22,7 @@
 typedef struct ngx_http_upstream_rr_peer_s   ngx_http_upstream_rr_peer_t;
 
 // 与每个服务器的具体IP地址一一对应
+// 1.11.5新增slow_start、max_conns
 struct ngx_http_upstream_rr_peer_s {
     struct sockaddr                *sockaddr;
     socklen_t                       socklen;
