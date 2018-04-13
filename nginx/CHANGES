@@ -1,4 +1,10 @@
 
+Changes with nginx 1.13.12                                       10 Apr 2018
+
+    *) Bugfix: connections with gRPC backends might be closed unexpectedly
+       when returning a large response.
+
+
 Changes with nginx 1.13.11                                       03 Apr 2018
 
     *) Feature: the "proxy_protocol" parameter of the "listen" directive now
