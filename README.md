@@ -8,6 +8,8 @@ Nginx1.10增加了动态模块、http2、reuseport。
 
 Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
 
+Nginx1.14增加了mirror模块，支持gRPC。
+
 请参考：
 * [《Nginx完全开发指南：使用C/C++和OpenResty》](http://item.jd.com/12082107.html)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
@@ -16,13 +18,13 @@ Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
 
 # 当前状态
-nginx 1.12.2
+nginx 1.14.0, merging
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx稳定版1.12.2|有
-upgrade | nginx稳定版1.12.2|无
+master  | nginx稳定版1.14.0|有
+upgrade | nginx稳定版1.14.0|无
 mainline| nginx开发版1.13.12|无
 
 # 已注解
