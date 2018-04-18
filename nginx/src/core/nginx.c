@@ -330,6 +330,9 @@ main(int argc, char *const *argv)
     // 如果是master/worker，会fork出新的子进程，见os/unix/ngx_daemon.c
     ngx_pid = ngx_getpid();
 
+    // 1.14.0新增,父进程pid
+    ngx_parent = ngx_getppid();
+
     // 初始化log
     // ngx_prefix是-p后的参数，即nginx的工作目录
     // 默认是NGX_CONF_PREFIX，即/usr/local/nginx
@@ -393,6 +396,13 @@ main(int argc, char *const *argv)
     if (ngx_crc32_table_init() != NGX_OK) {
         return 1;
     }
+
+    /*
+     * ngx_slab_sizes_init() requires ngx_pagesize set in ngx_os_init()
+     */
+
+    // 1.14.0新增
+    ngx_slab_sizes_init();
 
     // 检查NGINX环境变量，获取之前监听的socket
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
@@ -1167,8 +1177,8 @@ ngx_process_options(ngx_cycle_t *cycle)
          p--)
     {
         if (ngx_path_separator(*p)) {
-            cycle->conf_prefix.len = p - ngx_cycle->conf_file.data + 1;
-            cycle->conf_prefix.data = ngx_cycle->conf_file.data;
+            cycle->conf_prefix.len = p - cycle->conf_file.data + 1;
+            cycle->conf_prefix.data = cycle->conf_file.data;
             break;
         }
     }
