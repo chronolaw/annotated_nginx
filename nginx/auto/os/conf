@@ -41,6 +41,14 @@ case "$NGX_PLATFORM" in
 '
     ;;
 
+    NetBSD:*)
+        CORE_INCS="$UNIX_INCS"
+        CORE_DEPS="$UNIX_DEPS $POSIX_DEPS"
+        CORE_SRCS="$UNIX_SRCS"
+
+        NGX_RPATH=YES
+    ;;
+
     HP-UX:*)
         # HP/UX
         have=NGX_HPUX . auto/have_headers
@@ -99,6 +107,11 @@ case "$NGX_MACHINE" in
     ia64 )
         have=NGX_ALIGNMENT value=16 . auto/define
         # TODO
+        NGX_MACH_CACHE_LINE=64
+    ;;
+
+    aarch64 )
+        have=NGX_ALIGNMENT value=16 . auto/define
         NGX_MACH_CACHE_LINE=64
     ;;
 

@@ -70,6 +70,7 @@ HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
 HTTP_AUTH_REQUEST=NO
+HTTP_MIRROR=YES
 HTTP_USERID=YES
 HTTP_SLICE=NO
 HTTP_AUTOINDEX=YES
@@ -85,6 +86,7 @@ HTTP_PROXY=YES
 HTTP_FASTCGI=YES
 HTTP_UWSGI=YES
 HTTP_SCGI=YES
+HTTP_GRPC=YES
 HTTP_PERL=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
@@ -249,6 +251,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_userid_module)    HTTP_USERID=NO             ;;
         --without-http_access_module)    HTTP_ACCESS=NO             ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
+        --without-http_mirror_module)    HTTP_MIRROR=NO             ;;
         --without-http_autoindex_module) HTTP_AUTOINDEX=NO          ;;
         --without-http_status_module)    HTTP_STATUS=NO             ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
@@ -260,6 +263,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_fastcgi_module)   HTTP_FASTCGI=NO            ;;
         --without-http_uwsgi_module)     HTTP_UWSGI=NO              ;;
         --without-http_scgi_module)      HTTP_SCGI=NO               ;;
+        --without-http_grpc_module)      HTTP_GRPC=NO               ;;
         --without-http_memcached_module) HTTP_MEMCACHED=NO          ;;
         --without-http_limit_conn_module) HTTP_LIMIT_CONN=NO        ;;
         --without-http_limit_req_module) HTTP_LIMIT_REQ=NO         ;;
@@ -458,6 +462,7 @@ cat << END
   --without-http_userid_module       disable ngx_http_userid_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
+  --without-http_mirror_module       disable ngx_http_mirror_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
   --without-http_geo_module          disable ngx_http_geo_module
   --without-http_map_module          disable ngx_http_map_module
@@ -468,6 +473,7 @@ cat << END
   --without-http_fastcgi_module      disable ngx_http_fastcgi_module
   --without-http_uwsgi_module        disable ngx_http_uwsgi_module
   --without-http_scgi_module         disable ngx_http_scgi_module
+  --without-http_grpc_module         disable ngx_http_grpc_module
   --without-http_memcached_module    disable ngx_http_memcached_module
   --without-http_limit_conn_module   disable ngx_http_limit_conn_module
   --without-http_limit_req_module    disable ngx_http_limit_req_module
