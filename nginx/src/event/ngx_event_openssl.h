@@ -22,6 +22,7 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
 #endif
@@ -52,6 +53,11 @@
 
 #define ngx_ssl_session_t       SSL_SESSION
 #define ngx_ssl_conn_t          SSL
+
+
+#if (OPENSSL_VERSION_NUMBER < 0x10002000L)
+#define SSL_is_server(s)        (s)->server
+#endif
 
 
 struct ngx_ssl_s {
@@ -131,6 +137,7 @@ typedef struct {
 #define NGX_SSL_TLSv1    0x0008
 #define NGX_SSL_TLSv1_1  0x0010
 #define NGX_SSL_TLSv1_2  0x0020
+#define NGX_SSL_TLSv1_3  0x0040
 
 
 #define NGX_SSL_BUFFER   1
@@ -205,6 +212,8 @@ ngx_int_t ngx_ssl_get_server_name(ngx_connection_t *c, ngx_pool_t *pool,
 ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
