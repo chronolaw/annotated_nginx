@@ -34,6 +34,9 @@ ngx_daemon(ngx_log_t *log)
         exit(0);
     }
 
+    // 子进程是新进程，父进程pid就是原来的pid
+    ngx_parent = ngx_pid;
+
     // 子进程是新进程，需要重新获取pid
     // 也就是真正的master进程
     ngx_pid = ngx_getpid();
