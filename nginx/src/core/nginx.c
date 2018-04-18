@@ -228,6 +228,7 @@ main(int argc, char *const *argv)
 #endif
 
     ngx_pid = ngx_getpid();
+    ngx_parent = ngx_getppid();
 
     log = ngx_log_init(ngx_prefix);
     if (log == NULL) {
@@ -272,6 +273,12 @@ main(int argc, char *const *argv)
     if (ngx_crc32_table_init() != NGX_OK) {
         return 1;
     }
+
+    /*
+     * ngx_slab_sizes_init() requires ngx_pagesize set in ngx_os_init()
+     */
+
+    ngx_slab_sizes_init();
 
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
         return 1;
@@ -978,8 +985,8 @@ ngx_process_options(ngx_cycle_t *cycle)
          p--)
     {
         if (ngx_path_separator(*p)) {
-            cycle->conf_prefix.len = p - ngx_cycle->conf_file.data + 1;
-            cycle->conf_prefix.data = ngx_cycle->conf_file.data;
+            cycle->conf_prefix.len = p - cycle->conf_file.data + 1;
+            cycle->conf_prefix.data = cycle->conf_file.data;
             break;
         }
     }
