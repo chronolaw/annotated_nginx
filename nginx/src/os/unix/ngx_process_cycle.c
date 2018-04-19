@@ -72,6 +72,9 @@ ngx_uint_t    ngx_worker;
 // master在main()里获取
 // worker在fork之后重新获取
 ngx_pid_t     ngx_pid;
+
+// 1.14.0，父进程的pid
+// worker在fork之后重新获取
 ngx_pid_t     ngx_parent;
 
 // 原子变量，用于进程中检查信号
