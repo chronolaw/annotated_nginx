@@ -73,7 +73,7 @@ ngx_uint_t    ngx_worker;
 // worker在fork之后重新获取
 ngx_pid_t     ngx_pid;
 
-// 1.14.0，父进程的pid
+// 1.13.8，父进程的pid
 // worker在fork之后重新获取
 ngx_pid_t     ngx_parent;
 

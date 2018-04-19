@@ -34,6 +34,7 @@ ngx_daemon(ngx_log_t *log)
         exit(0);
     }
 
+    // 1.13.8新增
     // 子进程是新进程，父进程pid就是原来的pid
     ngx_parent = ngx_pid;
 

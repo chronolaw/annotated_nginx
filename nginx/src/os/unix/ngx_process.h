@@ -114,7 +114,8 @@ extern char         **ngx_os_argv;
 // in os/unix/ngx_process_cycle.c
 extern ngx_pid_t      ngx_pid;
 
-// 1.14.0新增，记录父进程pid
+// 1.13.8新增，记录父进程pid
+// in os/unix/ngx_process_cycle.c
 extern ngx_pid_t      ngx_parent;
 
 // in os/unix/ngx_process.c

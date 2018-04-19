@@ -330,7 +330,7 @@ main(int argc, char *const *argv)
     // 如果是master/worker，会fork出新的子进程，见os/unix/ngx_daemon.c
     ngx_pid = ngx_getpid();
 
-    // 1.14.0新增,父进程pid
+    // 1.13.8新增,父进程pid
     ngx_parent = ngx_getppid();
 
     // 初始化log
