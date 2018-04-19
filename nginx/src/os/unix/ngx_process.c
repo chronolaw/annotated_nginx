@@ -21,24 +21,25 @@ typedef struct {
     char   *signame;
     char   *name;
 
-    // 1.13.0 变动了函数接口，形式是
-    // void  (*handler)(int signo, siginfo_t *siginfo, void *ucontext);
+    // 原接口：void  (*handler)(int signo);
+    // 1.13.0 变动了函数接口
     // 可以多获取一些信号的信息
-    void  (*handler)(int signo);
+    void  (*handler)(int signo, siginfo_t *siginfo, void *ucontext);
 } ngx_signal_t;
 
 
 
 static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);
 
+
 // 1.13.0 变动了函数接口
-// static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
+// 原接口：static void ngx_signal_handler(int signo);
 //
 // 处理unix信号
 // 收到信号后设置ngx_quit/ngx_sigalrm/ngx_reconfigue等全局变量
 // 由进程里的无限循环检查这些变量再处理
 // 检查子进程结束，设置进程数组ngx_processes里的状态
-static void ngx_signal_handler(int signo);
+static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
 
 // 检查子进程结束，设置进程数组ngx_processes里的状态
 static void ngx_process_get_status(void);
@@ -115,9 +116,9 @@ ngx_signal_t  signals[] = {
 
     { SIGCHLD, "SIGCHLD", "", ngx_signal_handler },
 
-    { SIGSYS, "SIGSYS, SIG_IGN", "", SIG_IGN },
+    { SIGSYS, "SIGSYS, SIG_IGN", "", NULL },
 
-    { SIGPIPE, "SIGPIPE, SIG_IGN", "", SIG_IGN },
+    { SIGPIPE, "SIGPIPE, SIG_IGN", "", NULL },
 
     { 0, NULL, "", NULL }
 };
@@ -252,6 +253,9 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     // 0是子进程，开始执行worker进程的核心函数
     // ngx_worker_process_cycle，即无限循环处理事件
     case 0:
+        // 1.14.0,获取父进程pid，即masterpid
+        ngx_parent = ngx_pid;
+
         // worker进程重新获取进程id
         ngx_pid = ngx_getpid();
 
@@ -360,7 +364,15 @@ ngx_init_signals(ngx_log_t *log)
 
     for (sig = signals; sig->signo != 0; sig++) {
         ngx_memzero(&sa, sizeof(struct sigaction));
-        sa.sa_handler = sig->handler;
+
+        if (sig->handler) {
+            sa.sa_sigaction = sig->handler;
+            sa.sa_flags = SA_SIGINFO;
+
+        } else {
+            sa.sa_handler = SIG_IGN;
+        }
+
         sigemptyset(&sa.sa_mask);
         if (sigaction(sig->signo, &sa, NULL) == -1) {
 #if (NGX_VALGRIND)
@@ -386,7 +398,7 @@ ngx_init_signals(ngx_log_t *log)
 // 由进程里的无限循环检查这些变量再处理
 // 检查子进程结束，设置进程数组ngx_processes里的状态
 static void
-ngx_signal_handler(int signo)
+ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
 {
     char            *action;
     ngx_int_t        ignore;
@@ -448,12 +460,12 @@ ngx_signal_handler(int signo)
             break;
 
         case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
-            if (getppid() > 1 || ngx_new_binary > 0) {
+            if (ngx_getppid() == ngx_parent || ngx_new_binary > 0) {
 
                 /*
                  * Ignore the signal in the new binary if its parent is
-                 * not the init process, i.e. the old binary's process
-                 * is still running.  Or ignore the signal in the old binary's
+                 * not changed, i.e. the old binary's process is still
+                 * running.  Or ignore the signal in the old binary's
                  * process if the new binary's process is already running.
                  */
 
@@ -528,8 +540,16 @@ ngx_signal_handler(int signo)
         break;
     }
 
-    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
-                  "signal %d (%s) received%s", signo, sig->signame, action);
+    if (siginfo && siginfo->si_pid) {
+        ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
+                      "signal %d (%s) received from %P%s",
+                      signo, sig->signame, siginfo->si_pid, action);
+
+    } else {
+        ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
+                      "signal %d (%s) received%s",
+                      signo, sig->signame, action);
+    }
 
     if (ignore) {
         ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, 0,

@@ -75,6 +75,7 @@ typedef struct {
 
 
 #define ngx_getpid   getpid
+#define ngx_getppid  getppid
 
 #ifndef ngx_log_pid
 #define ngx_log_pid  ngx_pid
@@ -109,9 +110,12 @@ extern int            ngx_argc;
 extern char         **ngx_argv;
 extern char         **ngx_os_argv;
 
-// 记录nginx master进程的pid，在main()里使用
+// 记录nginx 进程的pid，在main()里使用
 // in os/unix/ngx_process_cycle.c
 extern ngx_pid_t      ngx_pid;
+
+// 1.14.0新增，记录父进程pid
+extern ngx_pid_t      ngx_parent;
 
 // in os/unix/ngx_process.c
 
