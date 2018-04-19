@@ -76,11 +76,11 @@ typedef struct {
     ngx_log_t            *log;
 } ngx_pool_cleanup_file_t;
 
-
+// 1.14.0删除了下面的两个函数
 // 分配内存,不用内存池，使用malloc
 // 实现在os/unix/ngx_alloc.c
-void *ngx_alloc(size_t size, ngx_log_t *log);
-void *ngx_calloc(size_t size, ngx_log_t *log);
+// void *ngx_alloc(size_t size, ngx_log_t *log);
+// void *ngx_calloc(size_t size, ngx_log_t *log);
 
 // 创建/销毁内存池
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
