@@ -315,7 +315,7 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
                     return NGX_HTTP_RANGE_NOT_SATISFIABLE;
                 }
 
-                start = start * 10 + *p++ - '0';
+                start = start * 10 + (*p++ - '0');
             }
 
             while (*p == ' ') { p++; }
@@ -345,7 +345,7 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
                 return NGX_HTTP_RANGE_NOT_SATISFIABLE;
             }
 
-            end = end * 10 + *p++ - '0';
+            end = end * 10 + (*p++ - '0');
         }
 
         while (*p == ' ') { p++; }
@@ -355,7 +355,7 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
         }
 
         if (suffix) {
-            start = content_length - end;
+            start = (end < content_length) ? content_length - end : 0;
             end = content_length - 1;
         }
 
@@ -386,6 +386,9 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
             if (ranges-- == 0) {
                 return NGX_DECLINED;
             }
+
+        } else if (start == 0) {
+            return NGX_DECLINED;
         }
 
         if (*p++ != ',') {
@@ -429,6 +432,8 @@ ngx_http_range_singlepart_header(ngx_http_request_t *r,
     content_range->value.data = ngx_pnalloc(r->pool,
                                     sizeof("bytes -/") - 1 + 3 * NGX_OFF_T_LEN);
     if (content_range->value.data == NULL) {
+        content_range->hash = 0;
+        r->headers_out.content_range = NULL;
         return NGX_ERROR;
     }
 
@@ -599,6 +604,8 @@ ngx_http_range_not_satisfiable(ngx_http_request_t *r)
     content_range->value.data = ngx_pnalloc(r->pool,
                                        sizeof("bytes */") - 1 + NGX_OFF_T_LEN);
     if (content_range->value.data == NULL) {
+        content_range->hash = 0;
+        r->headers_out.content_range = NULL;
         return NGX_ERROR;
     }
 
