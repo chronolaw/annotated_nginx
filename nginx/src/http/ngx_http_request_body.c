@@ -98,18 +98,18 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-#if (NGX_HTTP_V2)
-    if (r->stream) {
-        rc = ngx_http_v2_read_request_body(r, post_handler);
-        goto done;
-    }
-#endif
-
-    // 如果要求不缓存请求体数据
-    // 那么请求体就不会存在磁盘文件里
-    // if (r->request_body_no_buffering) {
-    //     r->request_body_in_file_only = 0;
-    // }
+//#if (NGX_HTTP_V2)
+//    if (r->stream) {
+//        rc = ngx_http_v2_read_request_body(r, post_handler);
+//        goto done;
+//    }
+//#endif
+//
+//    // 如果要求不缓存请求体数据
+//    // 那么请求体就不会存在磁盘文件里
+//    // if (r->request_body_no_buffering) {
+//    //     r->request_body_in_file_only = 0;
+//    // }
 
     if (ngx_http_test_expect(r) != NGX_OK) {
         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -151,6 +151,13 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         post_handler(r);
         return NGX_OK;
     }
+
+#if (NGX_HTTP_V2)
+    if (r->stream) {
+        rc = ngx_http_v2_read_request_body(r);
+        goto done;
+    }
+#endif
 
     // 查看已经读取的数据，即缓冲区里头之后的数据
     preread = r->header_in->last - r->header_in->pos;
@@ -1182,7 +1189,11 @@ ngx_http_test_expect(ngx_http_request_t *r)
 
     if (r->expect_tested
         || r->headers_in.expect == NULL
-        || r->http_version < NGX_HTTP_VERSION_11)
+        || r->http_version < NGX_HTTP_VERSION_11
+#if (NGX_HTTP_V2)
+        || r->stream != NULL
+#endif
+       )
     {
         return NGX_OK;
     }
