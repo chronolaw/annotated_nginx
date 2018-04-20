@@ -213,7 +213,16 @@ ngx_http_dav_put_handler(ngx_http_request_t *r)
     ngx_ext_rename_file_t     ext;
     ngx_http_dav_loc_conf_t  *dlcf;
 
-    if (r->request_body == NULL || r->request_body->temp_file == NULL) {
+    if (r->request_body == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "PUT request body is unavailable");
+        ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
+    if (r->request_body->temp_file == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "PUT request body must be in a file");
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
@@ -1080,6 +1089,7 @@ ngx_http_dav_location(ngx_http_request_t *r, u_char *path)
     } else {
         location = ngx_pnalloc(r->pool, r->uri.len);
         if (location == NULL) {
+            ngx_http_clear_location(r);
             return NGX_ERROR;
         }
 

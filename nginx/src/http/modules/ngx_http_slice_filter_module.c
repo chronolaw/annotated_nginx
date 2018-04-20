@@ -190,6 +190,8 @@ ngx_http_slice_header_filter(ngx_http_request_t *r)
         return rc;
     }
 
+    r->preserve_body = 1;
+
     if (r->headers_out.status == NGX_HTTP_PARTIAL_CONTENT) {
         if (ctx->start + (off_t) slcf->size <= r->headers_out.content_offset) {
             ctx->start = slcf->size
@@ -317,7 +319,7 @@ ngx_http_slice_parse_content_range(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        start = start * 10 + *p++ - '0';
+        start = start * 10 + (*p++ - '0');
     }
 
     while (*p == ' ') { p++; }
@@ -337,7 +339,7 @@ ngx_http_slice_parse_content_range(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        end = end * 10 + *p++ - '0';
+        end = end * 10 + (*p++ - '0');
     }
 
     end++;
@@ -362,7 +364,7 @@ ngx_http_slice_parse_content_range(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
 
-            complete_length = complete_length * 10 + *p++ - '0';
+            complete_length = complete_length * 10 + (*p++ - '0');
         }
 
     } else {
@@ -479,7 +481,7 @@ ngx_http_slice_get_start(ngx_http_request_t *r)
             return 0;
         }
 
-        start = start * 10 + *p++ - '0';
+        start = start * 10 + (*p++ - '0');
     }
 
     return start;

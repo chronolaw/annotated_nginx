@@ -631,7 +631,7 @@ static ngx_http_variable_t  ngx_http_fastcgi_vars[] = {
       ngx_http_fastcgi_path_info_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_http_null_variable
 };
 
 
@@ -1878,6 +1878,7 @@ ngx_http_fastcgi_process_header(ngx_http_request_t *r)
 
                     p = ngx_pnalloc(r->pool, size);
                     if (p == NULL) {
+                        h->hash = 0;
                         return NGX_ERROR;
                     }
 
@@ -1900,6 +1901,7 @@ ngx_http_fastcgi_process_header(ngx_http_request_t *r)
                         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                                       "invalid header after joining "
                                       "FastCGI records");
+                        h->hash = 0;
                         return NGX_ERROR;
                     }
 
@@ -1925,6 +1927,7 @@ ngx_http_fastcgi_process_header(ngx_http_request_t *r)
                                               h->key.len + 1 + h->value.len + 1
                                               + h->key.len);
                     if (h->key.data == NULL) {
+                        h->hash = 0;
                         return NGX_ERROR;
                     }
 
@@ -2509,36 +2512,6 @@ ngx_http_fastcgi_non_buffered_filter(void *data, ssize_t bytes)
         break;
     }
 
-    /* provide continuous buffer for subrequests in memory */
-
-    if (r->subrequest_in_memory) {
-
-        cl = u->out_bufs;
-
-        if (cl) {
-            buf->pos = cl->buf->pos;
-        }
-
-        buf->last = buf->pos;
-
-        for (cl = u->out_bufs; cl; cl = cl->next) {
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http fastcgi in memory %p-%p %O",
-                           cl->buf->pos, cl->buf->last, ngx_buf_size(cl->buf));
-
-            if (buf->last == cl->buf->pos) {
-                buf->last = cl->buf->last;
-                continue;
-            }
-
-            buf->last = ngx_movemem(buf->last, cl->buf->pos,
-                                    cl->buf->last - cl->buf->pos);
-
-            cl->buf->pos = buf->last - (cl->buf->last - cl->buf->pos);
-            cl->buf->last = buf->last;
-        }
-    }
-
     return NGX_OK;
 }
 
@@ -2643,6 +2616,7 @@ ngx_http_fastcgi_process_record(ngx_http_request_t *r,
         }
     }
 
+    f->pos = p;
     f->state = state;
 
     return NGX_AGAIN;
@@ -2732,8 +2706,6 @@ ngx_http_fastcgi_create_loc_conf(ngx_conf_t *cf)
      *     conf->upstream.cache_methods = 0;
      *     conf->upstream.temp_path = NULL;
      *     conf->upstream.hide_headers_hash = { NULL, 0 };
-     *     conf->upstream.uri = { 0, NULL };
-     *     conf->upstream.location = NULL;
      *     conf->upstream.store_lengths = NULL;
      *     conf->upstream.store_values = NULL;
      *
