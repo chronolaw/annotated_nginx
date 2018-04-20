@@ -277,7 +277,8 @@ struct ngx_conf_s {
     // types {...}就使用了这个实现
     ngx_conf_handler_pt   handler;
 
-    char                 *handler_conf;
+    // 1.14之前类型是char
+    void                 *handler_conf;
 };
 
 
