@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 
 
+static ngx_msec_t ngx_monotonic_time(time_t sec, ngx_uint_t msec);
+
+
 /*
  * The time may be updated by signal handler or by several threads.
  * The time update operations are rare and require to hold the ngx_time_lock.
@@ -93,7 +96,7 @@ ngx_time_update(void)
     sec = tv.tv_sec;
     msec = tv.tv_usec / 1000;
 
-    ngx_current_msec = (ngx_msec_t) sec * 1000 + msec;
+    ngx_current_msec = ngx_monotonic_time(sec, msec);
 
     tp = &cached_time[slot];
 
@@ -186,6 +189,31 @@ ngx_time_update(void)
     ngx_cached_syslog_time.data = p4;
 
     ngx_unlock(&ngx_time_lock);
+}
+
+
+static ngx_msec_t
+ngx_monotonic_time(time_t sec, ngx_uint_t msec)
+{
+#if (NGX_HAVE_CLOCK_MONOTONIC)
+    struct timespec  ts;
+
+#if defined(CLOCK_MONOTONIC_FAST)
+    clock_gettime(CLOCK_MONOTONIC_FAST, &ts);
+
+#elif defined(CLOCK_MONOTONIC_COARSE)
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+
+#else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+
+    sec = ts.tv_sec;
+    msec = ts.tv_nsec / 1000000;
+
+#endif
+
+    return (ngx_msec_t) sec * 1000 + msec;
 }
 
 
@@ -300,27 +328,39 @@ void
 ngx_gmtime(time_t t, ngx_tm_t *tp)
 {
     ngx_int_t   yday;
-    ngx_uint_t  n, sec, min, hour, mday, mon, year, wday, days, leap;
+    ngx_uint_t  sec, min, hour, mday, mon, year, wday, days, leap;
 
     /* the calculation is valid for positive time_t only */
 
-    n = (ngx_uint_t) t;
+    if (t < 0) {
+        t = 0;
+    }
 
-    days = n / 86400;
+    days = t / 86400;
+    sec = t % 86400;
+
+    /*
+     * no more than 4 year digits supported,
+     * truncate to December 31, 9999, 23:59:59
+     */
+
+    if (days > 2932896) {
+        days = 2932896;
+        sec = 86399;
+    }
 
     /* January 1, 1970 was Thursday */
 
     wday = (4 + days) % 7;
 
-    n %= 86400;
-    hour = n / 3600;
-    n %= 3600;
-    min = n / 60;
-    sec = n % 60;
+    hour = sec / 3600;
+    sec %= 3600;
+    min = sec / 60;
+    sec %= 60;
 
     /*
      * the algorithm based on Gauss' formula,
-     * see src/http/ngx_http_parse_time.c
+     * see src/core/ngx_parse_time.c
      */
 
     /* days since March 1, 1 BC */
