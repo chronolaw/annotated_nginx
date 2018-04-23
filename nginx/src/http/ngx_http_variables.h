@@ -152,7 +152,9 @@ ngx_int_t ngx_http_variables_add_core_vars(ngx_conf_t *cf);
 ngx_int_t ngx_http_variables_init_vars(ngx_conf_t *cf);
 
 
+// 简化变量数组结尾的null
 extern ngx_http_variable_value_t  ngx_http_variable_null_value;
+
 extern ngx_http_variable_value_t  ngx_http_variable_true_value;
 
 
