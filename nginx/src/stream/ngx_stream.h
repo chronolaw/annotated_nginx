@@ -103,6 +103,10 @@ typedef struct {
     // 内核里等待连接的队列长度
     int                            backlog;
 
+    // 1.14新增
+    int                            rcvbuf;
+    int                            sndbuf;
+
     // socket的类型，SOCK_STREAM 表示TCP
     int                            type;
 } ngx_stream_listen_t;

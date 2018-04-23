@@ -683,6 +683,8 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             // 端口的backlog
             ls->backlog = addr[i].opt.backlog;
+            ls->rcvbuf = addr[i].opt.rcvbuf;
+            ls->sndbuf = addr[i].opt.sndbuf;
 
             ls->wildcard = addr[i].opt.wildcard;
 
