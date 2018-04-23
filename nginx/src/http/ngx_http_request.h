@@ -73,15 +73,17 @@
 #define NGX_HTTP_CLIENT_ERROR              10
 #define NGX_HTTP_PARSE_INVALID_METHOD      10
 #define NGX_HTTP_PARSE_INVALID_REQUEST     11
-#define NGX_HTTP_PARSE_INVALID_09_METHOD   12
+#define NGX_HTTP_PARSE_INVALID_VERSION     12
+#define NGX_HTTP_PARSE_INVALID_09_METHOD   13
 
-#define NGX_HTTP_PARSE_INVALID_HEADER      13
+#define NGX_HTTP_PARSE_INVALID_HEADER      14
 
 
 /* unused                                  1 */
 #define NGX_HTTP_SUBREQUEST_IN_MEMORY      2
 #define NGX_HTTP_SUBREQUEST_WAITED         4
 #define NGX_HTTP_SUBREQUEST_CLONE          8
+#define NGX_HTTP_SUBREQUEST_BACKGROUND     16
 
 #define NGX_HTTP_LOG_UNSAFE                1
 
@@ -103,6 +105,7 @@
 #define NGX_HTTP_SEE_OTHER                 303
 #define NGX_HTTP_NOT_MODIFIED              304
 #define NGX_HTTP_TEMPORARY_REDIRECT        307
+#define NGX_HTTP_PERMANENT_REDIRECT        308
 
 #define NGX_HTTP_BAD_REQUEST               400
 #define NGX_HTTP_UNAUTHORIZED              401
@@ -158,6 +161,7 @@
 #define NGX_HTTP_BAD_GATEWAY               502
 #define NGX_HTTP_SERVICE_UNAVAILABLE       503
 #define NGX_HTTP_GATEWAY_TIME_OUT          504
+#define NGX_HTTP_VERSION_NOT_SUPPORTED     505
 #define NGX_HTTP_INSUFFICIENT_STORAGE      507
 
 
@@ -235,10 +239,11 @@ typedef struct {
     ngx_table_elt_t                  *if_range;
 
     ngx_table_elt_t                  *transfer_encoding;
+    ngx_table_elt_t                  *te;
     ngx_table_elt_t                  *expect;
     ngx_table_elt_t                  *upgrade;
 
-#if (NGX_HTTP_GZIP)
+#if (NGX_HTTP_GZIP || NGX_HTTP_HEADERS)
     ngx_table_elt_t                  *accept_encoding;
     ngx_table_elt_t                  *via;
 #endif
@@ -301,6 +306,7 @@ typedef struct {
 // status是响应码，status_line可以定制响应状态行
 typedef struct {
     ngx_list_t                        headers;
+    ngx_list_t                        trailers;
 
     // status是响应码，status_line可以定制响应状态行
     ngx_uint_t                        status;
@@ -329,6 +335,7 @@ typedef struct {
     ngx_uint_t                        content_type_hash;
 
     ngx_array_t                       cache_control;
+    ngx_array_t                       link;
 
     // 通常需要指定content_length_n，表示body的长度
     off_t                             content_length_n;
@@ -711,7 +718,6 @@ struct ngx_http_request_s {
 
 #if (NGX_HTTP_CACHE)
     unsigned                          cached:1;
-    unsigned                          cache_updater:1;
 #endif
 
 #if (NGX_HTTP_GZIP)
@@ -745,6 +751,8 @@ struct ngx_http_request_s {
     // 只有头的标志位
     // ngx_http_header_filter_module里检查，如果方法是head则置1
     unsigned                          header_only:1;
+
+    unsigned                          expect_trailers:1;
 
     // 是否keep alive
     unsigned                          keepalive:1;
@@ -781,6 +789,7 @@ struct ngx_http_request_s {
     unsigned                          main_filter_need_in_memory:1;
     unsigned                          filter_need_in_memory:1;
     unsigned                          filter_need_temporary:1;
+    unsigned                          preserve_body:1;
     unsigned                          allow_ranges:1;
     unsigned                          subrequest_ranges:1;
     unsigned                          single_range:1;
@@ -789,6 +798,7 @@ struct ngx_http_request_s {
     unsigned                          stat_writing:1;
     unsigned                          stat_processing:1;
 
+    unsigned                          background:1;
     unsigned                          health_check:1;
 
     /* used to parse HTTP headers */
