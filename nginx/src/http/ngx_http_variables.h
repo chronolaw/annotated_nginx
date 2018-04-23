@@ -80,6 +80,9 @@ struct ngx_http_variable_s {
     ngx_uint_t                    index;
 };
 
+// 简化变量数组结尾的null
+#define ngx_http_null_variable  { ngx_null_string, NULL, NULL, 0, 0, 0 }
+
 
 // Nginx变量机制的核心函数，创建一个命名的变量访问对象
 ngx_http_variable_t *ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name,
@@ -152,7 +155,6 @@ ngx_int_t ngx_http_variables_add_core_vars(ngx_conf_t *cf);
 ngx_int_t ngx_http_variables_init_vars(ngx_conf_t *cf);
 
 
-// 简化变量数组结尾的null
 extern ngx_http_variable_value_t  ngx_http_variable_null_value;
 
 extern ngx_http_variable_value_t  ngx_http_variable_true_value;
