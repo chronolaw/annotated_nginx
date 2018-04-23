@@ -38,6 +38,8 @@ static ngx_int_t ngx_http_variable_unknown_header_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_unknown_header_out(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_unknown_trailer_out(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_request_line(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_cookie(ngx_http_request_t *r,
@@ -316,6 +318,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("sent_http_cache_control"), NULL, ngx_http_variable_headers,
       offsetof(ngx_http_request_t, headers_out.cache_control), 0, 0 },
 
+    { ngx_string("sent_http_link"), NULL, ngx_http_variable_headers,
+      offsetof(ngx_http_request_t, headers_out.link), 0, 0 },
+
     { ngx_string("limit_rate"), ngx_http_variable_request_set_size,
       ngx_http_variable_request_get_size,
       offsetof(ngx_http_request_t, limit_rate),
@@ -365,13 +370,16 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("sent_http_"), NULL, ngx_http_variable_unknown_header_out,
       0, NGX_HTTP_VAR_PREFIX, 0 },
 
+    { ngx_string("sent_trailer_"), NULL, ngx_http_variable_unknown_trailer_out,
+      0, NGX_HTTP_VAR_PREFIX, 0 },
+
     { ngx_string("cookie_"), NULL, ngx_http_variable_cookie,
       0, NGX_HTTP_VAR_PREFIX, 0 },
 
     { ngx_string("arg_"), NULL, ngx_http_variable_argument,
       0, NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_PREFIX, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_http_null_variable
 };
 
 
@@ -421,7 +429,9 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
             return NULL;
         }
 
-        v->flags &= flags | ~NGX_HTTP_VAR_WEAK;
+        if (!(flags & NGX_HTTP_VAR_WEAK)) {
+            v->flags &= ~NGX_HTTP_VAR_WEAK;
+        }
 
         return v;
     }
@@ -486,7 +496,9 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
             return NULL;
         }
 
-        v->flags &= flags | ~NGX_HTTP_VAR_WEAK;
+        if (!(flags & NGX_HTTP_VAR_WEAK)) {
+            v->flags &= ~NGX_HTTP_VAR_WEAK;
+        }
 
         return v;
     }
@@ -931,6 +943,16 @@ ngx_http_variable_unknown_header_out(ngx_http_request_t *r,
     return ngx_http_variable_unknown_header(v, (ngx_str_t *) data,
                                             &r->headers_out.headers.part,
                                             sizeof("sent_http_") - 1);
+}
+
+
+static ngx_int_t
+ngx_http_variable_unknown_trailer_out(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    return ngx_http_variable_unknown_header(v, (ngx_str_t *) data,
+                                            &r->headers_out.trailers.part,
+                                            sizeof("sent_trailer_") - 1);
 }
 
 
@@ -1460,17 +1482,15 @@ static ngx_int_t
 ngx_http_variable_is_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
     if (r->args.len == 0) {
-        v->len = 0;
-        v->data = NULL;
+        *v = ngx_http_variable_null_value;
         return NGX_OK;
     }
 
     v->len = 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
     v->data = (u_char *) "?";
 
     return NGX_OK;
@@ -1987,11 +2007,7 @@ ngx_http_variable_request_completion(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    v->len = 0;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-    v->data = (u_char *) "";
+    *v = ngx_http_variable_null_value;
 
     return NGX_OK;
 }
