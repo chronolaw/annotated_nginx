@@ -502,6 +502,13 @@ ngx_http_init_phases(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
         return NGX_ERROR;
     }
 
+    if (ngx_array_init(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers,
+                       cf->pool, 2, sizeof(ngx_http_handler_pt))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
     if (ngx_array_init(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers,
                        cf->pool, 4, sizeof(ngx_http_handler_pt))
         != NGX_OK)
@@ -592,8 +599,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     // 1.12.0调整了代码格式
     n = 1                  /* find config phase */
         + use_rewrite      /* post rewrite phase */
-        + use_access       /* post access phase */
-        + cmcf->try_files;
+        + use_access;      /* post access phase */
 
     // 统计所有的handler模块数量，但不含log阶段，注意！
     for (i = 0; i < NGX_HTTP_LOG_PHASE; i++) {
@@ -689,15 +695,16 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 
             continue;
 
+        // 1.13.4去掉了原try_files阶段，改为precontent
         // 访问静态文件，不能介入
-        case NGX_HTTP_TRY_FILES_PHASE:
-            if (cmcf->try_files) {
-                ph->checker = ngx_http_core_try_files_phase;
-                n++;
-                ph++;
-            }
+        //case NGX_HTTP_TRY_FILES_PHASE:
+        //    if (cmcf->try_files) {
+        //        ph->checker = ngx_http_core_try_files_phase;
+        //        n++;
+        //        ph++;
+        //    }
 
-            continue;
+        //    continue;
 
         // 处理请求，产生响应内容，最常用的阶段
         // 这已经是处理的最后阶段了（log阶段不处理请求，不算）
@@ -715,7 +722,7 @@ ngx_http_init_phase_handlers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
         n += cmcf->phases[i].handlers.nelts;
 
         // 倒着遍历handler数组
-        for (j = cmcf->phases[i].handlers.nelts - 1; j >=0; j--) {
+        for (j = cmcf->phases[i].handlers.nelts - 1; j >= 0; j--) {
             ph->checker = checker;
             ph->handler = h[j];
             ph->next = n;

@@ -103,10 +103,15 @@ static ngx_str_t ngx_http_status_lines[] = {
     ngx_null_string,  /* "305 Use Proxy" */
     ngx_null_string,  /* "306 unused" */
     ngx_string("307 Temporary Redirect"),
+    ngx_string("308 Permanent Redirect"),
 
+<<<<<<< HEAD
 #define NGX_HTTP_LAST_3XX  308
 
 // 使用此偏移量计算4xx的位置
+=======
+#define NGX_HTTP_LAST_3XX  309
+>>>>>>> upgrade
 #define NGX_HTTP_OFF_4XX   (NGX_HTTP_LAST_3XX - 301 + NGX_HTTP_OFF_3XX)
 
     ngx_string("400 Bad Request"),
@@ -151,7 +156,7 @@ static ngx_str_t ngx_http_status_lines[] = {
     ngx_string("502 Bad Gateway"),
     ngx_string("503 Service Temporarily Unavailable"),
     ngx_string("504 Gateway Time-out"),
-    ngx_null_string,        /* "505 HTTP Version Not Supported" */
+    ngx_string("505 HTTP Version Not Supported"),
     ngx_null_string,        /* "506 Variant Also Negotiates" */
     ngx_string("507 Insufficient Storage"),
 
