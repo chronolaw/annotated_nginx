@@ -162,9 +162,10 @@ typedef enum {
     NGX_HTTP_POST_ACCESS_PHASE,
 
     // 1.13.3之前此阶段用户不可介入
+    //NGX_HTTP_TRY_FILES_PHASE,
     // 1.13.4后改为NGX_HTTP_PRECONTENT_PHASE
     // 用户可以在此阶段添加模块，在产生内容前做一些处理
-    NGX_HTTP_TRY_FILES_PHASE,
+    NGX_HTTP_PRECONTENT_PHASE,
 
     // 最常用的阶段，产生http内容，响应客户端请求
     // 在这里发出去的数据会由过滤链表处理最终发出
@@ -246,7 +247,8 @@ typedef struct {
     // http{}里定义的所有监听端口
     ngx_array_t               *ports;
 
-    ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
+    // 1.13.4之前有
+    //ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
 
     // http handler模块需要向这个数组添加元素
     // 在配置解析后的postconfiguration里向cmcf->phases数组注册
@@ -382,14 +384,15 @@ typedef struct {
 } ngx_http_err_page_t;
 
 
-typedef struct {
-    ngx_array_t               *lengths;
-    ngx_array_t               *values;
-    ngx_str_t                  name;
-
-    unsigned                   code:10;
-    unsigned                   test_dir:1;
-} ngx_http_try_file_t;
+// before 1.13.4
+//typedef struct {
+//    ngx_array_t               *lengths;
+//    ngx_array_t               *values;
+//    ngx_str_t                  name;
+//
+//    unsigned                   code:10;
+//    unsigned                   test_dir:1;
+//} ngx_http_try_file_t;
 
 
 // location的配置结构体
@@ -476,6 +479,8 @@ struct ngx_http_core_loc_conf_s {
     size_t        sendfile_max_chunk;      /* sendfile_max_chunk */
 
     size_t        read_ahead;              /* read_ahead */
+    size_t        subrequest_output_buffer_size;
+                                           /* subrequest_output_buffer_size */
 
     // 超时相关的参数
     ngx_msec_t    client_body_timeout;     /* client_body_timeout */
@@ -548,7 +553,6 @@ struct ngx_http_core_loc_conf_s {
 #endif
 
     ngx_array_t  *error_pages;             /* error_page */
-    ngx_http_try_file_t    *try_files;     /* try_files */
 
     ngx_path_t   *client_body_temp_path;   /* client_body_temp_path */
 
@@ -659,8 +663,8 @@ ngx_int_t ngx_http_core_post_access_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
 // 不研究
-ngx_int_t ngx_http_core_try_files_phase(ngx_http_request_t *r,
-    ngx_http_phase_handler_t *ph);
+//ngx_int_t ngx_http_core_try_files_phase(ngx_http_request_t *r,
+//    ngx_http_phase_handler_t *ph);
 
 // 处理请求，产生响应内容，最常用的阶段
 // 这已经是处理的最后阶段了（log阶段不处理请求，不算）
