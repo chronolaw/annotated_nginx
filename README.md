@@ -18,7 +18,7 @@ Nginx1.14增加了mirror模块，支持gRPC。
 * [stream lua, with log_by_lua/filter_by_lua](https://github.com/chronolaw/stream-lua-nginx-module)
 
 # 当前状态
-nginx 1.14.0, merging
+nginx 1.14.0
 
 # Git分支
 分支    |说明   |注释
