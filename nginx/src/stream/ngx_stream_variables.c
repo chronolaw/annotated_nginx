@@ -111,7 +111,7 @@ static ngx_stream_variable_t  ngx_stream_core_variables[] = {
     { ngx_string("protocol"), NULL,
       ngx_stream_variable_protocol, 0, 0, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_stream_null_variable
 };
 
 
@@ -161,7 +161,9 @@ ngx_stream_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
             return NULL;
         }
 
-        v->flags &= flags | ~NGX_STREAM_VAR_WEAK;
+        if (!(flags & NGX_STREAM_VAR_WEAK)) {
+            v->flags &= ~NGX_STREAM_VAR_WEAK;
+        }
 
         return v;
     }
@@ -227,7 +229,9 @@ ngx_stream_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name,
             return NULL;
         }
 
-        v->flags &= flags | ~NGX_STREAM_VAR_WEAK;
+        if (!(flags & NGX_STREAM_VAR_WEAK)) {
+            v->flags &= ~NGX_STREAM_VAR_WEAK;
+        }
 
         return v;
     }
@@ -460,7 +464,7 @@ ngx_stream_get_variable(ngx_stream_session_t *s, ngx_str_t *name,
 static ngx_int_t
 ngx_stream_variable_binary_remote_addr(ngx_stream_session_t *s,
      ngx_stream_variable_value_t *v, uintptr_t data)
- {
+{
     struct sockaddr_in   *sin;
 #if (NGX_HAVE_INET6)
     struct sockaddr_in6  *sin6;
