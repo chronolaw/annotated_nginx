@@ -65,6 +65,7 @@ typedef struct {
     ngx_msec_t                       response_time;
     ngx_msec_t                       connect_time;
     ngx_msec_t                       header_time;
+    ngx_msec_t                       queue_time;
     off_t                            response_length;
     off_t                            bytes_received;
 
@@ -124,10 +125,10 @@ typedef struct {
     // 服务器的恢复时间
     ngx_msec_t                       slow_start;
 
-    // 1.11.5新增slow_start、max_conns
-
     // 是否下线
-    unsigned                         down:1;
+    ngx_uint_t                       down;
+
+    // 1.11.5新增slow_start、max_conns
 
     // 是否是备用服务器
     unsigned                         backup:1;
@@ -261,6 +262,8 @@ typedef struct {
     signed                           store:2;
     unsigned                         intercept_404:1;
     unsigned                         change_buffering:1;
+    unsigned                         pass_trailers:1;
+    unsigned                         preserve_output:1;
 
 #if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_ssl_t                       *ssl;
@@ -290,6 +293,7 @@ typedef struct {
 
 typedef struct {
     ngx_list_t                       headers;
+    ngx_list_t                       trailers;
 
     ngx_uint_t                       status_n;
     ngx_str_t                        status_line;
@@ -450,6 +454,7 @@ struct ngx_http_upstream_s {
     // 是否已经发送请求体数据
     unsigned                         request_body_sent:1;
 
+    unsigned                         request_body_blocked:1;
     // 是否已经发送响应头
     unsigned                         header_sent:1;
 };
