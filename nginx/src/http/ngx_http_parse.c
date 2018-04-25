@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// 使用状态机解析，会调整缓冲区里的指针位置
+//
+// * ngx_http_parse_request_line
 
 /*
  * Copyright (C) Igor Sysoev
@@ -33,6 +38,8 @@ static uint32_t  usual[] = {
 };
 
 
+// 使用宏加速字符串比较，小优化
+// 实际上是转化为整数
 #if (NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED)
 
 #define ngx_str3_cmp(m, c0, c1, c2, c3)                                       \
@@ -134,6 +141,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
         sw_almost_done
     } state;
 
+    // 当前的状态
     state = r->state;
 
     for (p = b->pos; p < b->last; p++) {
@@ -142,27 +150,41 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
         switch (state) {
 
         /* HTTP methods: GET, HEAD, POST */
+
+        // 起始状态
         case sw_start:
+            // 数据的开始位置
             r->request_start = p;
 
             if (ch == CR || ch == LF) {
                 break;
             }
 
+            // 必须是大写字母，可以是_或-
+            // 否则出错
             if ((ch < 'A' || ch > 'Z') && ch != '_' && ch != '-') {
                 return NGX_HTTP_PARSE_INVALID_METHOD;
             }
 
+            // 转入解析method状态
             state = sw_method;
             break;
 
+        // 解析method状态
         case sw_method:
+            // 遇到空格才检测method
             if (ch == ' ') {
+
+                // method的结束位置
                 r->method_end = p - 1;
+
+                // method的开始位置
                 m = r->request_start;
 
+                // 看method多长
                 switch (p - m) {
 
+                // 3个字符就是get或put
                 case 3:
                     if (ngx_str3_cmp(m, 'G', 'E', 'T', ' ')) {
                         r->method = NGX_HTTP_GET;
@@ -176,6 +198,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 四个字符是post等
                 case 4:
                     if (m[1] == 'O') {
 
@@ -209,6 +232,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 5个字符
                 case 5:
                     if (ngx_str5cmp(m, 'M', 'K', 'C', 'O', 'L')) {
                         r->method = NGX_HTTP_MKCOL;
@@ -227,6 +251,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 6个字符
                 case 6:
                     if (ngx_str6cmp(m, 'D', 'E', 'L', 'E', 'T', 'E')) {
                         r->method = NGX_HTTP_DELETE;
@@ -240,6 +265,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 7个字符
                 case 7:
                     if (ngx_str7_cmp(m, 'O', 'P', 'T', 'I', 'O', 'N', 'S', ' '))
                     {
@@ -248,6 +274,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 8个字符
                 case 8:
                     if (ngx_str8cmp(m, 'P', 'R', 'O', 'P', 'F', 'I', 'N', 'D'))
                     {
@@ -256,6 +283,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
 
                     break;
 
+                // 9个字符
                 case 9:
                     if (ngx_str9cmp(m,
                             'P', 'R', 'O', 'P', 'P', 'A', 'T', 'C', 'H'))
@@ -266,10 +294,13 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
                     break;
                 }
 
+                // method解析完毕，进入uri前的空格状态
                 state = sw_spaces_before_uri;
                 break;
             }
 
+            // 必须是大写字母，可以是_或-
+            // 否则出错
             if ((ch < 'A' || ch > 'Z') && ch != '_' && ch != '-') {
                 return NGX_HTTP_PARSE_INVALID_METHOD;
             }
@@ -277,17 +308,24 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
             break;
 
         /* space* before URI */
+        // method解析完毕，进入uri前的空格状态
         case sw_spaces_before_uri:
 
+            // 通常的uri开头是/
             if (ch == '/') {
                 r->uri_start = p;
+
+                // 进入解析uri的状态
                 state = sw_after_slash_in_uri;
                 break;
             }
 
+            // 不规范的uri
             c = (u_char) (ch | 0x20);
             if (c >= 'a' && c <= 'z') {
                 r->schema_start = p;
+
+                // 进入解析shema状态
                 state = sw_schema;
                 break;
             }
@@ -300,6 +338,7 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
             }
             break;
 
+        // 进入解析shema状态
         case sw_schema:
 
             c = (u_char) (ch | 0x20);

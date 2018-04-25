@@ -803,6 +803,7 @@ struct ngx_http_request_s {
 
     /* used to parse HTTP headers */
 
+    // 解析http协议的状态机的状态
     ngx_uint_t                        state;
 
     ngx_uint_t                        header_hash;
