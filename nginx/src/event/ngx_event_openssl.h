@@ -109,6 +109,8 @@ struct ngx_ssl_connection_s {
 
 typedef struct ngx_ssl_sess_id_s  ngx_ssl_sess_id_t;
 
+// session id结构体
+// 有rbtree、queue成员
 struct ngx_ssl_sess_id_s {
     ngx_rbtree_node_t           node;
     u_char                     *id;
@@ -130,6 +132,7 @@ typedef struct {
 } ngx_ssl_session_cache_t;
 
 
+// session ticket key
 #ifdef SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB
 
 typedef struct {
@@ -142,6 +145,7 @@ typedef struct {
 #endif
 
 
+// 自定义ssl/tls版本标志
 #define NGX_SSL_SSLv2    0x0002
 #define NGX_SSL_SSLv3    0x0004
 #define NGX_SSL_TLSv1    0x0008
@@ -180,8 +184,11 @@ ngx_int_t ngx_ssl_dhparam(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file);
 ngx_int_t ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name);
 ngx_int_t ngx_ssl_session_cache(ngx_ssl_t *ssl, ngx_str_t *sess_ctx,
     ssize_t builtin_session_cache, ngx_shm_zone_t *shm_zone, time_t timeout);
+
+// session_ticket_keys
 ngx_int_t ngx_ssl_session_ticket_keys(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_array_t *paths);
+
 ngx_int_t ngx_ssl_session_cache_init(ngx_shm_zone_t *shm_zone, void *data);
 ngx_int_t ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c,
     ngx_uint_t flags);
