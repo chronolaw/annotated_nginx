@@ -23,6 +23,7 @@ typedef struct ngx_http_upstream_rr_peer_s   ngx_http_upstream_rr_peer_t;
 
 // 与每个服务器的具体IP地址一一对应
 // 1.11.5新增slow_start、max_conns
+// 但slow_start在开源版本中暂未使用
 struct ngx_http_upstream_rr_peer_s {
     struct sockaddr                *sockaddr;
     socklen_t                       socklen;
@@ -33,7 +34,10 @@ struct ngx_http_upstream_rr_peer_s {
     ngx_int_t                       effective_weight;
     ngx_int_t                       weight;
 
+    // 活跃连接数
     ngx_uint_t                      conns;
+
+    // 最大活跃连接数
     ngx_uint_t                      max_conns;
 
     ngx_uint_t                      fails;
@@ -45,6 +49,7 @@ struct ngx_http_upstream_rr_peer_s {
     ngx_msec_t                      slow_start;
     ngx_msec_t                      start_time;
 
+    // 是否下线
     ngx_uint_t                      down;
 
 #if (NGX_HTTP_SSL || NGX_COMPAT)
