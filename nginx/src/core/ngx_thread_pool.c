@@ -527,7 +527,7 @@ ngx_thread_pool_cycle(void *data)
         //
         // 调用系统函数eventfd，创建一个可以用于通知的描述符，用于实现notify
         (void) ngx_notify(ngx_thread_pool_handler);
-    }
+    }   //无限循环，回到开头再取下一个task
 }
 
 
