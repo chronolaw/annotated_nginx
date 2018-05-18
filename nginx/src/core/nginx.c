@@ -41,8 +41,11 @@ static char *ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf);
 static char *ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+// 设置绑定cpu的掩码
 static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
 static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -155,6 +158,7 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       NULL },
 
+    // 设置绑定cpu的掩码
     { ngx_string("worker_cpu_affinity"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_1MORE,
       ngx_set_cpu_affinity,
@@ -1508,6 +1512,7 @@ ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 设置绑定cpu的掩码
 static char *
 ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1519,20 +1524,27 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t        i, n;
     ngx_cpuset_t     *mask;
 
+    // 不能重复设置
     if (ccf->cpu_affinity) {
         return "is duplicate";
     }
 
+    // 创建数组，个数是参数数量减1,即去掉指令的数量
     mask = ngx_palloc(cf->pool, (cf->args->nelts - 1) * sizeof(ngx_cpuset_t));
     if (mask == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 掩码数量
     ccf->cpu_affinity_n = cf->args->nelts - 1;
+
+    // 把掩码填入ccf核心配置
     ccf->cpu_affinity = mask;
 
     value = cf->args->elts;
 
+    // 处理auto参数
+    // auto后可以再使用掩码
     if (ngx_strcmp(value[1].data, "auto") == 0) {
 
         if (cf->args->nelts > 3) {
@@ -1552,11 +1564,14 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         n = 2;
 
     } else {
+        // 没有auto则都是掩码
         n = 1;
     }
 
+    // 逐个处理掩码
     for ( /* void */ ; n < cf->args->nelts; n++) {
 
+        // 二进制掩码的长度不能超过cpu数量
         if (value[n].len > CPU_SETSIZE) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                          "\"worker_cpu_affinity\" supports up to %d CPUs only",
@@ -1567,12 +1582,15 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         i = 0;
         CPU_ZERO(&mask[n - 1]);
 
+        // 注意是倒着计算，最右边的是CPU0
         for (p = value[n].data + value[n].len - 1;
              p >= value[n].data;
              p--)
         {
             ch = *p;
 
+            // 允许使用空格
+            // 例如'00 01'
             if (ch == ' ') {
                 continue;
             }
@@ -1583,6 +1601,7 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 continue;
             }
 
+            // 设置掩码
             if (ch == '1') {
                 CPU_SET(i - 1, &mask[n - 1]);
                 continue;
@@ -1592,8 +1611,8 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                           "invalid character \"%c\" in \"worker_cpu_affinity\"",
                           ch);
             return NGX_CONF_ERROR;
-        }
-    }
+        }   // 处理完一个掩码
+    }   // 处理完所有掩码
 
 #else
 
