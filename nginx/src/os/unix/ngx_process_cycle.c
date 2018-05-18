@@ -911,6 +911,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
     ngx_worker_process_init(cycle, worker);
 
     // 设置进程名字
+    // 这里可以改进一下，增加workerid，或者其他特殊标记
+    // 可以由其他模块在init_worker阶段或稍后的时刻特殊操作
+    // 例如设置一个特殊的32字节字符串
     ngx_setproctitle("worker process");
 
     // 无限循环，处理事件和信号
