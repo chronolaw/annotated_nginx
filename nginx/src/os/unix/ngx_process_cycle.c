@@ -1111,9 +1111,13 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 #endif
     }
 
+    // 绑定cpu
     if (worker >= 0) {
+        // 根据worker id得到cpu掩码
+        // 由指令worker_cpu_affinity确定
         cpu_affinity = ngx_get_cpu_affinity(worker);
 
+        // 绑定cpu
         if (cpu_affinity) {
             ngx_setaffinity(cpu_affinity, cycle->log);
         }

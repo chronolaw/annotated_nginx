@@ -1544,9 +1544,10 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     // 处理auto参数
-    // auto后可以再使用掩码
+    // auto后可以再使用一个掩码，限定绑定的cpu
     if (ngx_strcmp(value[1].data, "auto") == 0) {
 
+        // 使用auto后不能有多个mask
         if (cf->args->nelts > 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid number of arguments in "
@@ -1554,13 +1555,16 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
+        // 自动绑定标志位
         ccf->cpu_affinity_auto = 1;
 
+        // 置所有的cpu位
         CPU_ZERO(&mask[0]);
         for (i = 0; i < (ngx_uint_t) ngx_min(ngx_ncpu, CPU_SETSIZE); i++) {
             CPU_SET(i, &mask[0]);
         }
 
+        // 之后从第2个开始
         n = 2;
 
     } else {
@@ -1642,9 +1646,12 @@ ngx_get_cpu_affinity(ngx_uint_t n)
         return NULL;
     }
 
+    // 自动绑定cpu
     if (ccf->cpu_affinity_auto) {
+        // 取限制掩码
         mask = &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
 
+        // 找到应该使用的cpu
         for (i = 0, j = n; /* void */ ; i++) {
 
             if (CPU_ISSET(i % CPU_SETSIZE, mask) && j-- == 0) {
@@ -1659,16 +1666,19 @@ ngx_get_cpu_affinity(ngx_uint_t n)
             /* void */
         }
 
+        // 设置掩码
         CPU_ZERO(&result);
         CPU_SET(i % CPU_SETSIZE, &result);
 
         return &result;
     }
 
+    // 不是自动设置则取第n个
     if (ccf->cpu_affinity_n > n) {
         return &ccf->cpu_affinity[n];
     }
 
+    // 设置的不足，取最后一个绑定
     return &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
 
 #else

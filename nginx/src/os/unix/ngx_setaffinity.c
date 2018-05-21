@@ -32,18 +32,23 @@ ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 
 #elif (NGX_HAVE_SCHED_SETAFFINITY)
 
+// Linux里使用这个函数绑定cpu
 void
 ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 {
     ngx_uint_t  i;
 
+    // 检查是否已经设置了某几个cpu的亲和性
     for (i = 0; i < CPU_SETSIZE; i++) {
+        // 使用宏CPU_ISSET检测，只记录notice日志
         if (CPU_ISSET(i, cpu_affinity)) {
             ngx_log_error(NGX_LOG_NOTICE, log, 0,
                           "sched_setaffinity(): using cpu #%ui", i);
         }
     }
 
+    // 实际上是设置线程的亲和性
+    // 但因为nginx是单线程，所以相当于设置了进程
     if (sched_setaffinity(0, sizeof(cpu_set_t), cpu_affinity) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
                       "sched_setaffinity() failed");
