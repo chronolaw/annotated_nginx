@@ -17,6 +17,10 @@
 // nginx的动态数组，表示一块连续的内存，其中顺序存放着数组元素，概念上和原始数组很接近
 // 如果数组内的元素不断增加，当nelts > nalloc时将会引发数组扩容
 // 可对比std::vector
+//
+// 数组空 arr->nelts == 0
+// 添加元素 T* p = ngx_array_push(arr)
+// 访问元素 T* values = arr->elts
 typedef struct {
     void        *elts;      //数组的内存位置，即数组首地址
     ngx_uint_t   nelts;     //数组当前的元素数量
@@ -27,6 +31,7 @@ typedef struct {
 
 
 // 使用内存池创建一个可容纳n个大小为size元素的数组，即分配了一块n*size大小的内存块
+// size参数通常要使用sizeof(T)
 ngx_array_t *ngx_array_create(ngx_pool_t *p, ngx_uint_t n, size_t size);
 
 // “销毁”动态数组，归还分配的内存
@@ -47,11 +52,13 @@ ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size)
      * that "array->nelts" may be used without having been initialized
      */
 
+    // 重新初始化数组属性
     array->nelts = 0;
     array->size = size;
     array->nalloc = n;
     array->pool = pool;
 
+    // 重新分配内存，原内存不释放
     array->elts = ngx_palloc(pool, n * size);
     if (array->elts == NULL) {
         return NGX_ERROR;
