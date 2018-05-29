@@ -32,11 +32,32 @@ typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
 
 // nginx共享内存结构体
 struct ngx_shm_zone_s {
+    // init回调使用的数据
     void                     *data;
+
+    // os/unix/ngx_shmem.h
+    // typedef struct {
+    //     u_char      *addr;
+    //     size_t       size;
+    //     ngx_str_t    name;
+    //     ngx_log_t   *log;
+    //     ngx_uint_t   exists;   /* unsigned  exists:1;  */
+    // } ngx_shm_t;
+    // 真正操作共享内存的对象
     ngx_shm_t                 shm;
+
+    // 创建成功后回调初始化共享内存
+    // typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
+    // data不空表示复用旧数据
     ngx_shm_zone_init_pt      init;
+
+    // 关联的标记，防止同名
+    // 通常是创建共享内存的模块指针
     void                     *tag;
+
     void                     *sync;
+
+    // reload时是否复用
     ngx_uint_t                noreuse;  /* unsigned  noreuse:1; */
 };
 

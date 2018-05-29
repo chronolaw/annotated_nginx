@@ -18,8 +18,10 @@
 // 出错时销毁cycle里的内存池
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
 
+// 初始化共享内存
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
     ngx_shm_zone_t *shm_zone);
+
 static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
 static void ngx_clean_old_cycles(ngx_event_t *ev);
 static void ngx_shutdown_timer_handler(ngx_event_t *ev);
@@ -497,6 +499,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             i = 0;
         }
 
+        // 不允许0字节的共享内存
         if (shm_zone[i].shm.size == 0) {
             ngx_log_error(NGX_LOG_EMERG, log, 0,
                           "zero size shared memory zone \"%V\"",
@@ -506,6 +509,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
         shm_zone[i].shm.log = cycle->log;
 
+        // 看是否有之前实例创建的共享内存
         opart = &old_cycle->shared_memory.part;
         oshm_zone = opart->elts;
 
@@ -532,6 +536,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 continue;
             }
 
+            // 是否复用
             if (shm_zone[i].tag == oshm_zone[n].tag
                 && shm_zone[i].shm.size == oshm_zone[n].shm.size
                 && !shm_zone[i].noreuse)
@@ -553,14 +558,17 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             break;
         }
 
+        // 创建共享内存
         if (ngx_shm_alloc(&shm_zone[i].shm) != NGX_OK) {
             goto failed;
         }
 
+        // 初始化共享内存
         if (ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK) {
             goto failed;
         }
 
+        // 回调模块自己的初始化函数
         if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
             goto failed;
         }
@@ -984,6 +992,7 @@ ngx_destroy_cycle_pools(ngx_conf_t *conf)
 }
 
 
+// 初始化共享内存
 static ngx_int_t
 ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 {
@@ -992,6 +1001,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 
     sp = (ngx_slab_pool_t *) zn->shm.addr;
 
+    // 已存在就复用
     if (zn->shm.exists) {
 
         if (sp == sp->addr) {
@@ -1020,6 +1030,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
         return NGX_ERROR;
     }
 
+    // 设置slab的参数
     sp->end = zn->shm.addr + zn->shm.size;
     sp->min_shift = 3;
     sp->addr = zn->shm.addr;
@@ -1039,6 +1050,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 
 #endif
 
+    // 共享内存锁
     if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -1328,6 +1340,8 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
 }
 
 
+// 添加一个共享内存区域定义
+// 加入链表cycle->shared_memory
 ngx_shm_zone_t *
 ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
 {
@@ -1338,6 +1352,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     part = &cf->cycle->shared_memory.part;
     shm_zone = part->elts;
 
+    // 查找是否有重复定义
     for (i = 0; /* void */ ; i++) {
 
         if (i >= part->nelts) {
@@ -1382,21 +1397,29 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
         return &shm_zone[i];
     }
 
+    // 加入链表
     shm_zone = ngx_list_push(&cf->cycle->shared_memory);
 
     if (shm_zone == NULL) {
         return NULL;
     }
 
+    // 各种参数
     shm_zone->data = NULL;
     shm_zone->shm.log = cf->cycle->log;
+
+    // 共享内存的大小
     shm_zone->shm.size = size;
+
+    // 共享内存的名字
     shm_zone->shm.name = *name;
+
     shm_zone->shm.exists = 0;
     shm_zone->init = NULL;
     shm_zone->tag = tag;
     shm_zone->noreuse = 0;
 
+    // 返回结构体，需要再填充自己的数据
     return shm_zone;
 }
 
