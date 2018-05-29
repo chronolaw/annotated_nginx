@@ -1050,7 +1050,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 
 #endif
 
-    // 共享内存锁
+    // 共享内存锁,使用了信号量
     if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
         return NGX_ERROR;
     }

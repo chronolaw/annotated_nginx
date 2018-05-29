@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -9,11 +10,14 @@
 #include <ngx_core.h>
 
 
+// 通常都进这个条件编译
 #if (NGX_HAVE_MAP_ANON)
 
+// 创建一块共享内存
 ngx_int_t
 ngx_shm_alloc(ngx_shm_t *shm)
 {
+    // MAP_ANON|MAP_SHARED
     shm->addr = (u_char *) mmap(NULL, shm->size,
                                 PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, 0);
@@ -28,6 +32,7 @@ ngx_shm_alloc(ngx_shm_t *shm)
 }
 
 
+// 销毁共享内存
 void
 ngx_shm_free(ngx_shm_t *shm)
 {

@@ -31,6 +31,14 @@ typedef struct ngx_shm_zone_s  ngx_shm_zone_t;
 typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
 
 // nginx共享内存结构体
+// 使用共享内存锁保证安全
+//
+// ngx_uint_t ngx_shmtx_trylock(ngx_shmtx_t *mtx);
+// void ngx_shmtx_lock(ngx_shmtx_t *mtx);
+// void ngx_shmtx_unlock(ngx_shmtx_t *mtx);
+//
+// sp = (ngx_slab_pool_t *) zn->shm.addr;
+// if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
 struct ngx_shm_zone_s {
     // init回调使用的数据
     void                     *data;
