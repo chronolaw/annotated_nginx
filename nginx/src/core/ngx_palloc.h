@@ -42,30 +42,55 @@ struct ngx_pool_cleanup_s {
 };
 
 
+// 大块内存节点
 typedef struct ngx_pool_large_s  ngx_pool_large_t;
 
+// 大块内存节点, 大于4k
+// 保存成链表方便回收利用
 struct ngx_pool_large_s {
     ngx_pool_large_t     *next;
     void                 *alloc;
 };
 
 
+// 描述内存池的信息
 typedef struct {
+    // 可用内存的起始位置
     u_char               *last;
+
+    // 可用内存的结束位置
     u_char               *end;
+
+    // 下一个内存池节点
     ngx_pool_t           *next;
+
+    // 本节点分配失败次数
     ngx_uint_t            failed;
 } ngx_pool_data_t;
 
 
 // nginx内存池结构体
+// 实际是由多个节点串成的链表
+// 每个节点分配小块内存
+// 但大块内存链表只在头节点
 struct ngx_pool_s {
+    // 描述本内存池节点的信息
     ngx_pool_data_t       d;
+
+    // 可分配的最大块
     size_t                max;
+
+    // 当前使用的内存池节点
     ngx_pool_t           *current;
+
+    // 为chain做的优化，空闲缓冲区链表
     ngx_chain_t          *chain;
+
+    // 大块的内存
     ngx_pool_large_t     *large;
+
     ngx_pool_cleanup_t   *cleanup;      //清理链表头指针
+
     ngx_log_t            *log;
 };
 
@@ -83,22 +108,32 @@ typedef struct {
 // void *ngx_calloc(size_t size, ngx_log_t *log);
 
 // 创建/销毁内存池
+
+// 字节对齐分配一个size - sizeof(ngx_pool_t)内存
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
+
 void ngx_destroy_pool(ngx_pool_t *pool);
 void ngx_reset_pool(ngx_pool_t *pool);
 
 // 分配对齐的内存，速度快，可能有少量浪费
+// 分配大块内存(>4k),直接调用malloc
+// 所以可以用jemalloc来优化
 void *ngx_palloc(ngx_pool_t *pool, size_t size);
 
 // 分配未对齐的内存
+// 分配大块内存(>4k),直接调用malloc
+// 所以可以用jemalloc来优化
 void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
 
 // 使用ngx_palloc分配内存，并将内存块清零
+// 分配大块内存(>4k),直接调用malloc
+// 所以可以用jemalloc来优化
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
 
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
 
 // 把内存归还给内存池，通常无需调用
+// 实际上只释放大块内存
 ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
 
 

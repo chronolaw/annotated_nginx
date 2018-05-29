@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// * ngx_create_pool
+// * ngx_palloc_small
+// * ngx_palloc_large
 
 /*
  * Copyright (C) Igor Sysoev
@@ -15,27 +20,41 @@ static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
+// 字节对齐分配一个size - sizeof(ngx_pool_t)内存
+// 一开始只有一个内存池节点
 ngx_pool_t *
 ngx_create_pool(size_t size, ngx_log_t *log)
 {
     ngx_pool_t  *p;
 
+    // 字节对齐分配内存
+    // os/unix/ngx_alloc.c
     p = ngx_memalign(NGX_POOL_ALIGNMENT, size, log);
     if (p == NULL) {
         return NULL;
     }
 
+    // 设置可用的内存，减去了自身的大小
     p->d.last = (u_char *) p + sizeof(ngx_pool_t);
     p->d.end = (u_char *) p + size;
+
+    // 一开始只有一个内存池节点
     p->d.next = NULL;
     p->d.failed = 0;
 
+    // 池内可用的内存空间
     size = size - sizeof(ngx_pool_t);
+
+    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k
     p->max = (size < NGX_MAX_ALLOC_FROM_POOL) ? size : NGX_MAX_ALLOC_FROM_POOL;
 
+    // 刚创建，就使用自己
     p->current = p;
+
+    // 未开始分配，链表都是空
     p->chain = NULL;
     p->large = NULL;
+
     p->cleanup = NULL;
     p->log = log;
 
@@ -43,6 +62,7 @@ ngx_create_pool(size_t size, ngx_log_t *log)
 }
 
 
+// 销毁内存池
 void
 ngx_destroy_pool(ngx_pool_t *pool)
 {
@@ -50,6 +70,7 @@ ngx_destroy_pool(ngx_pool_t *pool)
     ngx_pool_large_t    *l;
     ngx_pool_cleanup_t  *c;
 
+    // 调用清理函数链表
     for (c = pool->cleanup; c; c = c->next) {
         if (c->handler) {
             ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
@@ -80,12 +101,16 @@ ngx_destroy_pool(ngx_pool_t *pool)
 
 #endif
 
+    // 检查大块内存链表，直接free
+    // in os/unix/ngx_alloc.h
+    // #define ngx_free          free
     for (l = pool->large; l; l = l->next) {
         if (l->alloc) {
             ngx_free(l->alloc);
         }
     }
 
+    // 遍历内存池节点，逐个free
     for (p = pool, n = pool->d.next; /* void */; p = n, n = n->d.next) {
         ngx_free(p);
 
@@ -96,6 +121,7 @@ ngx_destroy_pool(ngx_pool_t *pool)
 }
 
 
+// 重置内存池，释放内存
 void
 ngx_reset_pool(ngx_pool_t *pool)
 {
@@ -119,22 +145,27 @@ ngx_reset_pool(ngx_pool_t *pool)
 }
 
 
+// 分配对齐的内存，速度快，可能有少量浪费
 void *
 ngx_palloc(ngx_pool_t *pool, size_t size)
 {
+    // 如果要求小于4k的内存，对齐分配
 #if !(NGX_DEBUG_PALLOC)
     if (size <= pool->max) {
         return ngx_palloc_small(pool, size, 1);
     }
 #endif
 
+    // 分配大块内存(>4k)
     return ngx_palloc_large(pool, size);
 }
 
 
+// 分配未对齐的内存
 void *
 ngx_pnalloc(ngx_pool_t *pool, size_t size)
 {
+    // 如果要求小于4k的内存，不对齐分配
 #if !(NGX_DEBUG_PALLOC)
     if (size <= pool->max) {
         return ngx_palloc_small(pool, size, 0);
@@ -145,35 +176,46 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
 }
 
 
+// 在本内存池内分配小块内存
 static ngx_inline void *
 ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 {
     u_char      *m;
     ngx_pool_t  *p;
 
+    // 使用当前节点
     p = pool->current;
 
     do {
+        // 空闲内存的起始位置
         m = p->d.last;
 
+        // 要求对齐
         if (align) {
             m = ngx_align_ptr(m, NGX_ALIGNMENT);
         }
 
+        // 看空间是否足够
         if ((size_t) (p->d.end - m) >= size) {
+            // 移动空闲内存的位置
             p->d.last = m + size;
 
             return m;
         }
 
+        // 空闲不足，找下一个内存池节点
         p = p->d.next;
 
     } while (p);
 
+    // 所有当前的内存池节点都空间不足
+    // 需要创建一个新的节点
     return ngx_palloc_block(pool, size);
 }
 
 
+// 所有内存池节点都空间不足
+// 创建一个新的节点
 static void *
 ngx_palloc_block(ngx_pool_t *pool, size_t size)
 {
@@ -181,8 +223,10 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     size_t       psize;
     ngx_pool_t  *p, *new;
 
+    // 计算当前内存池的大小
     psize = (size_t) (pool->d.end - (u_char *) pool);
 
+    // 创建一个新节点
     m = ngx_memalign(NGX_POOL_ALIGNMENT, psize, pool->log);
     if (m == NULL) {
         return NULL;
@@ -190,14 +234,19 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
     new = (ngx_pool_t *) m;
 
+    // 设置节点的空闲空间
     new->d.end = m + psize;
     new->d.next = NULL;
     new->d.failed = 0;
 
+    // 跳过内存池结构体的长度
     m += sizeof(ngx_pool_data_t);
+
+    // 成功分配内存
     m = ngx_align_ptr(m, NGX_ALIGNMENT);
     new->d.last = m + size;
 
+    // 重新设置当前节点
     for (p = pool->current; p->d.next; p = p->d.next) {
         if (p->d.failed++ > 4) {
             pool->current = p->d.next;
@@ -206,10 +255,13 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
     p->d.next = new;
 
+    // 返回分配的内存
     return m;
 }
 
 
+// 分配大块内存(>4k),直接调用malloc
+// 所以可以用jemalloc来优化
 static void *
 ngx_palloc_large(ngx_pool_t *pool, size_t size)
 {
@@ -217,6 +269,7 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
     ngx_uint_t         n;
     ngx_pool_large_t  *large;
 
+    // 封装C库函数malloc，可以记录错误日志
     p = ngx_alloc(size, pool->log);
     if (p == NULL) {
         return NULL;
@@ -224,23 +277,28 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
 
     n = 0;
 
+    // 挂到大块链表里
     for (large = pool->large; large; large = large->next) {
         if (large->alloc == NULL) {
             large->alloc = p;
             return p;
         }
 
+        // 只找三次，避免低效查找
         if (n++ > 3) {
             break;
         }
     }
 
+    // 三次没有空节点则新建一个
     large = ngx_palloc_small(pool, sizeof(ngx_pool_large_t), 1);
     if (large == NULL) {
         ngx_free(p);
         return NULL;
     }
 
+    // 挂到链表最前面
+    // 可以理解为先进先出
     large->alloc = p;
     large->next = pool->large;
     pool->large = large;
@@ -274,11 +332,15 @@ ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment)
 }
 
 
+// 把内存归还给内存池，通常无需调用
+// 实际上只释放大块内存
 ngx_int_t
 ngx_pfree(ngx_pool_t *pool, void *p)
 {
     ngx_pool_large_t  *l;
 
+    // 遍历大块链表，找到则释放
+    // 如果多次申请大块内存需要当心效率
     for (l = pool->large; l; l = l->next) {
         if (p == l->alloc) {
             ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
@@ -294,6 +356,7 @@ ngx_pfree(ngx_pool_t *pool, void *p)
 }
 
 
+// 使用ngx_palloc分配内存，并将内存块清零
 void *
 ngx_pcalloc(ngx_pool_t *pool, size_t size)
 {
