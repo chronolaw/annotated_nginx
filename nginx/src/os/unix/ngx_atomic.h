@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Igor Sysoev
@@ -12,6 +13,12 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+// Linux下通常使用的是gcc atomic
+//#define ngx_atomic_cmp_set(lock, old, set)                                    \
+//    __sync_bool_compare_and_swap(lock, old, set)
+//
+//#define ngx_atomic_fetch_add(value, add)                                      \
+//    __sync_fetch_and_add(value, add)
 
 #if (NGX_HAVE_LIBATOMIC)
 
