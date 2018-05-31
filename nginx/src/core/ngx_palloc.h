@@ -18,11 +18,16 @@
  * NGX_MAX_ALLOC_FROM_POOL should be (ngx_pagesize - 1), i.e. 4095 on x86.
  * On Windows NT it decreases a number of locked pages in a kernel.
  */
+// 在内存池可直接分配的最大块，通常是4k
 #define NGX_MAX_ALLOC_FROM_POOL  (ngx_pagesize - 1)
 
+// 默认一个内存池块大小是16k
+// 用于cycle->pool
 #define NGX_DEFAULT_POOL_SIZE    (16 * 1024)
 
+// 内存池对齐数，16字节，即128位
 #define NGX_POOL_ALIGNMENT       16
+
 #define NGX_MIN_POOL_SIZE                                                     \
     ngx_align((sizeof(ngx_pool_t) + 2 * sizeof(ngx_pool_large_t)),            \
               NGX_POOL_ALIGNMENT)
@@ -72,7 +77,7 @@ typedef struct {
 // nginx内存池结构体
 // 实际是由多个节点串成的链表
 // 每个节点分配小块内存
-// 但大块内存链表只在头节点
+// 但max、current、大块内存链表只在头节点
 struct ngx_pool_s {
     // 描述本内存池节点的信息
     ngx_pool_data_t       d;
@@ -101,7 +106,6 @@ typedef struct {
     ngx_log_t            *log;
 } ngx_pool_cleanup_file_t;
 
-// 1.14.0删除了下面的两个函数
 // 分配内存,不用内存池，使用malloc
 // 实现在os/unix/ngx_alloc.c
 // void *ngx_alloc(size_t size, ngx_log_t *log);
@@ -110,9 +114,13 @@ typedef struct {
 // 创建/销毁内存池
 
 // 字节对齐分配一个size - sizeof(ngx_pool_t)内存
+// 内存池的大小可以超过4k
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
 
+// 销毁内存池
 void ngx_destroy_pool(ngx_pool_t *pool);
+
+// 重置内存池，释放内存
 void ngx_reset_pool(ngx_pool_t *pool);
 
 // 分配对齐的内存，速度快，可能有少量浪费
@@ -130,6 +138,7 @@ void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
 // 所以可以用jemalloc来优化
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
 
+// 字节对齐分配大块内存
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
 
 // 把内存归还给内存池，通常无需调用

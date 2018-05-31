@@ -21,13 +21,14 @@ static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
 // 字节对齐分配一个size - sizeof(ngx_pool_t)内存
+// 内存池的大小可以超过4k
 // 一开始只有一个内存池节点
 ngx_pool_t *
 ngx_create_pool(size_t size, ngx_log_t *log)
 {
     ngx_pool_t  *p;
 
-    // 字节对齐分配内存
+    // 字节对齐分配内存,16字节的倍数
     // os/unix/ngx_alloc.c
     p = ngx_memalign(NGX_POOL_ALIGNMENT, size, log);
     if (p == NULL) {
@@ -128,18 +129,24 @@ ngx_reset_pool(ngx_pool_t *pool)
     ngx_pool_t        *p;
     ngx_pool_large_t  *l;
 
+    // 检查大块内存链表，直接free
     for (l = pool->large; l; l = l->next) {
         if (l->alloc) {
             ngx_free(l->alloc);
         }
     }
 
+    // 遍历内存池节点，逐个重置空闲指针位置
+    // 相当于释放了已经分配的内存
     for (p = pool; p; p = p->d.next) {
         p->d.last = (u_char *) p + sizeof(ngx_pool_t);
         p->d.failed = 0;
     }
 
+    // 当前内存池指针
     pool->current = pool;
+
+    // 指针置空，之前的内存都已经释放了
     pool->chain = NULL;
     pool->large = NULL;
 }
@@ -190,7 +197,12 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
         // 空闲内存的起始位置
         m = p->d.last;
 
-        // 要求对齐
+        // 要求对齐，所以会有少量浪费，但cpu处理速度快
+        // 向上对齐到8字节(64位), in ngx_config.h
+        // #define NGX_ALIGNMENT   sizeof(unsigned long)    /* platform word */
+        // #define ngx_align(d, a)     (((d) + (a - 1)) & ~(a - 1))
+        // #define ngx_align_ptr(p, a)                                                   \
+        //     (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
         if (align) {
             m = ngx_align_ptr(m, NGX_ALIGNMENT);
         }
@@ -216,6 +228,8 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 
 // 所有内存池节点都空间不足
 // 创建一个新的节点
+// 跳过内存池描述信息的长度
+// 后面的max,current等没有意义，所以可以被利用
 static void *
 ngx_palloc_block(ngx_pool_t *pool, size_t size)
 {
@@ -239,7 +253,8 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     new->d.next = NULL;
     new->d.failed = 0;
 
-    // 跳过内存池结构体的长度
+    // 跳过内存池描述信息的长度
+    // 后面的max,current等没有意义，所以可以被利用
     m += sizeof(ngx_pool_data_t);
 
     // 成功分配内存
@@ -307,23 +322,28 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
 }
 
 
+// 字节对齐分配大块内存
 void *
 ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment)
 {
     void              *p;
     ngx_pool_large_t  *large;
 
+    // 字节对齐分配内存,16字节的倍数
+    // os/unix/ngx_alloc.c
     p = ngx_memalign(alignment, size, pool->log);
     if (p == NULL) {
         return NULL;
     }
 
+    // 新建一个管理节点
     large = ngx_palloc_small(pool, sizeof(ngx_pool_large_t), 1);
     if (large == NULL) {
         ngx_free(p);
         return NULL;
     }
 
+    // 加入大块内存链表
     large->alloc = p;
     large->next = pool->large;
     pool->large = large;
