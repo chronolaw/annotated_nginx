@@ -28,6 +28,11 @@
 // 内存池对齐数，16字节，即128位
 #define NGX_POOL_ALIGNMENT       16
 
+// 内存池最小的大小
+// 首先要能够容纳ngx_pool_t结构体
+// 然后还要至少能分配两个大内存块
+// 最后16字节对齐
+// 用于配置内存池时的参数检查
 #define NGX_MIN_POOL_SIZE                                                     \
     ngx_align((sizeof(ngx_pool_t) + 2 * sizeof(ngx_pool_large_t)),            \
               NGX_POOL_ALIGNMENT)
@@ -75,7 +80,7 @@ typedef struct {
 
 
 // nginx内存池结构体
-// 实际是由多个节点串成的链表
+// 实际是由多个节点串成的单向链表
 // 每个节点分配小块内存
 // 但max、current、大块内存链表只在头节点
 struct ngx_pool_s {
@@ -123,7 +128,7 @@ void ngx_destroy_pool(ngx_pool_t *pool);
 // 重置内存池，释放内存
 void ngx_reset_pool(ngx_pool_t *pool);
 
-// 分配对齐的内存，速度快，可能有少量浪费
+// 分配8字节对齐的内存，速度快，可能有少量浪费
 // 分配大块内存(>4k),直接调用malloc
 // 所以可以用jemalloc来优化
 void *ngx_palloc(ngx_pool_t *pool, size_t size);

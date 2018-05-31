@@ -227,7 +227,7 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 
 
 // 所有内存池节点都空间不足
-// 创建一个新的节点
+// 创建一个新的节点，即内存块
 // 跳过内存池描述信息的长度
 // 后面的max,current等没有意义，所以可以被利用
 static void *
@@ -263,11 +263,15 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
     // 重新设置当前节点
     for (p = pool->current; p->d.next; p = p->d.next) {
+        // 分配失败次数超过5次的节点
+        // 它的下一个节点作为current
+        // 也就是说之前的节点都已经满了，不会再做分配
         if (p->d.failed++ > 4) {
             pool->current = p->d.next;
         }
     }
 
+    // 失败不超过四次，挂到末尾
     p->d.next = new;
 
     // 返回分配的内存
