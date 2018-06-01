@@ -12,7 +12,8 @@
 #include <ngx_core.h>
 
 
-// 内存页的标记
+// 内存页的标记，即二进制11
+// 在指针的后两位
 #define NGX_SLAB_PAGE_MASK   3
 
 // 整页分配，0,即memzero
@@ -57,8 +58,11 @@
 #define ngx_slab_slots(pool)                                                  \
     (ngx_slab_page_t *) ((u_char *) (pool) + sizeof(ngx_slab_pool_t))
 
+// 检查内存页的类型
+// 取指针末两位
 #define ngx_slab_page_type(page)   ((page)->prev & NGX_SLAB_PAGE_MASK)
 
+// 去掉末两位，得到实际的指针
 #define ngx_slab_page_prev(page)                                              \
     (ngx_slab_page_t *) ((page)->prev & ~NGX_SLAB_PAGE_MASK)
 
@@ -92,6 +96,7 @@ static ngx_slab_page_t *ngx_slab_alloc_pages(ngx_slab_pool_t *pool,
 static void ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     ngx_uint_t pages);
 
+// 简单地记录日志
 static void ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level,
     char *text);
 
@@ -192,6 +197,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     page->prev = (uintptr_t) &pool->free;
 
     // 真正可用的内存空间
+    // 有指针对齐,对齐到4k，可能会有内存浪费
     pool->start = ngx_align_ptr(p + pages * sizeof(ngx_slab_page_t),
                                 ngx_pagesize);
 
@@ -212,6 +218,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     // 是否记录无内存异常
     pool->log_nomem = 1;
 
+    // 日志用的对象
     pool->log_ctx = &pool->zero;
     pool->zero = '\0';
 }
@@ -880,6 +887,7 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
         }
     }
 
+    // 加入最后一页的prev，方便以后的合并查找
     if (pages) {
         page[pages].prev = (uintptr_t) page;
     }
@@ -890,10 +898,12 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
 
     page->next->prev = (uintptr_t) page;
 
+    // 空闲链表头节点
     pool->free.next = page;
 }
 
 
+// 简单地记录日志
 static void
 ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level, char *text)
 {
