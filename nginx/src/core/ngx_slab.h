@@ -1,4 +1,6 @@
 // annotated by chrono since 2018
+//
+// * ngx_slab_pool_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -36,6 +38,8 @@ typedef struct {
 
 
 // 管理共享内存的池
+// 但也可以直接管理内部的非共享内存
+// 不使用锁即可
 typedef struct {
     // 互斥锁
     ngx_shmtx_sh_t    lock;

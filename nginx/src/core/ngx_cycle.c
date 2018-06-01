@@ -1386,16 +1386,19 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             i = 0;
         }
 
+        // 比较名字长度
         if (name->len != shm_zone[i].shm.name.len) {
             continue;
         }
 
+        // 比较字符串
         if (ngx_strncmp(name->data, shm_zone[i].shm.name.data, name->len)
             != 0)
         {
             continue;
         }
 
+        // 名字相同但tag不同，被别的模块用了，不允许
         if (tag != shm_zone[i].tag) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                             "the shared memory zone \"%V\" is "
@@ -1408,6 +1411,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             shm_zone[i].shm.size = size;
         }
 
+        // 名字相同，模块相同，但大小不同，也不允许
         if (size && size != shm_zone[i].shm.size) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                             "the size %uz of shared memory zone \"%V\" "
@@ -1416,9 +1420,11 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             return NULL;
         }
 
+        // 名字模块大小都相同，已经定义过了，返回之前的结构体
         return &shm_zone[i];
     }
 
+    // 没有重复定义，是新的共享内存
     // 加入链表
     shm_zone = ngx_list_push(&cf->cycle->shared_memory);
 
@@ -1427,7 +1433,10 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     }
 
     // 各种参数
+
+    // 注意data是null，在之后会被init调用赋值
     shm_zone->data = NULL;
+
     shm_zone->shm.log = cf->cycle->log;
 
     // 共享内存的大小
@@ -1438,7 +1447,11 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
 
     shm_zone->shm.exists = 0;
     shm_zone->init = NULL;
+
+    // 这里绑定了tag，通常锁模块的指针
     shm_zone->tag = tag;
+
+    // 允许复用
     shm_zone->noreuse = 0;
 
     // 返回结构体，需要再填充自己的数据
