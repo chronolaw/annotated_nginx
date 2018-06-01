@@ -1,3 +1,4 @@
+// annotated by chrono since 2018
 
 /*
  * Copyright (C) Igor Sysoev
@@ -14,6 +15,7 @@
 #define NGX_SLAB_EXACT       2
 #define NGX_SLAB_SMALL       3
 
+// 32位用掩码
 #if (NGX_PTR_SIZE == 4)
 
 #define NGX_SLAB_PAGE_FREE   0
@@ -26,6 +28,7 @@
 
 #define NGX_SLAB_BUSY        0xffffffff
 
+// 64位用掩码
 #else /* (NGX_PTR_SIZE == 8) */
 
 #define NGX_SLAB_PAGE_FREE   0
@@ -41,6 +44,7 @@
 #endif
 
 
+// 跳过内存前面的管理结构，得到可用内存位置
 #define ngx_slab_slots(pool)                                                  \
     (ngx_slab_page_t *) ((u_char *) (pool) + sizeof(ngx_slab_pool_t))
 
@@ -54,6 +58,8 @@
      + (uintptr_t) (pool)->start)
 
 
+// 调试用宏，内存放入垃圾数据
+// 正式环境不会起作用
 #if (NGX_DEBUG_MALLOC)
 
 #define ngx_slab_junk(p, size)     ngx_memset(p, 0xA5, size)
@@ -77,17 +83,22 @@ static void ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level,
     char *text);
 
 
+// 最大slab，是page的一半
 static ngx_uint_t  ngx_slab_max_size;
+
 static ngx_uint_t  ngx_slab_exact_size;
 static ngx_uint_t  ngx_slab_exact_shift;
 
 
+// 初始化上面的三个数字
 void
 ngx_slab_sizes_init(void)
 {
     ngx_uint_t  n;
 
+    // 最大slab，是page的一半
     ngx_slab_max_size = ngx_pagesize / 2;
+
     ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
     for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) {
         /* void */
@@ -95,6 +106,7 @@ ngx_slab_sizes_init(void)
 }
 
 
+// 初始化slab结构
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
 {
@@ -106,11 +118,16 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 
     pool->min_size = (size_t) 1 << pool->min_shift;
 
+    // 跳过内存前面的管理结构，得到可用内存位置
     slots = ngx_slab_slots(pool);
 
     p = (u_char *) slots;
+
+    // 得到可用内存数量
     size = pool->end - p;
 
+    // 调试用宏，内存放入垃圾数据
+    // 正式环境不会起作用
     ngx_slab_junk(p, size);
 
     n = ngx_pagesize_shift - pool->min_shift;
@@ -165,6 +182,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 }
 
 
+// 加锁分配内存
 void *
 ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
 {
@@ -180,6 +198,7 @@ ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
 }
 
 
+// 不加锁分配内存
 void *
 ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 {
@@ -417,6 +436,7 @@ done:
 }
 
 
+// 加锁分配内存并清空
 void *
 ngx_slab_calloc(ngx_slab_pool_t *pool, size_t size)
 {
@@ -432,6 +452,7 @@ ngx_slab_calloc(ngx_slab_pool_t *pool, size_t size)
 }
 
 
+// 不加锁分配内存并清空
 void *
 ngx_slab_calloc_locked(ngx_slab_pool_t *pool, size_t size)
 {
@@ -446,6 +467,7 @@ ngx_slab_calloc_locked(ngx_slab_pool_t *pool, size_t size)
 }
 
 
+// 加锁释放内存
 void
 ngx_slab_free(ngx_slab_pool_t *pool, void *p)
 {
@@ -457,6 +479,7 @@ ngx_slab_free(ngx_slab_pool_t *pool, void *p)
 }
 
 
+// 不加锁释放内存
 void
 ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 {

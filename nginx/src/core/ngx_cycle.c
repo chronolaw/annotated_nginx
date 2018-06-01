@@ -486,6 +486,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     // 创建配置文件里指定的共享内存
     part = &cycle->shared_memory.part;
+
+    // 获取配置的共享内存数组
     shm_zone = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -513,6 +515,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         opart = &old_cycle->shared_memory.part;
         oshm_zone = opart->elts;
 
+        // 遍历old cycle链表
         for (n = 0; /* void */ ; n++) {
 
             if (n >= opart->nelts) {
@@ -524,10 +527,12 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 n = 0;
             }
 
+            // 看名字的长度，不等直接跳过
             if (shm_zone[i].shm.name.len != oshm_zone[n].shm.name.len) {
                 continue;
             }
 
+            // 名字字符串比较
             if (ngx_strncmp(shm_zone[i].shm.name.data,
                             oshm_zone[n].shm.name.data,
                             shm_zone[i].shm.name.len)
@@ -536,45 +541,52 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 continue;
             }
 
-            // 是否复用
+            // 到这里就是同名的共享内存了
+            // 看tag和容量是否相同，决定是否复用
+            // 因为reload只是改配置文件，模块不变，所以tag不变
             if (shm_zone[i].tag == oshm_zone[n].tag
                 && shm_zone[i].shm.size == oshm_zone[n].shm.size
                 && !shm_zone[i].noreuse)
             {
+                // 复用则直接使用之前分配的内存
                 shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
 #if (NGX_WIN32)
                 shm_zone[i].shm.handle = oshm_zone[n].shm.handle;
 #endif
 
+                // 使用旧数据初始化，注意传入的data
                 if (shm_zone[i].init(&shm_zone[i], oshm_zone[n].data)
                     != NGX_OK)
                 {
                     goto failed;
                 }
 
+                // 结束本次循环,配置下一个共享内存
                 goto shm_zone_found;
             }
 
             break;
         }
 
-        // 创建共享内存
+        // 没有同名共享内存，需要新建一个
+        // 创建共享内存，里面没有结构，只是内存空间
         if (ngx_shm_alloc(&shm_zone[i].shm) != NGX_OK) {
             goto failed;
         }
 
-        // 初始化共享内存
+        // 初始化共享内存，增加管理结构
         if (ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK) {
             goto failed;
         }
 
-        // 回调模块自己的初始化函数
+        // 回调模块自己的初始化函数,传入null，即新建
         if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
             goto failed;
         }
 
     shm_zone_found:
 
+        // 结束本次循环,配置下一个共享内存
         continue;
     }
 
@@ -992,13 +1004,16 @@ ngx_destroy_cycle_pools(ngx_conf_t *conf)
 }
 
 
-// 初始化共享内存
+// 初始化共享内存，增加管理结构
+// 初始化slab结构
 static ngx_int_t
 ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 {
     u_char           *file;
     ngx_slab_pool_t  *sp;
 
+    // 取共享内存的地址
+    // 转化为slab结构体
     sp = (ngx_slab_pool_t *) zn->shm.addr;
 
     // 已存在就复用
@@ -1031,10 +1046,16 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     }
 
     // 设置slab的参数
+
+    // 内存的结束地址
     sp->end = zn->shm.addr + zn->shm.size;
+
     sp->min_shift = 3;
+
+    // 内存的开始地址
     sp->addr = zn->shm.addr;
 
+    // 有原子操作就不需要使用file锁
 #if (NGX_HAVE_ATOMIC_OPS)
 
     file = NULL;
@@ -1055,6 +1076,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
         return NGX_ERROR;
     }
 
+    // 初始化slab结构
     ngx_slab_init(sp);
 
     return NGX_OK;
