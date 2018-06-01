@@ -47,14 +47,20 @@ typedef struct {
     size_t            min_size;
     size_t            min_shift;
 
+    // 页数组
     ngx_slab_page_t  *pages;
+
+    // 页链表指针
     ngx_slab_page_t  *last;
     ngx_slab_page_t   free;
 
     ngx_slab_stat_t  *stats;
+
+    // 空闲页数量
     ngx_uint_t        pfree;
 
     // 共享内存的开始地址
+    // 经过了多次计算，前面有很多管理信息
     u_char           *start;
 
     // 共享内存的末尾地址
@@ -63,11 +69,16 @@ typedef struct {
     // 互斥锁
     ngx_shmtx_t       mutex;
 
+    // 指向zero
     u_char           *log_ctx;
+
+    // 0字符
     u_char            zero;
 
+    // 是否记录无内存异常
     unsigned          log_nomem:1;
 
+    // 无用的数据？？
     void             *data;
     void             *addr;
 } ngx_slab_pool_t;
