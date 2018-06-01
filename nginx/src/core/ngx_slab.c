@@ -1,4 +1,7 @@
 // annotated by chrono since 2018
+//
+// * ngx_slab_alloc_pages
+// * ngx_slab_free_pages
 
 /*
  * Copyright (C) Igor Sysoev
@@ -9,9 +12,15 @@
 #include <ngx_core.h>
 
 
+// 内存页的标记
 #define NGX_SLAB_PAGE_MASK   3
+
+// 整页分配，0,即memzero
 #define NGX_SLAB_PAGE        0
+
+// 较大数据
 #define NGX_SLAB_BIG         1
+
 #define NGX_SLAB_EXACT       2
 #define NGX_SLAB_SMALL       3
 
@@ -79,8 +88,10 @@
 static ngx_slab_page_t *ngx_slab_alloc_pages(ngx_slab_pool_t *pool,
     ngx_uint_t pages);
 
+// 释放多个内存页，支持合并
 static void ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     ngx_uint_t pages);
+
 static void ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level,
     char *text);
 
@@ -780,40 +791,52 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 }
 
 
+// 释放多个内存页，支持合并
 static void
 ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     ngx_uint_t pages)
 {
     ngx_slab_page_t  *prev, *join;
 
+    // 空闲页数量增加
     pool->pfree += pages;
 
+    // 当前页的后续空闲数量，减去自己
     page->slab = pages--;
 
+    // 后面连续多个页清空
     if (pages) {
         ngx_memzero(&page[1], pages * sizeof(ngx_slab_page_t));
     }
 
+    // 调整链表结构
     if (page->next) {
         prev = ngx_slab_page_prev(page);
         prev->next = page->next;
         page->next->prev = page->prev;
     }
 
+    // 合并空闲内存页
+
+    // 看归还后的那个内存页join
     join = page + page->slab;
 
     if (join < pool->last) {
 
+        // 后面的内存页可以合并
         if (ngx_slab_page_type(join) == NGX_SLAB_PAGE) {
 
             if (join->next != NULL) {
+                // 空闲页数量增加
                 pages += join->slab;
                 page->slab += join->slab;
 
+                // 调整队列指针
                 prev = ngx_slab_page_prev(join);
                 prev->next = join->next;
                 join->next->prev = join->prev;
 
+                //这个内存页标记为空闲
                 join->slab = NGX_SLAB_PAGE_FREE;
                 join->next = NULL;
                 join->prev = NGX_SLAB_PAGE;
@@ -821,27 +844,37 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
         }
     }
 
+    // 再看前面的内存页
     if (page > pool->pages) {
+
+        // join是前面的内存页
         join = page - 1;
 
+        // 前面的内存页可以合并
         if (ngx_slab_page_type(join) == NGX_SLAB_PAGE) {
 
+            // 可以合并
             if (join->slab == NGX_SLAB_PAGE_FREE) {
+                // 直接跳到第一个空闲页
                 join = ngx_slab_page_prev(join);
             }
 
             if (join->next != NULL) {
+                // 空闲页数量增加
                 pages += join->slab;
                 join->slab += page->slab;
 
+                // 调整队列指针
                 prev = ngx_slab_page_prev(join);
                 prev->next = join->next;
                 join->next->prev = join->prev;
 
+                //这个内存页标记为空闲
                 page->slab = NGX_SLAB_PAGE_FREE;
                 page->next = NULL;
                 page->prev = NGX_SLAB_PAGE;
 
+                // 移动空闲页指针
                 page = join;
             }
         }
@@ -851,6 +884,7 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
         page[pages].prev = (uintptr_t) page;
     }
 
+    // 合并完成，加入空闲链表
     page->prev = (uintptr_t) &pool->free;
     page->next = pool->free.next;
 
