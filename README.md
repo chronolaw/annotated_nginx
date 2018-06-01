@@ -68,6 +68,7 @@ mainline| nginx开发版1.13.12|无
 * [ngx_http_request_body.c](/nginx/src/http/ngx_http_request_body.c)
 * [ngx_http_header_filter_module.c](/nginx/src/http/ngx_http_header_filter_module.c)
 * [ngx_http_write_filter_module.c](/nginx/src/http/ngx_http_write_filter_module.c)
+* [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
 
 ###### os/unix目录
 * [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
@@ -89,6 +90,7 @@ mainline| nginx开发版1.13.12|无
 * [ngx_string.h](/nginx/src/core/ngx_string.h)
 * [ngx_buf.h](/nginx/src/core/ngx_buf.h)
 * [ngx_rbtree.h](/nginx/src/core/ngx_rbtree.h)
+* [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
 
 ###### 进程机制
 * [nginx.c](/nginx/src/core/nginx.c)
