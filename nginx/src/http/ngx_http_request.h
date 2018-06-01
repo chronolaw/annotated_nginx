@@ -735,6 +735,9 @@ struct ngx_http_request_s {
      * ngx_http_limit_conn_module and ngx_http_limit_req_module
      * we use the single bits in the request structure
      */
+
+    // 给流量控制模块用的标志位
+    // 不放在ctx结构体里，节约内存
     unsigned                          limit_conn_set:1;
     unsigned                          limit_req_set:1;
 

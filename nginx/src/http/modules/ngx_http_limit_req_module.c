@@ -1,3 +1,4 @@
+// annotated by chrono since 2018
 
 /*
  * Copyright (C) Igor Sysoev
@@ -10,19 +11,32 @@
 #include <ngx_http.h>
 
 
+// 第一个成员与ngx_rbtree_node_t的color相同
+// 拼接在node后面，实现共用内存
+// nginx里常用的手法，类似继承
 typedef struct {
+    // rbtree的最后一个成员
     u_char                       color;
+
+    // 下面是自己的数据
     u_char                       dummy;
     u_short                      len;
+
+    // 节点也串成一个队列
     ngx_queue_t                  queue;
+
     ngx_msec_t                   last;
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   excess;
     ngx_uint_t                   count;
+
+    // 用来存放字符串，1只是示意
+    // 之后会分配足够的内存，len大小
     u_char                       data[1];
 } ngx_http_limit_req_node_t;
 
 
+// 红黑树，同时用队列
 typedef struct {
     ngx_rbtree_t                  rbtree;
     ngx_rbtree_node_t             sentinel;
@@ -40,6 +54,7 @@ typedef struct {
 } ngx_http_limit_req_ctx_t;
 
 
+// 限流的信息
 typedef struct {
     ngx_shm_zone_t              *shm_zone;
     /* integer value, 1 corresponds to 0.001 r/s */
@@ -48,10 +63,16 @@ typedef struct {
 } ngx_http_limit_req_limit_t;
 
 
+// 配置结构体
 typedef struct {
+    // 限流信息的多个数组
     ngx_array_t                  limits;
+
+    // 日志级别
     ngx_uint_t                   limit_log_level;
     ngx_uint_t                   delay_log_level;
+
+    // 返回的状态码
     ngx_uint_t                   status_code;
 } ngx_http_limit_req_conf_t;
 
@@ -67,10 +88,16 @@ static void ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx,
 static void *ngx_http_limit_req_create_conf(ngx_conf_t *cf);
 static char *ngx_http_limit_req_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
+
+// 解析共享内存指令
 static char *ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 设置使用的共享内存
 static char *ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+// 在preaccess阶段，rewrite之后
 static ngx_int_t ngx_http_limit_req_init(ngx_conf_t *cf);
 
 
@@ -165,6 +192,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     ngx_http_limit_req_conf_t   *lrcf;
     ngx_http_limit_req_limit_t  *limit, *limits;
 
+    // 置标志位则限制，直接拒绝请求
+    // 标记了主请求，限制子请求
     if (r->main->limit_req_set) {
         return NGX_DECLINED;
     }
@@ -180,12 +209,14 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     limit = NULL;
 #endif
 
+    // 逐个检查之前设置的共享内存
     for (n = 0; n < lrcf->limits.nelts; n++) {
 
         limit = &limits[n];
 
         ctx = limit->shm_zone->data;
 
+        // 计算key
         if (ngx_http_complex_value(r, &ctx->key, &key) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -202,8 +233,10 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
             continue;
         }
 
+        // crc32作为红黑树key
         hash = ngx_crc32_short(key.data, key.len);
 
+        // 锁定共享内存再操作
         ngx_shmtx_lock(&ctx->shpool->mutex);
 
         rc = ngx_http_limit_req_lookup(limit, hash, &key, &excess,
@@ -260,6 +293,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         excess = 0;
     }
 
+    // 计算延迟的毫秒
     delay = ngx_http_limit_req_account(limits, n, &excess, &limit);
 
     if (!delay) {
@@ -375,13 +409,16 @@ ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit, ngx_uint_t hash,
     node = ctx->sh->rbtree.root;
     sentinel = ctx->sh->rbtree.sentinel;
 
+    // 红黑树查找
     while (node != sentinel) {
 
+        // 左子树
         if (hash < node->key) {
             node = node->left;
             continue;
         }
 
+        // 右子树
         if (hash > node->key) {
             node = node->right;
             continue;
@@ -389,10 +426,14 @@ ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit, ngx_uint_t hash,
 
         /* hash == node->key */
 
+        // key相同，但还要判断字符串
+
         lr = (ngx_http_limit_req_node_t *) &node->color;
 
+        // 比较长度和内容
         rc = ngx_memn2cmp(key->data, lr->data, key->len, (size_t) lr->len);
 
+        // 找到
         if (rc == 0) {
             ngx_queue_remove(&lr->queue);
             ngx_queue_insert_head(&ctx->sh->queue, &lr->queue);
@@ -424,17 +465,23 @@ ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit, ngx_uint_t hash,
             return NGX_AGAIN;
         }
 
+        // key相同但字符串不同，需要继续找
         node = (rc < 0) ? node->left : node->right;
     }
 
     *ep = 0;
 
+    // 需要新建一个节点
+    // 先是rbtree_node
+    // 然后是req_node
+    // 最后是字符串
     size = offsetof(ngx_rbtree_node_t, color)
            + offsetof(ngx_http_limit_req_node_t, data)
            + key->len;
 
     ngx_http_limit_req_expire(ctx, 1);
 
+    // 在共享内存里分配内存
     node = ngx_slab_alloc_locked(ctx->shpool, size);
 
     if (node == NULL) {
@@ -606,6 +653,7 @@ ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx, ngx_uint_t n)
 }
 
 
+// 模块自己的初始化共享内存
 static ngx_int_t
 ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
@@ -616,6 +664,7 @@ ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     ctx = shm_zone->data;
 
+    // 旧数据处理
     if (octx) {
         if (ctx->key.value.len != octx->key.value.len
             || ngx_strncmp(ctx->key.value.data, octx->key.value.data,
@@ -636,6 +685,7 @@ ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
+    // slab内存池
     ctx->shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
 
     if (shm_zone->shm.exists) {
@@ -651,9 +701,11 @@ ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     ctx->shpool->data = ctx->sh;
 
+    // 初始化红黑树
     ngx_rbtree_init(&ctx->sh->rbtree, &ctx->sh->sentinel,
                     ngx_http_limit_req_rbtree_insert_value);
 
+    // 初始化队列
     ngx_queue_init(&ctx->sh->queue);
 
     len = sizeof(" in limit_req zone \"\"") + shm_zone->shm.name.len;
@@ -718,6 +770,7 @@ ngx_http_limit_req_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 解析共享内存指令
 static char *
 ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -738,6 +791,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 编译key变量
     ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
     ccv.cf = cf;
@@ -753,6 +807,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     scale = 1;
     name.len = 0;
 
+    // 解析各个参数
     for (i = 2; i < cf->args->nelts; i++) {
 
         if (ngx_strncmp(value[i].data, "zone=", 5) == 0) {
@@ -827,12 +882,14 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ctx->rate = rate * 1000 / scale;
 
+    // 添加共享内存
     shm_zone = ngx_shared_memory_add(cf, &name, size,
                                      &ngx_http_limit_req_module);
     if (shm_zone == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 有data，就是初始化过了
     if (shm_zone->data) {
         ctx = shm_zone->data;
 
@@ -842,13 +899,17 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 模块自己的初始化函数
     shm_zone->init = ngx_http_limit_req_init_zone;
+
+    // 设置data
     shm_zone->data = ctx;
 
     return NGX_CONF_OK;
 }
 
 
+// 设置使用的共享内存
 static char *
 ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -866,6 +927,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     burst = 0;
     nodelay = 0;
 
+    // 解析各个参数
     for (i = 1; i < cf->args->nelts; i++) {
 
         if (ngx_strncmp(value[i].data, "zone=", 5) == 0) {
@@ -873,6 +935,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             s.len = value[i].len - 5;
             s.data = value[i].data + 5;
 
+            // 根据名字找到之前添加的共享内存
             shm_zone = ngx_shared_memory_add(cf, &s, 0,
                                              &ngx_http_limit_req_module);
             if (shm_zone == NULL) {
@@ -904,6 +967,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 必须根据名字找到已经定义的共享内存
     if (shm_zone == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "\"%V\" must have \"zone\" parameter",
@@ -911,6 +975,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 可以添加多个共享内存限制
     limits = lrcf->limits.elts;
 
     if (limits == NULL) {
@@ -933,6 +998,8 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 加入共享内存等信息
+    // 之后请求的preaccess时使用
     limit->shm_zone = shm_zone;
     limit->burst = burst * 1000;
     limit->nodelay = nodelay;
@@ -941,6 +1008,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 在preaccess阶段，rewrite之后
 static ngx_int_t
 ngx_http_limit_req_init(ngx_conf_t *cf)
 {

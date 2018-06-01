@@ -1364,6 +1364,7 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
 
 // 添加一个共享内存区域定义
 // 加入链表cycle->shared_memory
+// 同时也作为共享内存的查找函数
 ngx_shm_zone_t *
 ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
 {
@@ -1407,6 +1408,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             return NULL;
         }
 
+        // 传递0就是用来查找
         if (shm_zone[i].shm.size == 0) {
             shm_zone[i].shm.size = size;
         }
