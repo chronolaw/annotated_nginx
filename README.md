@@ -50,6 +50,7 @@ mainline| nginx开发版1.13.12|无
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 * [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
 * [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
+* [ngx_slab.c](/nginx/src/core/ngx_slab.c)
 
 ###### event目录
 * [ngx_event.h](/nginx/src/event/ngx_event.h)
@@ -83,6 +84,11 @@ mainline| nginx开发版1.13.12|无
 * [ngx_stream_handler.c](/nginx/src/stream/ngx_stream_handler.c)
 
 #### 部分关键源码（功能分类）
+
+###### 内存管理
+* [ngx_palloc.c](/nginx/src/core/ngx_palloc.c)
+* [ngx_slab.c](/nginx/src/core/ngx_slab.c)
+* [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
 
 ###### 数据结构
 * [ngx_array.h](/nginx/src/core/ngx_array.h)
