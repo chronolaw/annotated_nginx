@@ -1,6 +1,8 @@
 // annotated by chrono since 2016
 //
 // * ngx_sockaddr_t
+// * ngx_inet_addr
+// * ngx_sock_ntop
 
 /*
  * Copyright (C) Igor Sysoev

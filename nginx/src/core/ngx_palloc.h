@@ -18,7 +18,7 @@
  * NGX_MAX_ALLOC_FROM_POOL should be (ngx_pagesize - 1), i.e. 4095 on x86.
  * On Windows NT it decreases a number of locked pages in a kernel.
  */
-// 在内存池可直接分配的最大块，通常是4k
+// 在内存池可直接分配的最大块，通常是4k-1
 #define NGX_MAX_ALLOC_FROM_POOL  (ngx_pagesize - 1)
 
 // 默认一个内存池块大小是16k
