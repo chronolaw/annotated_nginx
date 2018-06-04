@@ -195,12 +195,16 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     // 分别管理8/16/32/64/128/256/512/1024/2048等字节
     for (i = 0; i < n; i++) {
         /* only "next" is used in list head */
+
+        // slot的序号标记了自己管理的大小
+        // 所以slab字段没有意义
         slots[i].slab = 0;
 
         // next指向自己
         // 表示还没有分配空闲内存页
         slots[i].next = &slots[i];
 
+        // 不使用prev
         slots[i].prev = 0;
     }
 
@@ -374,12 +378,16 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
             // 空闲页首地址作为bitmap
             bitmap = (uintptr_t *) ngx_slab_page_addr(pool, page);
 
+            // 计算需要多少个小块来管理
             map = (ngx_pagesize >> shift) / (8 * sizeof(uintptr_t));
 
+            // 逐个检查位图
             for (n = 0; n < map; n++) {
 
+                // 不是全ff就可以分配
                 if (bitmap[n] != NGX_SLAB_BUSY) {
 
+                    // 在里面再找空位
                     for (m = 1, i = 0; m; m <<= 1, i++) {
                         if (bitmap[n] & m) {
                             continue;
@@ -393,6 +401,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
                         p = (uintptr_t) bitmap + i;
 
+                        // 使用数加1
                         pool->stats[slot].used++;
 
                         // busy是0xfffff,即此内存页已经全部分配，无空闲
@@ -461,6 +470,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                 // i<<shift => i*64
                 p = ngx_slab_page_addr(pool, page) + (i << shift);
 
+                // 使用数加1
                 pool->stats[slot].used++;
 
                 goto done;
@@ -512,6 +522,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                 // i<<shift => i*128/256
                 p = ngx_slab_page_addr(pool, page) + (i << shift);
 
+                // 使用数加1
                 pool->stats[slot].used++;
 
                 goto done;

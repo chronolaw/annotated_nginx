@@ -25,10 +25,13 @@ struct ngx_slab_page_s {
     // 位图方式标记页面内部的使用情况
     uintptr_t         slab;
 
-    // 前后链表指针
+    // 后链表指针，串联多个可分配内存页
+    // 全满页的next是null
     ngx_slab_page_t  *next;
 
+    // 半满页指向管理头节点
     // prev的后两位标记页类型
+    // 全满页低位作为页标记
     uintptr_t         prev;
 };
 
