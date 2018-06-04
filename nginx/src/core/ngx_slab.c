@@ -18,22 +18,22 @@
 
 // 整页分配，0,即memzero
 // x >=ngx_slab_max_size
-// 精确的大小，64位系统是64
+// 中等大小，64位系统是64
 #define NGX_SLAB_PAGE        0
 
 // 较大数据
 // ngx_slab_exact_size< x <ngx_slab_max_size
-// 精确的大小，64位系统是64
+// 中等大小，64位系统是64
 #define NGX_SLAB_BIG         1
 
-// 正好的数据
+// 中等大小的数据
 // x = ngx_slab_exact_size
 // 精确的大小，64位系统是64
 #define NGX_SLAB_EXACT       2
 
 // 小块的数据
 // x < ngx_slab_exact_size
-// 精确的大小，64位系统是64
+// 中等大小，64位系统是64
 #define NGX_SLAB_SMALL       3
 
 // 32位用掩码
@@ -120,7 +120,7 @@ static void ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level,
 // 超过此大小则直接分配整页
 static ngx_uint_t  ngx_slab_max_size;
 
-// 精确的大小，64位系统是64
+// 中等大小，64位系统是64
 // 1个指针大小的位图能够管理的大小
 // '8'是一个字节里的位数
 // 8 * sizeof(uintptr_t)即一个指针的总位数
@@ -144,7 +144,7 @@ ngx_slab_sizes_init(void)
     // ngx_pagesize是4k
     ngx_slab_max_size = ngx_pagesize / 2;
 
-    // 精确的大小，64位系统是64
+    // 中等大小，64位系统是64
     // 1个指针大小的位图能够管理的大小
     // '8'是一个字节里的位数
     // 8 * sizeof(uintptr_t)即一个指针的总位数
@@ -411,6 +411,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                             prev->next = page->next;
                             page->next->prev = page->prev;
 
+                            // next和prev都不再作为指针
                             page->next = NULL;
 
                             // 标记页类型为small
@@ -449,6 +450,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                     prev->next = page->next;
                     page->next->prev = page->prev;
 
+                    // next和prev都不再作为指针
                     page->next = NULL;
 
                     // 标记页类型为exact
@@ -469,6 +471,8 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
             // 计算掩码
             mask = ((uintptr_t) 1 << (ngx_pagesize >> shift)) - 1;
+
+            // 移动到高32位
             mask <<= NGX_SLAB_MAP_SHIFT;
 
             // 检查位图映射
@@ -497,8 +501,10 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                     prev->next = page->next;
                     page->next->prev = page->prev;
 
-                    // 标记页类型为big
+                    // next和prev都不再作为指针
                     page->next = NULL;
+
+                    // 标记页类型为big
                     page->prev = NGX_SLAB_BIG;
                 }
 
@@ -542,13 +548,16 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
             /* "n" elements for bitmap, plus one requested */
 
+            // 页面的前n块用做位图，不能用于分配，所以置busy
             for (i = 0; i < (n + 1) / (8 * sizeof(uintptr_t)); i++) {
                 bitmap[i] = NGX_SLAB_BUSY;
             }
 
+            // 随后标记一块已经分配的内存
             m = ((uintptr_t) 1 << ((n + 1) % (8 * sizeof(uintptr_t)))) - 1;
             bitmap[i] = m;
 
+            // 剩下的位图置空，可以分配
             map = (ngx_pagesize >> shift) / (8 * sizeof(uintptr_t));
 
             for (i = i + 1; i < map; i++) {
@@ -735,6 +744,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
     switch (type) {
 
+    // 分配的内存块小于64字节
     case NGX_SLAB_SMALL:
 
         shift = slab & NGX_SLAB_SHIFT_MASK;
@@ -763,6 +773,8 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
                 page->next->prev = (uintptr_t) page | NGX_SLAB_SMALL;
             }
 
+            // 取反操作，刚才的位变成0
+            // 标记位图，有可分配空间
             bitmap[n] &= ~m;
 
             n = (ngx_pagesize >> shift) / ((1 << shift) * 8);
@@ -778,6 +790,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
                 goto done;
             }
 
+            // 判断是否全空，即全部释放
             map = (ngx_pagesize >> shift) / (8 * sizeof(uintptr_t));
 
             for (i = i + 1; i < map; i++) {
@@ -786,6 +799,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
                 }
             }
 
+            // 全空就回收整个页面
             ngx_slab_free_pages(pool, page, 1);
 
             pool->stats[slot].total -= (ngx_pagesize >> shift) - n;
@@ -795,35 +809,53 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
         goto chunk_already_free;
 
+    // 分配的内存块等于64字节
     case NGX_SLAB_EXACT:
 
+        // 计算对应的bitmap
         m = (uintptr_t) 1 <<
                 (((uintptr_t) p & (ngx_pagesize - 1)) >> ngx_slab_exact_shift);
+
+        // 大小就是64
         size = ngx_slab_exact_size;
 
+        // 指针应该对齐
+        // 即低位都是0
         if ((uintptr_t) p & (size - 1)) {
             goto wrong_chunk;
         }
 
+        // 检查位图，该位应该是1,即被分配出去
         if (slab & m) {
+            // 找到对应的slot头节点
             slot = ngx_slab_exact_shift - pool->min_shift;
 
+            // 看位图已经全部分配了，即全满页
+            // 释放有有空间，可以参与之后的分配
+            // 应该也可以用page->next=null来检查
             if (slab == NGX_SLAB_BUSY) {
+                // 获取slots数组首地址
                 slots = ngx_slab_slots(pool);
 
+                // 挂回slots链表，可以参与之后的分配
                 page->next = slots[slot].next;
                 slots[slot].next = page;
 
+                // 再做一下标记
                 page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
                 page->next->prev = (uintptr_t) page | NGX_SLAB_EXACT;
             }
 
+            // 取反操作，刚才的位变成0
+            // 标记位图，有可分配空间
             page->slab &= ~m;
 
+            // 判断是否全空，即全部释放
             if (page->slab) {
                 goto done;
             }
 
+            // 全空就回收整个页面
             ngx_slab_free_pages(pool, page, 1);
 
             pool->stats[slot].total -= 8 * sizeof(uintptr_t);
@@ -833,37 +865,55 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
         goto chunk_already_free;
 
+    // 分配的内存块大于64字节
     case NGX_SLAB_BIG:
 
+        // 取低32位保存的块大小左移数
         shift = slab & NGX_SLAB_SHIFT_MASK;
+
+        // 左移得到块大小
         size = (size_t) 1 << shift;
 
+        // 指针应该对齐
         if ((uintptr_t) p & (size - 1)) {
             goto wrong_chunk;
         }
 
+        // 计算对应的bitmap
         m = (uintptr_t) 1 << ((((uintptr_t) p & (ngx_pagesize - 1)) >> shift)
                               + NGX_SLAB_MAP_SHIFT);
 
+        // 检查位图，该位应该是1,即被分配出去
         if (slab & m) {
+            // 找到对应的slot头节点
             slot = shift - pool->min_shift;
 
+            // null表示不在链表里
+            // 即全满页面
             if (page->next == NULL) {
+
+                // 获取slots数组首地址
                 slots = ngx_slab_slots(pool);
 
+                // 挂回slots链表，可以参与之后的分配
                 page->next = slots[slot].next;
                 slots[slot].next = page;
 
+                // 再做一下标记
                 page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_BIG;
                 page->next->prev = (uintptr_t) page | NGX_SLAB_BIG;
             }
 
+            // 取反操作，刚才的位变成0
+            // 标记位图，有可分配空间
             page->slab &= ~m;
 
+            // 判断是否全空，即全部释放
             if (page->slab & NGX_SLAB_MAP_MASK) {
                 goto done;
             }
 
+            // 全空就回收整个页面
             ngx_slab_free_pages(pool, page, 1);
 
             pool->stats[slot].total -= ngx_pagesize >> shift;
@@ -873,6 +923,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
         goto chunk_already_free;
 
+    // 分配的内存块大于2k
     // 整页分配的内存
     case NGX_SLAB_PAGE:
 
