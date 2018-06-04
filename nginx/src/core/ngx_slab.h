@@ -18,7 +18,7 @@
 
 typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
-// slab页信息，在梅页的最前面
+// slab页信息
 struct ngx_slab_page_s {
     // 指示连续空闲页的数量,NGX_SLAB_PAGE
     // 标记页面的状态：busy
@@ -59,16 +59,19 @@ typedef struct {
     size_t            min_shift;
 
     // 页数组
+    // 4k大小，对齐管理内存
     ngx_slab_page_t  *pages;
 
-    // 页链表指针
+    // 页链表指针，最后一页
     ngx_slab_page_t  *last;
 
     // 空闲页链表头节点
+    // 也作为链表的尾节点哨兵
     // 注意不是指针
     ngx_slab_page_t   free;
 
     // 统计信息数组
+    // 在slots之后
     ngx_slab_stat_t  *stats;
 
     // 空闲页数量

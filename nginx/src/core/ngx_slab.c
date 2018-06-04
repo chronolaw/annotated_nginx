@@ -191,13 +191,14 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     n = ngx_pagesize_shift - pool->min_shift;
 
     // 初始化slab管理数组，有9个元素
-    // 串成一个链表
-    // 分别管理8/16/32/64/128/256等字节
+    // 每个元素又是一个链表的头节点
+    // 分别管理8/16/32/64/128/256/512/1024/2048等字节
     for (i = 0; i < n; i++) {
         /* only "next" is used in list head */
         slots[i].slab = 0;
 
         // next指向自己
+        // 表示还没有分配空闲内存页
         slots[i].next = &slots[i];
 
         slots[i].prev = 0;
@@ -361,6 +362,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
     page = slots[slot].next;
 
     // 已经分配了空闲内存页
+    // 第一次分配内存不会进这里
     if (page->next != page) {
 
         // shift即2的幂，分配的数量小于64字节
@@ -369,6 +371,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         // 需要用页前面的一部分做bitmap
         if (shift < ngx_slab_exact_shift) {
 
+            // 空闲页首地址作为bitmap
             bitmap = (uintptr_t *) ngx_slab_page_addr(pool, page);
 
             map = (ngx_pagesize >> shift) / (8 * sizeof(uintptr_t));
@@ -382,14 +385,17 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                             continue;
                         }
 
+                        // 找到空闲的就置该位，标记已经分配
                         bitmap[n] |= m;
 
+                        // 计算偏移，得到分配的地址
                         i = (n * 8 * sizeof(uintptr_t) + i) << shift;
 
                         p = (uintptr_t) bitmap + i;
 
                         pool->stats[slot].used++;
 
+                        // busy是0xfffff,即此内存页已经全部分配，无空闲
                         if (bitmap[n] == NGX_SLAB_BUSY) {
                             for (n = n + 1; n < map; n++) {
                                 if (bitmap[n] != NGX_SLAB_BUSY) {
@@ -397,11 +403,17 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                                 }
                             }
 
+                            // 找管理页
                             prev = ngx_slab_page_prev(page);
+
+                            // 从slots的链表里摘除
+                            // 可能slots的next==null，之后又需要分配新空闲页
                             prev->next = page->next;
                             page->next->prev = page->prev;
 
                             page->next = NULL;
+
+                            // 标记页类型为small
                             page->prev = NGX_SLAB_SMALL;
                         }
 
@@ -413,22 +425,38 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         // shift即2的幂，分配的数量正好是64字节
         } else if (shift == ngx_slab_exact_shift) {
 
+            // 检查位图映射
+            // m左移，逐位检查bitmap是否是1
+            // 1表示已经分配，0是空闲
+            // 最后左移变成0,退出循环
+            // i即第i个小内存块
             for (m = 1, i = 0; m; m <<= 1, i++) {
                 if (page->slab & m) {
                     continue;
                 }
 
+                // 找到空闲的就置该位，标记已经分配
                 page->slab |= m;
 
+                // busy是0xfffff,即此内存页已经全部分配，无空闲
                 if (page->slab == NGX_SLAB_BUSY) {
+
+                    // 找管理页
                     prev = ngx_slab_page_prev(page);
+
+                    // 从slots的链表里摘除
+                    // 可能slots的next==null，之后又需要分配新空闲页
                     prev->next = page->next;
                     page->next->prev = page->prev;
 
                     page->next = NULL;
+
+                    // 标记页类型为exact
                     page->prev = NGX_SLAB_EXACT;
                 }
 
+                // 先取空闲页地址，再计算偏移，得到分配的地址
+                // i<<shift => i*64
                 p = ngx_slab_page_addr(pool, page) + (i << shift);
 
                 pool->stats[slot].used++;
@@ -436,11 +464,18 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                 goto done;
             }
 
+        // shift即2的幂，分配的数量>64字节
         } else { /* shift > ngx_slab_exact_shift */
 
+            // 计算掩码
             mask = ((uintptr_t) 1 << (ngx_pagesize >> shift)) - 1;
             mask <<= NGX_SLAB_MAP_SHIFT;
 
+            // 检查位图映射
+            // m左移，逐位检查bitmap是否是1
+            // 1表示已经分配，0是空闲
+            // 最后左移变成0,退出循环
+            // i即第i个小内存块
             for (m = (uintptr_t) 1 << NGX_SLAB_MAP_SHIFT, i = 0;
                  m & mask;
                  m <<= 1, i++)
@@ -449,17 +484,26 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                     continue;
                 }
 
+                // 找到空闲的就置该位，标记已经分配
                 page->slab |= m;
 
+                // 高位是0xfffff,即此内存页已经全部分配，无空闲
                 if ((page->slab & NGX_SLAB_MAP_MASK) == mask) {
+                    // 找管理页
                     prev = ngx_slab_page_prev(page);
+
+                    // 从slots的链表里摘除
+                    // 可能slots的next==null，之后又需要分配新空闲页
                     prev->next = page->next;
                     page->next->prev = page->prev;
 
+                    // 标记页类型为big
                     page->next = NULL;
                     page->prev = NGX_SLAB_BIG;
                 }
 
+                // 先取空闲页地址，再计算偏移，得到分配的地址
+                // i<<shift => i*128/256
                 p = ngx_slab_page_addr(pool, page) + (i << shift);
 
                 pool->stats[slot].used++;
@@ -511,7 +555,11 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                 bitmap[i] = 0;
             }
 
+            // page->slab不是位图，而是chunk的大小
             page->slab = shift;
+
+            // 链接到管理头节点
+            // prev和next都指向slots
             page->next = &slots[slot];
 
             // 设置页的标记，small，分配小于64字节
@@ -536,7 +584,12 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         // shift即2的幂，分配的数量正好是64字节
         } else if (shift == ngx_slab_exact_shift) {
 
+            // page->slab就可以用位标记内存分配情况
+            // 低位置1，标记分配了一个chunk
             page->slab = 1;
+
+            // 链接到管理头节点
+            // prev和next都指向slots
             page->next = &slots[slot];
 
             // 设置页的标记，exact，精确分配
@@ -562,7 +615,13 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         // shift即2的幂，分配的数量>64字节
         } else { /* shift > ngx_slab_exact_shift */
 
+            // 高32位是bitmap，置1,分配了一块
+            // 因为块大，不用全部空间表示bitmap
+            // 低32位表示块的大小，如128/256
             page->slab = ((uintptr_t) 1 << NGX_SLAB_MAP_SHIFT) | shift;
+
+            // 链接到管理头节点
+            // prev和next都指向slots
             page->next = &slots[slot];
 
             // 设置页的标记，big，分配大于64字节
@@ -573,6 +632,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
             // 即该slot管理了一个page
             slots[slot].next = page;
 
+            // 统计信息
             pool->stats[slot].total += ngx_pagesize >> shift;
 
             // 减去数组首地址，左移4k
