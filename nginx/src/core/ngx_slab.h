@@ -20,7 +20,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
 // slab页信息，在梅页的最前面
 struct ngx_slab_page_s {
-    // 指示联系空闲页的数量
+    // 指示连续空闲页的数量,NGX_SLAB_PAGE
     // 标记页面的状态：busy
     // 位图方式标记页面内部的使用情况
     uintptr_t         slab;
