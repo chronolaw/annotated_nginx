@@ -1050,6 +1050,8 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     // 内存的结束地址
     sp->end = zn->shm.addr + zn->shm.size;
 
+    // 最小左移，通常是3
+    // 计算最小的分配内存大小
     sp->min_shift = 3;
 
     // 内存的开始地址

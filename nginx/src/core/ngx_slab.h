@@ -18,12 +18,15 @@
 
 typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
-// slab页
+// slab页信息，在梅页的最前面
 struct ngx_slab_page_s {
+    // 指示联系空闲页的数量
     uintptr_t         slab;
 
     // 前后链表指针
     ngx_slab_page_t  *next;
+
+    // prev的后两位标记页类型
     uintptr_t         prev;
 };
 
@@ -45,6 +48,9 @@ typedef struct {
     ngx_shmtx_sh_t    lock;
 
     size_t            min_size;
+
+    // 最小左移，通常是3
+    // ngx_init_zone_pool里设置
     size_t            min_shift;
 
     // 页数组
@@ -52,6 +58,9 @@ typedef struct {
 
     // 页链表指针
     ngx_slab_page_t  *last;
+
+    // 空闲页链表头节点
+    // 注意不是指针
     ngx_slab_page_t   free;
 
     ngx_slab_stat_t  *stats;
@@ -84,7 +93,12 @@ typedef struct {
 } ngx_slab_pool_t;
 
 
+// 1.14.0新增
+// 初始化上面的三个数字
+// 在main里调用
 void ngx_slab_sizes_init(void);
+
+// 初始化slab结构
 void ngx_slab_init(ngx_slab_pool_t *pool);
 
 // 加锁分配内存

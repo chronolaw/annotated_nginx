@@ -17,12 +17,19 @@
 #define NGX_SLAB_PAGE_MASK   3
 
 // 整页分配，0,即memzero
+// x >=ngx_slab_max_size
 #define NGX_SLAB_PAGE        0
 
 // 较大数据
+// ngx_slab_exact_size< x <ngx_slab_max_size
 #define NGX_SLAB_BIG         1
 
+// 正好的数据
+// x = ngx_slab_exact_size
 #define NGX_SLAB_EXACT       2
+
+// 小块的数据
+// x < ngx_slab_exact_size
 #define NGX_SLAB_SMALL       3
 
 // 32位用掩码
@@ -102,9 +109,14 @@ static void ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level,
 
 
 // 最大slab，是page的一半
+// 超过此大小则直接分配整页
 static ngx_uint_t  ngx_slab_max_size;
 
+// 精确的大小，64位系统是64
+// 8个指针大小的位图能够管理的大小
 static ngx_uint_t  ngx_slab_exact_size;
+
+// exact的位移，即8
 static ngx_uint_t  ngx_slab_exact_shift;
 
 
@@ -117,9 +129,15 @@ ngx_slab_sizes_init(void)
     ngx_uint_t  n;
 
     // 最大slab，是page的一半
+    // 超过此大小则直接分配整页
+    // ngx_pagesize是4k
     ngx_slab_max_size = ngx_pagesize / 2;
 
+    // 精确的大小，64位系统是64
+    // 8个指针大小的位图能够管理的大小
     ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
+
+    // 计算exact的位移，即8
     for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) {
         /* void */
     }
@@ -136,6 +154,8 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     ngx_uint_t        i, n, pages;
     ngx_slab_page_t  *slots, *page;
 
+    // 左移得到最小大小，1<<3=8
+    // ngx_init_zone_pool里设置
     pool->min_size = (size_t) 1 << pool->min_shift;
 
     // 跳过内存前面的管理结构，得到可用内存位置
@@ -150,8 +170,13 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     // 正式环境不会起作用
     ngx_slab_junk(p, size);
 
+    // ngx_os_init里初始化
+    // page左移数,4k即2^12,值12
+    // 12-3=9
     n = ngx_pagesize_shift - pool->min_shift;
 
+    // 初始化slab管理数组
+    // 串成一个链表
     for (i = 0; i < n; i++) {
         /* only "next" is used in list head */
         slots[i].slab = 0;
@@ -250,11 +275,13 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
     ngx_slab_page_t  *page, *prev, *slots;
 
     // 最大slab，是page的一半
+    // 超过此大小则直接分配整页
     if (size > ngx_slab_max_size) {
 
         ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
                        "slab alloc: %uz", size);
 
+        // 分配多个内存页
         page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
                                           + ((size % ngx_pagesize) ? 1 : 0));
         if (page) {

@@ -11,9 +11,13 @@
 
 
 // 基本的页大小,ngx_pagesize = getpagesize()
+// 通常是4k
 ngx_uint_t  ngx_pagesize;
 
+// 页大小的左移数
+// 左移数,4k即2^12,值12
 ngx_uint_t  ngx_pagesize_shift;
+
 ngx_uint_t  ngx_cacheline_size;
 
 
