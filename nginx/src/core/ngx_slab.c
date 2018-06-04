@@ -148,7 +148,7 @@ ngx_slab_sizes_init(void)
     // 所以一个uintptr_t用位图就可以管理一个页
     ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
 
-    // 计算exact的位移，即8
+    // 计算exact的位移，即64=2^8,exact_shift=8
     for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) {
         /* void */
     }
@@ -195,6 +195,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 
         // next指向自己
         slots[i].next = &slots[i];
+
         slots[i].prev = 0;
     }
 
@@ -324,6 +325,8 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
     // 要分配的内存>8字节
     if (size > pool->min_size) {
         // 计算左移数，得到对应的slot数组位置
+        // shift即2的幂
+        // slot是对应的数组位置
         shift = 1;
         for (s = size - 1; s >>= 1; shift++) { /* void */ }
         slot = shift - pool->min_shift;
@@ -451,14 +454,21 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         ngx_debug_point();
     }
 
+    // 获取一个空闲页
     page = ngx_slab_alloc_pages(pool, 1);
 
+    // 获取成功
     if (page) {
+        // shift即2的幂，分配的数量小于64
         if (shift < ngx_slab_exact_shift) {
+
+            // 空闲页首地址作为bitmap
             bitmap = (uintptr_t *) ngx_slab_page_addr(pool, page);
 
+            // 计算需要多少个小块
             n = (ngx_pagesize >> shift) / ((1 << shift) * 8);
 
+            // 至少分配1块
             if (n == 0) {
                 n = 1;
             }
@@ -492,16 +502,20 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
             goto done;
 
+        // shift即2的幂，分配的数量正好是64字节
         } else if (shift == ngx_slab_exact_shift) {
 
             page->slab = 1;
             page->next = &slots[slot];
+
+            // 设置页的标记，exact，精确分配
             page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
 
             slots[slot].next = page;
 
             pool->stats[slot].total += 8 * sizeof(uintptr_t);
 
+            // 减去数组首地址，左移4k
             p = ngx_slab_page_addr(pool, page);
 
             pool->stats[slot].used++;
@@ -526,8 +540,11 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         }
     }
 
+    // 获取空闲页失败
+    // 分配内存失败
     p = 0;
 
+    // 更新统计信息
     pool->stats[slot].fails++;
 
 done:
@@ -593,14 +610,21 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
     ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0, "slab free: %p", p);
 
+    // 检查指针是否属于本共享内存
+    // 必须在start和end之间
     if ((u_char *) p < pool->start || (u_char *) p > pool->end) {
         ngx_slab_error(pool, NGX_LOG_ALERT, "ngx_slab_free(): outside of pool");
         goto fail;
     }
 
+    // 算出所使用的page数组位置
     n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+
     page = &pool->pages[n];
     slab = page->slab;
+
+    // 检查内存页的类型
+    // 取指针末两位
     type = ngx_slab_page_type(page);
 
     switch (type) {

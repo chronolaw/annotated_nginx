@@ -22,6 +22,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 struct ngx_slab_page_s {
     // 指示联系空闲页的数量
     // 标记页面的状态：busy
+    // 位图方式标记页面内部的使用情况
     uintptr_t         slab;
 
     // 前后链表指针
@@ -54,6 +55,7 @@ typedef struct {
 
     // 最小左移，通常是3
     // ngx_init_zone_pool里设置
+    // 在shm_zone[i].init之前，不能自己修改
     size_t            min_shift;
 
     // 页数组
@@ -66,6 +68,7 @@ typedef struct {
     // 注意不是指针
     ngx_slab_page_t   free;
 
+    // 统计信息数组
     ngx_slab_stat_t  *stats;
 
     // 空闲页数量
@@ -81,7 +84,10 @@ typedef struct {
     // 互斥锁
     ngx_shmtx_t       mutex;
 
-    // 指向zero
+    // 记录日志的额外字符串，用户可以指定
+    // 共享内存错误记录日志时区分不同的共享内存
+    // 不指定则指向zera，即无特殊字符串
+    // 被ngx_slab_error使用，外界不能用
     u_char           *log_ctx;
 
     // 0字符
@@ -90,7 +96,6 @@ typedef struct {
     // 是否记录无内存异常
     unsigned          log_nomem:1;
 
-    // 无用的数据？？
     void             *data;
     void             *addr;
 } ngx_slab_pool_t;
