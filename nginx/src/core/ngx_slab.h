@@ -21,6 +21,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 // slab页信息，在梅页的最前面
 struct ngx_slab_page_s {
     // 指示联系空闲页的数量
+    // 标记页面的状态：busy
     uintptr_t         slab;
 
     // 前后链表指针
@@ -31,6 +32,7 @@ struct ngx_slab_page_s {
 };
 
 
+// 统计信息
 typedef struct {
     ngx_uint_t        total;
     ngx_uint_t        used;
@@ -47,6 +49,7 @@ typedef struct {
     // 互斥锁
     ngx_shmtx_sh_t    lock;
 
+    // 最小分配数量，通常是8字节
     size_t            min_size;
 
     // 最小左移，通常是3
