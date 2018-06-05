@@ -1121,6 +1121,7 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     }
 
     // 调整链表结构
+    // 从slot链表里摘掉
     if (page->next) {
         prev = ngx_slab_page_prev(page);
         prev->next = page->next;
@@ -1137,6 +1138,8 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
         // 后面的内存页可以合并
         if (ngx_slab_page_type(join) == NGX_SLAB_PAGE) {
 
+            // not null意思是在链表里可以合并
+            // null是孤立的页面
             if (join->next != NULL) {
                 // 空闲页数量增加
                 pages += join->slab;
