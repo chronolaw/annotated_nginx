@@ -245,9 +245,14 @@ ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
 }
 
 
+// 估算key的长度，字符串长度+2,再加一个指针
+// 第一个void*是结构体里的value指针
+// 2是ushort len的长度
 #define NGX_HASH_ELT_SIZE(name)                                               \
     (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
 
+// 初始化散列表hinit
+// 输入一个ngx_hash_key_t数组，长度散nelts
 ngx_int_t
 ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 {
@@ -257,6 +262,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
     ngx_uint_t       i, n, key, size, start, bucket_size;
     ngx_hash_elt_t  *elt, **buckets;
 
+    // max_size不能是0
     if (hinit->max_size == 0) {
         ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
                       "could not build %s, you should "
@@ -265,7 +271,9 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
         return NGX_ERROR;
     }
 
+    // 遍历names数组
     for (n = 0; n < nelts; n++) {
+        // 桶的大小必须能够容纳任意一个字符串
         if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
         {
             ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
@@ -276,11 +284,13 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
         }
     }
 
+    // 分配一些内存
     test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
     if (test == NULL) {
         return NGX_ERROR;
     }
 
+    // 去掉一个指针的大小
     bucket_size = hinit->bucket_size - sizeof(void *);
 
     start = nelts / (bucket_size / (2 * sizeof(void *)));
