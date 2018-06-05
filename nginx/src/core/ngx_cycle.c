@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_init_cycle
+// * ngx_init_zone_pool
 // * ngx_signal_process
 // * ngx_set_shutdown_timer
 

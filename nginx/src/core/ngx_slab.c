@@ -20,7 +20,7 @@
 
 // 整页分配，0,即memzero
 // x >=ngx_slab_max_size
-// 中等大小，64位系统是64
+// ngx_slab_max_size = 4k/2 = 2k
 #define NGX_SLAB_PAGE        0
 
 // 较大数据
@@ -161,6 +161,8 @@ ngx_slab_sizes_init(void)
 
 
 // 初始化slab结构
+// 之前需要初始化min_shift和end
+// 自己使用可以把min_shift适当调整改大一点
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
 {
@@ -190,6 +192,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     // page左移数,4k即2^12,值12
     // 12-3=9
     // 即8-4k之间的幂数量
+    // 得到slots数组数量，管理不同的小块
     n = ngx_pagesize_shift - pool->min_shift;
 
     // 初始化slab管理数组，有9个元素
@@ -366,6 +369,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
     slots = ngx_slab_slots(pool);
 
     // 找对应的管理页面
+    // slot只是头节点，所以使用next
     page = slots[slot].next;
 
     // 已经分配了空闲内存页
@@ -436,6 +440,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
             }
 
         // shift即2的幂，分配的数量正好是64字节
+        // 即容纳32<x<=64的数据
         } else if (shift == ngx_slab_exact_shift) {
 
             // 检查位图映射
@@ -605,6 +610,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
             goto done;
 
         // shift即2的幂，分配的数量正好是64字节
+        // 即容纳32<x<=64的数据
         } else if (shift == ngx_slab_exact_shift) {
 
             // page->slab就可以用位标记内存分配情况
@@ -749,7 +755,11 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
     // 算出所使用的page数组位置
     n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
 
+    // 取对应的页面数组元素
     page = &pool->pages[n];
+
+    // slab存储页面信息
+    // 依类型含义不同
     slab = page->slab;
 
     // 检查内存页的类型
@@ -824,6 +834,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
         goto chunk_already_free;
 
     // 分配的内存块等于64字节
+    // slab就是位图
     case NGX_SLAB_EXACT:
 
         // 计算对应的bitmap
@@ -856,6 +867,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
                 slots[slot].next = page;
 
                 // 再做一下标记
+                // prev指针可用
                 page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
                 page->next->prev = (uintptr_t) page | NGX_SLAB_EXACT;
             }
@@ -872,6 +884,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
             // 全空就回收整个页面
             ngx_slab_free_pages(pool, page, 1);
 
+            // 回收后总分配数减少
             pool->stats[slot].total -= 8 * sizeof(uintptr_t);
 
             goto done;
@@ -880,6 +893,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
         goto chunk_already_free;
 
     // 分配的内存块大于64字节
+    // slab高位是bitmap，低位是大小的shift
     case NGX_SLAB_BIG:
 
         // 取低32位保存的块大小左移数
@@ -930,6 +944,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
             // 全空就回收整个页面
             ngx_slab_free_pages(pool, page, 1);
 
+            // 回收后总分配数减少
             pool->stats[slot].total -= ngx_pagesize >> shift;
 
             goto done;
@@ -939,8 +954,10 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
     // 分配的内存块大于2k
     // 整页分配的内存
+    // 管理页必须有start标志位
     case NGX_SLAB_PAGE:
 
+        // 指针应该对齐
         if ((uintptr_t) p & (ngx_pagesize - 1)) {
             goto wrong_chunk;
         }
@@ -967,6 +984,8 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
         // 释放多个内存页，支持合并
         ngx_slab_free_pages(pool, &pool->pages[n], size);
 
+        // 调试用宏，内存放入垃圾数据
+        // 正式环境不会起作用
         ngx_slab_junk(p, size << ngx_pagesize_shift);
 
         // 直接返回，不用操作slot数组

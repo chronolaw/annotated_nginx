@@ -111,6 +111,8 @@ typedef struct {
     unsigned          log_nomem:1;
 
     void             *data;
+
+    // 内存的起始地址，何用？
     void             *addr;
 } ngx_slab_pool_t;
 
