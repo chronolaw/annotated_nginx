@@ -30,6 +30,7 @@ void *ngx_calloc(size_t size, ngx_log_t *log);
 
 #if (NGX_HAVE_POSIX_MEMALIGN || NGX_HAVE_MEMALIGN)
 
+// 对齐分配内存
 void *ngx_memalign(size_t alignment, size_t size, ngx_log_t *log);
 
 #else
@@ -42,7 +43,12 @@ void *ngx_memalign(size_t alignment, size_t size, ngx_log_t *log);
 // 基本的页大小,ngx_pagesize = getpagesize()
 extern ngx_uint_t  ngx_pagesize;
 
+// 页大小的左移数
+// 左移数,4k即2^12,值12
 extern ngx_uint_t  ngx_pagesize_shift;
+
+// 宏定义为64
+// 然后由ngx_cpuinfo（ngx_cpuinfo.c）来探测
 extern ngx_uint_t  ngx_cacheline_size;
 
 

@@ -21,6 +21,7 @@
 typedef struct {
 
     // 锁变量
+    // 使用原子操作实现锁
     ngx_atomic_t   lock;
 
     // 信号量等待变量
@@ -32,8 +33,8 @@ typedef struct {
 
 
 typedef struct {
-    // 指向ngx_shmtx_sh_t.lock
 #if (NGX_HAVE_ATOMIC_OPS)
+    // 指向ngx_shmtx_sh_t.lock
     ngx_atomic_t  *lock;
 
     // 使用进程间信号量
