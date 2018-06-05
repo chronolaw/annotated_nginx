@@ -14,9 +14,17 @@
 #include <ngx_core.h>
 
 
+// 在本内存池内分配小块内存
 static ngx_inline void *ngx_palloc_small(ngx_pool_t *pool, size_t size,
     ngx_uint_t align);
+
+// 所有内存池节点都空间不足
+// 创建一个新的节点，即内存块
+// 跳过内存池描述信息的长度
+// 后面的max,current等没有意义，所以可以被利用
 static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
+
+// 分配大块内存(>4k),直接调用malloc
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
@@ -153,6 +161,7 @@ ngx_reset_pool(ngx_pool_t *pool)
 
 
 // 分配对齐的内存，速度快，可能有少量浪费
+// 多用于创建结构体
 void *
 ngx_palloc(ngx_pool_t *pool, size_t size)
 {
@@ -169,6 +178,7 @@ ngx_palloc(ngx_pool_t *pool, size_t size)
 
 
 // 分配未对齐的内存
+// 多用于字符串等不规则内存需求
 void *
 ngx_pnalloc(ngx_pool_t *pool, size_t size)
 {

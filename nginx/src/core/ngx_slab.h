@@ -1,5 +1,6 @@
 // annotated by chrono since 2018
 //
+// * ngx_slab_page_s
 // * ngx_slab_pool_t
 
 /*
@@ -19,6 +20,7 @@
 typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
 // slab页信息
+// 管理每个内存页
 struct ngx_slab_page_s {
     // 指示连续空闲页的数量,NGX_SLAB_PAGE
     // 标记页面的状态：busy
@@ -32,11 +34,14 @@ struct ngx_slab_page_s {
     // 半满页指向管理头节点
     // prev的后两位标记页类型
     // 全满页低位作为页标记
+    // ngx_slab_page_prev计算
     uintptr_t         prev;
 };
 
 
-// 统计信息
+// 各个slot分配内存的统计信息
+// 目前暂无接口使用
+// 只能自己定位获取信息
 typedef struct {
     ngx_uint_t        total;
     ngx_uint_t        used;
@@ -47,6 +52,8 @@ typedef struct {
 
 
 // 管理共享内存的池
+// 使用best fit算法
+// 分成8/16/32...2k/4k的多个slot，找最合适的分配
 // 但也可以直接管理内部的非共享内存
 // 不使用锁即可
 typedef struct {
@@ -66,6 +73,7 @@ typedef struct {
     ngx_slab_page_t  *pages;
 
     // 页链表指针，最后一页
+    // 用于合并空闲页的末尾计算
     ngx_slab_page_t  *last;
 
     // 空闲页链表头节点

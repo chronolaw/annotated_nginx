@@ -1,6 +1,8 @@
 // annotated by chrono since 2018
 //
+// * ngx_slab_alloc_locked
 // * ngx_slab_alloc_pages
+// * ngx_slab_free_locked
 // * ngx_slab_free_pages
 
 /*
@@ -240,6 +242,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     /* only "next" is used in list head */
     // 空闲页链表头节点
     // 只使用next，其他无意义
+    // 与slots类似
     pool->free.slab = 0;
     pool->free.next = page;
     pool->free.prev = 0;
