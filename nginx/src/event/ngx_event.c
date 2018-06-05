@@ -737,6 +737,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     /* cl should be equal to or greater than cache line size */
 
     // cl是一个基本长度，可以容纳原子变量
+    // 对齐到cache line，操作更快
     cl = 128;
 
     // 最基本的三个：负载均衡锁，连接计数器,
@@ -762,6 +763,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_str_set(&shm.name, "nginx_shared_zone");
     shm.log = cycle->log;
 
+    // 分配一块共享内存
     if (ngx_shm_alloc(&shm) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -771,8 +773,15 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     // 第一个就是负载均衡锁
     ngx_accept_mutex_ptr = (ngx_atomic_t *) shared;
+
+    // spin是-1则不使用信号量
+    // 只会自旋，不会导致进程睡眠等待
+    // 这样避免抢accept锁时的性能降低
     ngx_accept_mutex.spin = (ngx_uint_t) -1;
 
+    // 初始化互斥锁
+    // spin是-1则不使用信号量
+    // 只会自旋，不会导致进程睡眠等待
     if (ngx_shmtx_create(&ngx_accept_mutex, (ngx_shmtx_sh_t *) shared,
                          cycle->lock_file.data)
         != NGX_OK)
@@ -795,6 +804,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     tp = ngx_timeofday();
 
     // 随机数
+    // 每个进程不同
     ngx_random_number = (tp->msec << 16) + ngx_pid;
 
 #if (NGX_STAT_STUB)
