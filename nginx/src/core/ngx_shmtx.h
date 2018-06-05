@@ -24,6 +24,7 @@ typedef struct {
     ngx_atomic_t   lock;
 
     // 信号量等待变量
+    // 标记等待的进程数量
 #if (NGX_HAVE_POSIX_SEM)
     ngx_atomic_t   wait;
 #endif
@@ -55,16 +56,37 @@ typedef struct {
 #endif
 
     // 类似自旋锁的等待周期
+    // spin是-1则不使用信号量
+    // 只会自旋，不会导致进程睡眠等待
     ngx_uint_t     spin;
 } ngx_shmtx_t;
 
 
+// 初始化互斥锁
+// spin是-1则不使用信号量
+// 只会自旋，不会导致进程睡眠等待
 ngx_int_t ngx_shmtx_create(ngx_shmtx_t *mtx, ngx_shmtx_sh_t *addr,
     u_char *name);
+
+// 销毁使用的信号量
+// spin是-1则不使用信号量
 void ngx_shmtx_destroy(ngx_shmtx_t *mtx);
+
+// 无阻塞尝试锁，使用cas
+// 值使用pid，保证只能自己才能解锁
 ngx_uint_t ngx_shmtx_trylock(ngx_shmtx_t *mtx);
+
+// 阻塞获取锁
+// 自旋或信号量睡眠等待
 void ngx_shmtx_lock(ngx_shmtx_t *mtx);
+
+// 解锁
+// 解锁成功则信号量唤醒其他睡眠等待的进程
 void ngx_shmtx_unlock(ngx_shmtx_t *mtx);
+
+// 强制解锁，指定了pid
+// 解锁成功则信号量唤醒其他睡眠等待的进程
+// 用于某些worker进程异常的情况，解除互斥锁
 ngx_uint_t ngx_shmtx_force_unlock(ngx_shmtx_t *mtx, ngx_pid_t pid);
 
 
