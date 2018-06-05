@@ -66,6 +66,7 @@ struct ngx_pool_large_s {
 // 描述内存池的信息
 typedef struct {
     // 可用内存的起始位置
+    // 小块内存每次都从这里分配
     u_char               *last;
 
     // 可用内存的结束位置
@@ -75,6 +76,7 @@ typedef struct {
     ngx_pool_t           *next;
 
     // 本节点分配失败次数
+    // 失败超过4次则本节点认为满，不再参与分配
     ngx_uint_t            failed;
 } ngx_pool_data_t;
 
@@ -88,6 +90,7 @@ struct ngx_pool_s {
     ngx_pool_data_t       d;
 
     // 可分配的最大块
+    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k
     size_t                max;
 
     // 当前使用的内存池节点
@@ -154,6 +157,7 @@ ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
 // 创建一个清理结构体，size是ngx_pool_cleanup_t::data分配的大小
 // size可以为0,用户需要自己设置ngx_pool_cleanup_t::data指针
 ngx_pool_cleanup_t *ngx_pool_cleanup_add(ngx_pool_t *p, size_t size);
+
 void ngx_pool_run_cleanup_file(ngx_pool_t *p, ngx_fd_t fd);
 
 // 清理文件用

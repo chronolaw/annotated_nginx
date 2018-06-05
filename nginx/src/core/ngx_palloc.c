@@ -405,16 +405,21 @@ ngx_pcalloc(ngx_pool_t *pool, size_t size)
 }
 
 
+// 创建一个清理结构体，size是ngx_pool_cleanup_t::data分配的大小
+// size可以为0,用户需要自己设置ngx_pool_cleanup_t::data指针
 ngx_pool_cleanup_t *
 ngx_pool_cleanup_add(ngx_pool_t *p, size_t size)
 {
     ngx_pool_cleanup_t  *c;
 
+    // 内存池拿一块内存
     c = ngx_palloc(p, sizeof(ngx_pool_cleanup_t));
     if (c == NULL) {
         return NULL;
     }
 
+    // 如果要求额外数据就再分配一块
+    // 注意都是对齐的
     if (size) {
         c->data = ngx_palloc(p, size);
         if (c->data == NULL) {
@@ -425,7 +430,10 @@ ngx_pool_cleanup_add(ngx_pool_t *p, size_t size)
         c->data = NULL;
     }
 
+    // handler清空，之后用户自己设置
     c->handler = NULL;
+
+    // 挂到内存池的清理链表里
     c->next = p->cleanup;
 
     p->cleanup = c;
