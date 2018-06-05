@@ -16,6 +16,7 @@
 
 // nginx的动态数组，表示一块连续的内存，其中顺序存放着数组元素，概念上和原始数组很接近
 // 如果数组内的元素不断增加，当nelts > nalloc时将会引发数组扩容
+// 所以是“不稳定”的，扩容后指向元素的指针会失效
 // 可对比std::vector
 //
 // 数组空 arr->nelts == 0
@@ -34,7 +35,9 @@ typedef struct {
 // size参数通常要使用sizeof(T)
 ngx_array_t *ngx_array_create(ngx_pool_t *p, ngx_uint_t n, size_t size);
 
-// “销毁”动态数组，归还分配的内存
+// “销毁”动态数组，不一定归还分配的内存
+// 数组创建后如果又使用了内存池则不会回收内存
+// 因为内存池不允许空洞
 void ngx_array_destroy(ngx_array_t *a);
 
 // 向数组添加元素，用法比较特别，它们返回的是一个void*指针，用户必须把它转换为真正的元素类型再操作
