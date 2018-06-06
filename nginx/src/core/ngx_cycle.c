@@ -28,6 +28,7 @@ static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
 static void ngx_clean_old_cycles(ngx_event_t *ev);
 
 // 设置了shutdown_timeout后就到时间就会执行
+// 使用独立的event对象 ngx_shutdown_event
 static void ngx_shutdown_timer_handler(ngx_event_t *ev);
 
 
