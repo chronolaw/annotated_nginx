@@ -112,6 +112,7 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
                 // cpu等待的时间逐步加长
                 for (i = 0; i < n; i++) {
                     // #define ngx_cpu_pause()             __asm__ ("pause")
+                    // 自旋等待，降低功耗，不会引起性能下降
                     ngx_cpu_pause();
                 }
 

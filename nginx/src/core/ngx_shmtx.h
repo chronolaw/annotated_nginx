@@ -44,6 +44,7 @@ typedef struct {
     ngx_atomic_t  *wait;
 
     // 是否使用信号量的标志
+    // 可以手动置0强制不使用信号量
     ngx_uint_t     semaphore;
 
     // unix信号量对象
@@ -59,6 +60,7 @@ typedef struct {
     // 类似自旋锁的等待周期
     // spin是-1则不使用信号量
     // 只会自旋，不会导致进程睡眠等待
+    // 目前只有accept_mutex使用了-1
     ngx_uint_t     spin;
 } ngx_shmtx_t;
 

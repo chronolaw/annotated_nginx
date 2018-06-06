@@ -2,6 +2,7 @@
 //
 // * ngx_init_cycle
 // * ngx_init_zone_pool
+// * ngx_shared_memory_add
 // * ngx_signal_process
 // * ngx_set_shutdown_timer
 
@@ -1075,6 +1076,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 #endif
 
     // 共享内存锁,使用了信号量
+    // 没有设置spin=-1,会使用信号量睡眠等待
     if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -1453,7 +1455,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     shm_zone->shm.exists = 0;
     shm_zone->init = NULL;
 
-    // 这里绑定了tag，通常锁模块的指针
+    // 这里绑定了tag，通常是模块的指针
     shm_zone->tag = tag;
 
     // 允许复用
