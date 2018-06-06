@@ -41,6 +41,7 @@ typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
 // if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
 struct ngx_shm_zone_s {
     // init回调使用的数据
+    // 存储与共享内存使用相关的数据，ctx
     void                     *data;
 
     // os/unix/ngx_shmem.h

@@ -110,6 +110,7 @@ typedef struct {
     // 是否记录无内存异常
     unsigned          log_nomem:1;
 
+    // 供用户使用，关联任意数据
     void             *data;
 
     // 内存的起始地址，何用？
