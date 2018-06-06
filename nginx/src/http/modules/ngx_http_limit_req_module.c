@@ -3,6 +3,7 @@
 // * ngx_http_limit_req_init_zone
 // * ngx_http_limit_req_delay
 // * ngx_http_limit_req_lookup
+// * ngx_http_limit_req_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -91,10 +92,13 @@ typedef struct {
 
     /* integer value, 1 corresponds to 0.001 r/s */
 
+    // 超过限速值的容忍值，即允许处理的突发流量
     // 配置文件里的值，放大了1000倍，方便计算
     ngx_uint_t                   burst;
 
     // 是否延迟
+    // 0表示burst数量的请求仍然立即处理
+    // 1表示burst数量的请求需要延迟处理，保证限速
     ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
 } ngx_http_limit_req_limit_t;
 
@@ -371,11 +375,15 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     }
 
     // 计算延迟的毫秒
+    // 如果设置了nodelay参数，那么就是0
     delay = ngx_http_limit_req_account(limits, n, &excess, &limit);
 
+    // 不延迟，流程继续处理
     if (!delay) {
         return NGX_DECLINED;
     }
+
+    // 延迟delay毫秒，使用定时器
 
     ngx_log_error(lrcf->delay_log_level, r->connection->log, 0,
                   "delaying request, excess: %ui.%03ui, by zone \"%V\"",
