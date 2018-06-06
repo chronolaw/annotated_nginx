@@ -26,6 +26,8 @@ static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
 
 static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
 static void ngx_clean_old_cycles(ngx_event_t *ev);
+
+// 设置了shutdown_timeout后就到时间就会执行
 static void ngx_shutdown_timer_handler(ngx_event_t *ev);
 
 

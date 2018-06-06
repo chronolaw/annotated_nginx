@@ -40,7 +40,8 @@ struct ngx_slab_page_s {
 
 
 // 各个slot分配内存的统计信息
-// 目前暂无接口使用
+// 目前供商业模块ngx_api来调用
+// 目前暂无公开接口使用
 // 只能自己定位获取信息
 typedef struct {
     ngx_uint_t        total;
@@ -83,6 +84,9 @@ typedef struct {
 
     // 统计信息数组
     // 在slots之后
+    // 目前供商业模块ngx_api来调用
+    // 目前暂无公开接口使用
+    // 只能自己定位获取信息
     ngx_slab_stat_t  *stats;
 
     // 空闲页数量

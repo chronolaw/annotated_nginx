@@ -217,6 +217,9 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     p += n * sizeof(ngx_slab_page_t);
 
     // 统计信息
+    // 目前供商业模块ngx_api来调用
+    // 目前暂无公开接口使用
+    // 只能自己定位获取信息
     pool->stats = (ngx_slab_stat_t *) p;
 
     // 也有9个
