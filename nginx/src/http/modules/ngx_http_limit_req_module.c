@@ -54,6 +54,7 @@ typedef struct {
 
 // 红黑树，同时用队列
 // 存放在共享内存里
+// ctx = limit->shm_zone->data;
 // 红黑树按字符串key查找
 // 队列时间序，即lru，最后的可以过期释放
 typedef struct {

@@ -50,6 +50,7 @@ typedef struct {
 // 一个共享内存限制连接的基本信息
 // 红黑树
 // 存放在共享内存里
+// ctx = limit->shm_zone->data;
 // 与limit_req不同，没有用队列
 // 因为不需要lru管理，在断连时减数
 typedef struct {
@@ -93,6 +94,7 @@ static ngx_rbtree_node_t *ngx_http_limit_conn_lookup(ngx_rbtree_t *rbtree,
 // 清理函数，减少连接数
 static void ngx_http_limit_conn_cleanup(void *data);
 
+// 运行本模块的清理函数
 static ngx_inline void ngx_http_limit_conn_cleanup_all(ngx_pool_t *pool);
 
 static void *ngx_http_limit_conn_create_conf(ngx_conf_t *cf);
@@ -483,6 +485,7 @@ ngx_http_limit_conn_cleanup(void *data)
 }
 
 
+// 运行本模块的清理函数
 static ngx_inline void
 ngx_http_limit_conn_cleanup_all(ngx_pool_t *pool)
 {
