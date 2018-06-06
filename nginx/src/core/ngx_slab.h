@@ -111,6 +111,8 @@ typedef struct {
     unsigned          log_nomem:1;
 
     // 供用户使用，关联任意数据
+    // 方便使用最常用的数据
+    // 例如红黑树指针
     void             *data;
 
     // 内存的起始地址，何用？
