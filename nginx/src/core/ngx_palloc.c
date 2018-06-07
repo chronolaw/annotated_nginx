@@ -211,7 +211,7 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
         // 向上对齐到8字节(64位), in ngx_config.h
         // #define NGX_ALIGNMENT   sizeof(unsigned long)    /* platform word */
         // #define ngx_align(d, a)     (((d) + (a - 1)) & ~(a - 1))
-        // #define ngx_align_ptr(p, a)                                                   \
+        // #define ngx_align_ptr(p, a)
         //     (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
         if (align) {
             m = ngx_align_ptr(m, NGX_ALIGNMENT);
