@@ -15,19 +15,11 @@
 #include <ngx_event.h>
 
 
-// 遍历监听端口列表，加入epoll连接事件，开始接受请求
-static ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle);
-
 // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
 static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all);
 
 // 发生了错误，关闭一个连接
 static void ngx_close_accepted_connection(ngx_connection_t *c);
-
-#if (NGX_DEBUG)
-static void ngx_debug_accepted_connection(ngx_event_conf_t *ecf,
-    ngx_connection_t *c);
-#endif
 
 // 仅接受tcp连接
 // ngx_event_process_init里设置接受连接的回调函数为ngx_event_accept，可以接受连接
@@ -402,6 +394,9 @@ ngx_event_accept(ngx_event_t *ev)
 }
 
 
+// 1.15.0 udp移动到新的ngx_event_udp.c
+#if 0
+
 // 仅支持unix
 #if !(NGX_WIN32)
 
@@ -768,6 +763,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+#endif // if 0
 
 // 尝试获取负载均衡锁，监听端口
 // 如未获取则不监听端口
@@ -834,7 +830,7 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 
 
 // 遍历监听端口列表，加入epoll连接事件，开始接受请求
-static ngx_int_t
+ngx_int_t
 ngx_enable_accept_events(ngx_cycle_t *cycle)
 {
     ngx_uint_t         i;
@@ -924,7 +920,7 @@ ngx_close_accepted_connection(ngx_connection_t *c)
     c->fd = (ngx_socket_t) -1;
 
     // 关闭socket
-    if (!c->shared && ngx_close_socket(fd) == -1) {
+    if (ngx_close_socket(fd) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_socket_errno,
                       ngx_close_socket_n " failed");
     }
@@ -950,7 +946,7 @@ ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len)
 
 #if (NGX_DEBUG)
 
-static void
+void
 ngx_debug_accepted_connection(ngx_event_conf_t *ecf, ngx_connection_t *c)
 {
     struct sockaddr_in   *sin;

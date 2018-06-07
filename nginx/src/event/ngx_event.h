@@ -728,6 +728,8 @@ void ngx_event_accept(ngx_event_t *ev);
 #if !(NGX_WIN32)
 // 1.10新增函数，接受udp连接的handler
 void ngx_event_recvmsg(ngx_event_t *ev);
+void ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 #endif
 
 // 尝试获取负载均衡锁，监听端口
@@ -735,7 +737,14 @@ void ngx_event_recvmsg(ngx_event_t *ev);
 // 内部调用ngx_enable_accept_events/ngx_disable_accept_events
 ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
 
+// 遍历监听端口列表，加入epoll连接事件，开始接受请求
+ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle);
+
 u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
+
+#if (NGX_DEBUG)
+void ngx_debug_accepted_connection(ngx_event_conf_t *ecf, ngx_connection_t *c);
+#endif
 
 
 // 在ngx_single_process_cycle/ngx_worker_process_cycle里调用
