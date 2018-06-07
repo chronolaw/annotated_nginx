@@ -17,14 +17,14 @@ Nginx1.14增加了mirror模块，支持gRPC。
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 
 # 当前状态
-nginx 1.14.0
+nginx 1.15.0
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx稳定版1.14.0|有
+master  | nginx开发版1.15.0|有
 upgrade | nginx稳定版1.14.0|无
-mainline| nginx开发版1.13.12|无
+mainline| nginx开发版1.15.0|无
 
 # 已注解
 
