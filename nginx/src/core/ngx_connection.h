@@ -92,6 +92,8 @@ struct ngx_listening_s {
 
     // 1.15.0 新增，管理本端口的udp客户端连接
     // 保持udp连接，支持客户端发多包
+    // 但对于tcp连接来说浪费了点空间
+    // 可以改成指针，只有udp才分配内存创建
     ngx_rbtree_t        rbtree;
     ngx_rbtree_node_t   sentinel;
 

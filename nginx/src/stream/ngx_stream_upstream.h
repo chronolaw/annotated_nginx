@@ -111,6 +111,7 @@ struct ngx_stream_upstream_srv_conf_s {
     // 无端口号的标志位
     ngx_uint_t                         no_port;  /* unsigned no_port:1 */
 
+    // 给商业版模块使用的共享内存
 #if (NGX_STREAM_UPSTREAM_ZONE)
     ngx_shm_zone_t                    *shm_zone;
 #endif
@@ -158,6 +159,7 @@ typedef struct {
     // 从upstream{}里获取一个上游server
     ngx_peer_connection_t              peer;
 
+    // 上行下行使用的缓冲区
     ngx_buf_t                          downstream_buf;
     ngx_buf_t                          upstream_buf;
 
@@ -173,10 +175,10 @@ typedef struct {
     // 开始的时间，只是秒数
     time_t                             start_sec;
 
-    // 1.15新增
+    // 1.15新增,上行的包数
     ngx_uint_t                         requests;
 
-    // 1.10新增
+    // 1.10新增,下行的包数
     ngx_uint_t                         responses;
 
     ngx_str_t                          ssl_name;

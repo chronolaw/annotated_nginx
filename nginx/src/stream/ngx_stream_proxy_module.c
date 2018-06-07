@@ -457,6 +457,7 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
 
     s->log_handler = ngx_stream_proxy_log_error;
 
+    // 1.15新增
     u->requests = 1;
 
     u->peer.log = c->log;
@@ -1870,6 +1871,8 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                 cl->buf->flush = 1;
 
                 // 增加接收的包数
+                // packets = &u->requests;
+                // packets = &u->responses;
                 (*packets)++;
 
                 // 增加接收的数据字节数
