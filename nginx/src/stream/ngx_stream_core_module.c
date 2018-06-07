@@ -270,6 +270,7 @@ ngx_stream_core_generic_phase(ngx_stream_session_t *s,
 }
 
 
+// 处理preread阶段，帮模块读一些数据
 ngx_int_t
 ngx_stream_core_preread_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph)
@@ -280,15 +281,19 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
     ngx_connection_t            *c;
     ngx_stream_core_srv_conf_t  *cscf;
 
+    // 取连接对象
     c = s->connection;
 
     c->log->action = "prereading client data";
 
+    // 取配置
     cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
 
+    // 超时就不再读了
     if (c->read->timedout) {
         rc = NGX_STREAM_OK;
 
+    // 有定时器，需要读
     } else if (c->read->timer_set) {
         rc = NGX_AGAIN;
 
@@ -298,6 +303,7 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
 
     while (rc == NGX_AGAIN) {
 
+        // 分配供客户端读取的内存
         if (c->buffer == NULL) {
             c->buffer = ngx_create_temp_buf(c->pool, cscf->preread_buffer_size);
             if (c->buffer == NULL) {
@@ -306,19 +312,23 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
             }
         }
 
+        // 缓冲区大小
         size = c->buffer->end - c->buffer->last;
 
+        // 满则不能再读
         if (size == 0) {
             ngx_log_error(NGX_LOG_ERR, c->log, 0, "preread buffer full");
             rc = NGX_STREAM_BAD_REQUEST;
             break;
         }
 
+        // 客户端关闭连接
         if (c->read->eof) {
             rc = NGX_STREAM_OK;
             break;
         }
 
+        // 不可读，需要加入事件监控
         if (!c->read->ready) {
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                 rc = NGX_ERROR;
@@ -334,6 +344,7 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
             return NGX_OK;
         }
 
+        // 读取数据
         n = c->recv(c, c->buffer->last, size);
 
         if (n == NGX_ERROR) {
@@ -341,10 +352,12 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
             break;
         }
 
+        // 读取了n字节
         if (n > 0) {
             c->buffer->last += n;
         }
 
+        // 小于0也可能是成功的，因为udp已经存进了buffer
         rc = ph->handler(s);
     }
 
