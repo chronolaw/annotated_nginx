@@ -488,42 +488,24 @@ ngx_stream_proxy_handler(ngx_stream_session_t *s)
         return;
     }
 
-<<<<<<< HEAD
-    // 如果是tcp连接，那么创建一个缓冲区，用来接收数据
-    if (c->type == SOCK_STREAM) {
-        p = ngx_pnalloc(c->pool, pscf->buffer_size);
-        if (p == NULL) {
-            ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
-            return;
-        }
-
-        // 注意是给下游使用的缓冲区
-        u->downstream_buf.start = p;
-        u->downstream_buf.end = p + pscf->buffer_size;
-        u->downstream_buf.pos = p;
-        u->downstream_buf.last = p;
-
-        // 连接可读，表示客户端有数据发过来
-        // 加入到&ngx_posted_events
-        // 稍后由ngx_stream_proxy_downstream_handler来处理
-        if (c->read->ready) {
-            ngx_post_event(c->read, &ngx_posted_events);
-        }
-=======
+    // 1.15给udp/tcp都创建一个缓冲区，用来接收数据
     p = ngx_pnalloc(c->pool, pscf->buffer_size);
     if (p == NULL) {
         ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
     }
 
+    // 注意是给下游使用的缓冲区
     u->downstream_buf.start = p;
     u->downstream_buf.end = p + pscf->buffer_size;
     u->downstream_buf.pos = p;
     u->downstream_buf.last = p;
 
+    // 连接可读，表示客户端有数据发过来
+    // 加入到&ngx_posted_events
+    // 稍后由ngx_stream_proxy_downstream_handler来处理
     if (c->read->ready) {
         ngx_post_event(c->read, &ngx_posted_events);
->>>>>>> mainline
     }
 
     // udp不需要，始终用一个固定大小的数组接收数据
@@ -1027,12 +1009,9 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 
         cl->buf->tag = (ngx_buf_tag_t) &ngx_stream_proxy_module;
         cl->buf->flush = 1;
-<<<<<<< HEAD
 
-        // udp特殊处理，直接是最后一块数据，所以Nginx暂不支持udp会话
-        cl->buf->last_buf = (c->type == SOCK_DGRAM);
-=======
->>>>>>> mainline
+        // 1.15.0之前udp特殊处理，直接是最后一块数据，所以Nginx暂不支持udp会话
+        // cl->buf->last_buf = (c->type == SOCK_DGRAM);
 
         // 把数据挂到upstream_out里，要发给上游
         cl->next = u->upstream_out;
@@ -1075,15 +1054,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         u->proxy_protocol = 0;
     }
 
-<<<<<<< HEAD
-    if (c->type == SOCK_DGRAM && pscf->responses == 0) {
-        pc->read->ready = 0;
-        pc->read->eof = 1;
-    }
-
     // 进入此函数，肯定已经成功连接了上游服务器
-=======
->>>>>>> mainline
     u->connected = 1;
 
     // 修改上游读写事件，不再测试连接，改为ngx_stream_proxy_upstream_handler
@@ -1877,17 +1848,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                     }
                 }
 
-<<<<<<< HEAD
-                // udp处理
-                if (c->type == SOCK_DGRAM && ++u->responses == pscf->responses)
-                {
-                    src->read->ready = 0;
-                    src->read->eof = 1;
-                }
-
                 // 找到链表末尾
-=======
->>>>>>> mainline
                 for (ll = out; *ll; ll = &(*ll)->next) { /* void */ }
 
                 // 把读到的数据挂到链表末尾
@@ -1908,11 +1869,10 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                 cl->buf->last_buf = src->read->eof;
                 cl->buf->flush = 1;
 
-<<<<<<< HEAD
-                // 增加接收的数据字节数
-=======
+                // 增加接收的包数
                 (*packets)++;
->>>>>>> mainline
+
+                // 增加接收的数据字节数
                 *received += n;
 
                 // 缓冲区的末尾指针移动，表示收到了n字节新数据
@@ -1931,17 +1891,14 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
 
     c->log->action = "proxying connection";
 
-<<<<<<< HEAD
     // 这时应该是src已经读完，数据也发送完
     // 读取出错也会有eof标志
-    if (src->read->eof && dst && (dst->read->eof || !dst->buffered)) {
-=======
+    //if (src->read->eof && dst && (dst->read->eof || !dst->buffered)) {
     if (c->type == SOCK_DGRAM
         && pscf->responses != NGX_MAX_INT32_VALUE
         && u->responses >= pscf->responses * u->requests
         && !src->buffered && dst && !dst->buffered)
     {
->>>>>>> mainline
         handler = c->log->handler;
         c->log->handler = NULL;
 

@@ -266,14 +266,12 @@ struct ngx_connection_s {
     ngx_ssl_connection_t  *ssl;
 #endif
 
-<<<<<<< HEAD
+    // 1.15.0新增
+    ngx_udp_connection_t  *udp;
+
     // 本地监听端口的socketaddr，也就是listening中的sockaddr
     // 有的时候local_sockaddr可能是0
     // 需要调用ngx_connection_local_sockaddr才能获得真正的服务器地址
-=======
-    ngx_udp_connection_t  *udp;
-
->>>>>>> mainline
     struct sockaddr    *local_sockaddr;
     socklen_t           local_socklen;
 
