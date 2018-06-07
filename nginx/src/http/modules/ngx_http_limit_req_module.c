@@ -555,8 +555,16 @@ ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit, ngx_uint_t hash,
             // 计算上次访问的时间间隔
             ms = (ngx_msec_int_t) (now - lr->last);
 
+            // 1.15.0
+            if (ms < -60000) {
+                ms = 1;
+
+            } else if (ms < 0) {
+                ms = 0;
+            }
+
             // 计算超出值
-            excess = lr->excess - ctx->rate * ngx_abs(ms) / 1000 + 1000;
+            excess = lr->excess - ctx->rate * ms / 1000 + 1000;
 
             if (excess < 0) {
                 excess = 0;
@@ -575,7 +583,10 @@ ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit, ngx_uint_t hash,
             if (account) {
                 // 记录本次的请求信息
                 lr->excess = excess;
-                lr->last = now;
+
+                if (ms) {
+                    lr->last = now;
+                }
 
                 // ok不会拒绝请求
                 return NGX_OK;
@@ -698,13 +709,23 @@ ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits, ngx_uint_t n,
         now = ngx_current_msec;
         ms = (ngx_msec_int_t) (now - lr->last);
 
-        excess = lr->excess - ctx->rate * ngx_abs(ms) / 1000 + 1000;
+        if (ms < -60000) {
+            ms = 1;
+
+        } else if (ms < 0) {
+            ms = 0;
+        }
+
+        excess = lr->excess - ctx->rate * ms / 1000 + 1000;
 
         if (excess < 0) {
             excess = 0;
         }
 
-        lr->last = now;
+        if (ms) {
+            lr->last = now;
+        }
+
         lr->excess = excess;
         lr->count--;
 

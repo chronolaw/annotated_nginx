@@ -496,19 +496,10 @@ ngx_http_init_connection(ngx_connection_t *c)
     // sscf->enable对应指令ssl on，通常不使用
     // hc->addr_conf->ssl对应listen xxx ssl
     if (sscf->enable || hc->addr_conf->ssl) {
-
-        c->log->action = "SSL handshaking";
-
-        // 要求必须指定证书，否则报错
-        if (hc->addr_conf->ssl && sscf->ssl.ctx == NULL) {
-            ngx_log_error(NGX_LOG_ERR, c->log, 0,
-                          "no \"ssl_certificate\" is defined "
-                          "in server listening on SSL port");
-            ngx_http_close_connection(c);
-            return;
-        }
+        // 1.15.0不要求必须指定证书
 
         hc->ssl = 1;
+        c->log->action = "SSL handshaking";
 
         // ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
         // 进入ssl握手处理，而不是直接读取http头

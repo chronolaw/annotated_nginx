@@ -3952,6 +3952,9 @@ ngx_http_core_create_srv_conf(ngx_conf_t *cf)
     cscf->merge_slashes = NGX_CONF_UNSET;
     cscf->underscores_in_headers = NGX_CONF_UNSET;
 
+    cscf->file_name = cf->conf_file->file.name.data;
+    cscf->line = cf->conf_file->line;
+
     return cscf;
 }
 
