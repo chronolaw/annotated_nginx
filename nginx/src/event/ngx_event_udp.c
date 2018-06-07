@@ -319,8 +319,9 @@ ngx_event_recvmsg(ngx_event_t *ev)
             // udp连接可读
             rev->ready = 1;
 
-            // 执行读回调函数，从缓冲区读数据
-            // 调用的是ngx_udp_shared_recv
+            // 执行读回调函数ngx_stream_session_handler
+            // 按阶段执行处理引擎，调用各个模块的handler
+            // 从缓冲区读数据调用的是ngx_udp_shared_recv
             rev->handler(rev);
 
             // 读完清空缓冲区
@@ -385,6 +386,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
         // 1.15新增
         // 专用的udp读取函数
+        // 之前udp的recv指针是null，无法读数据
         c->recv = ngx_udp_shared_recv;
 
         // udp发送函数
