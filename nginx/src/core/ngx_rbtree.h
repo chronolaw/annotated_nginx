@@ -31,6 +31,7 @@ typedef struct ngx_rbtree_node_s  ngx_rbtree_node_t;
 
 // 红黑树节点
 // 通常需要以侵入式的方式使用，即作为结构体的一个成员
+// 在C语言里利用平坦内存特点，后面放自己的数据
 struct ngx_rbtree_node_s {
     // 节点的key，用于二分查找
     ngx_rbtree_key_t       key;
@@ -45,6 +46,8 @@ struct ngx_rbtree_node_s {
     ngx_rbtree_node_t     *parent;
 
     // 节点的颜色
+    // 根节点是黑色
+    // 新插入的节点必定是红色
     u_char                 color;
 
     // 节点数据，只有一个字节，通常无意义

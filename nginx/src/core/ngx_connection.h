@@ -393,8 +393,11 @@ void ngx_close_connection(ngx_connection_t *c);
 // 检查cycle里的连接数组，如果连接空闲则设置close标志位，关闭
 void ngx_close_idle_connections(ngx_cycle_t *cycle);
 
+// 有的时候local_sockaddr可能是0
+// 需要调用ngx_connection_local_sockaddr才能获得真正的服务器地址
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     ngx_uint_t port);
+
 ngx_int_t ngx_tcp_nodelay(ngx_connection_t *c);
 ngx_int_t ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text);
 
