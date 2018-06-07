@@ -764,9 +764,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* free the unnecessary shared memory */
 
+    // 收尾工作
+
+    // 看旧cycle里是否有共享内存需要释放
+
     opart = &old_cycle->shared_memory.part;
     oshm_zone = opart->elts;
 
+    // 遍历旧共享内存列表
     for (i = 0; /* void */ ; i++) {
 
         if (i >= opart->nelts) {
@@ -778,6 +783,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             i = 0;
         }
 
+        // 在新cycle里找同名共享内存
         part = &cycle->shared_memory.part;
         shm_zone = part->elts;
 
@@ -792,10 +798,12 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 n = 0;
             }
 
+            // 名字长度不同
             if (oshm_zone[i].shm.name.len != shm_zone[n].shm.name.len) {
                 continue;
             }
 
+            // 名字不同
             if (ngx_strncmp(oshm_zone[i].shm.name.data,
                             shm_zone[n].shm.name.data,
                             oshm_zone[i].shm.name.len)
@@ -804,22 +812,26 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 continue;
             }
 
+            // 都对，但要求复用
             if (oshm_zone[i].tag == shm_zone[n].tag
                 && oshm_zone[i].shm.size == shm_zone[n].shm.size
                 && !oshm_zone[i].noreuse)
             {
+                // 跳到continue，不会释放
                 goto live_shm_zone;
             }
 
+            // 都对，不复用，结束查找
             break;
         }
 
+        // 释放不使用的共享内存
         ngx_shm_free(&oshm_zone[i].shm);
 
     live_shm_zone:
 
         continue;
-    }
+    } // 遍历旧共享内存列表
 
 old_shm_zone_done:
 
