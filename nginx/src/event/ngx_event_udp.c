@@ -40,7 +40,7 @@ static ssize_t ngx_udp_shared_recv(ngx_connection_t *c, u_char *buf,
 // key是客户端地址+服务器地址
 static ngx_int_t ngx_insert_udp_connection(ngx_connection_t *c);
 
-    // 清理函数，会删除红黑树节点
+// 清理函数，会删除红黑树节点
 static void ngx_delete_udp_connection(void *data);
 
 // 红黑树查找是否已经有连接
