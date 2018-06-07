@@ -35,6 +35,7 @@ typedef struct ngx_thread_task_s     ngx_thread_task_t;
 
 typedef struct ngx_ssl_s             ngx_ssl_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
+typedef struct ngx_udp_connection_s  ngx_udp_connection_t;
 
 // 事件发生时调用的函数
 // 例如监听端口时会回调ngx_event_accept

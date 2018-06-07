@@ -90,6 +90,11 @@ struct ngx_listening_s {
     // 从cycle的内存池分配，但只用了read事件
     ngx_connection_t   *connection;
 
+    // 1.15.0 新增
+    // 保持udp连接，支持客户端发多包
+    ngx_rbtree_t        rbtree;
+    ngx_rbtree_node_t   sentinel;
+
     // worker进程的序号，用于reuseport
     ngx_uint_t          worker;
 
@@ -261,9 +266,14 @@ struct ngx_connection_s {
     ngx_ssl_connection_t  *ssl;
 #endif
 
+<<<<<<< HEAD
     // 本地监听端口的socketaddr，也就是listening中的sockaddr
     // 有的时候local_sockaddr可能是0
     // 需要调用ngx_connection_local_sockaddr才能获得真正的服务器地址
+=======
+    ngx_udp_connection_t  *udp;
+
+>>>>>>> mainline
     struct sockaddr    *local_sockaddr;
     socklen_t           local_socklen;
 
