@@ -1,4 +1,41 @@
 
+Changes with nginx 1.15.0                                        05 Jun 2018
+
+    *) Change: the "ssl" directive is deprecated; the "ssl" parameter of the
+       "listen" directive should be used instead.
+
+    *) Change: now nginx detects missing SSL certificates during
+       configuration testing when using the "ssl" parameter of the "listen"
+       directive.
+
+    *) Feature: now the stream module can handle multiple incoming UDP
+       datagrams from a client within a single session.
+
+    *) Bugfix: it was possible to specify an incorrect response code in the
+       "proxy_cache_valid" directive.
+
+    *) Bugfix: nginx could not be built by gcc 8.1.
+
+    *) Bugfix: logging to syslog stopped on local IP address changes.
+
+    *) Bugfix: nginx could not be built by clang with CUDA SDK installed;
+       the bug had appeared in 1.13.8.
+
+    *) Bugfix: "getsockopt(TCP_FASTOPEN) ... failed" messages might appear
+       in logs during binary upgrade when using unix domain listen sockets
+       on FreeBSD.
+
+    *) Bugfix: nginx could not be built on Fedora 28 Linux.
+
+    *) Bugfix: request processing rate might exceed configured rate when
+       using the "limit_req" directive.
+
+    *) Bugfix: in handling of client addresses when using unix domain listen
+       sockets to work with datagrams on Linux.
+
+    *) Bugfix: in memory allocation error handling.
+
+
 Changes with nginx 1.13.12                                       10 Apr 2018
 
     *) Bugfix: connections with gRPC backends might be closed unexpectedly
