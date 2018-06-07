@@ -18,6 +18,9 @@
 
 typedef struct ngx_queue_s  ngx_queue_t;
 
+// 队列结构，两个指针
+// 需作为结构体的成员使用
+// 取原结构使用ngx_queue_data(q, type, link)
 struct ngx_queue_s {
     ngx_queue_t  *prev;
     ngx_queue_t  *next;
@@ -125,6 +128,7 @@ struct ngx_queue_s {
     (type *) ((u_char *) q - offsetof(type, link))
 
 
+// 队列的中间节点
 ngx_queue_t *ngx_queue_middle(ngx_queue_t *queue);
 
 // 使用一个比较函数指针对队列元素排序，但效率不是很高
