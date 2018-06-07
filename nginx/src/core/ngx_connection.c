@@ -108,6 +108,10 @@ ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
     // 拷贝addr的字符串形式
     ngx_memcpy(ls->addr_text.data, text, len);
 
+#if !(NGX_WIN32)
+    ngx_rbtree_init(&ls->rbtree, &ls->sentinel, ngx_udp_rbtree_insert_value);
+#endif
+
     ls->fd = (ngx_socket_t) -1;
     ls->type = SOCK_STREAM;
 
@@ -379,7 +383,9 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
         {
             err = ngx_socket_errno;
 
-            if (err != NGX_EOPNOTSUPP && err != NGX_ENOPROTOOPT) {
+            if (err != NGX_EOPNOTSUPP && err != NGX_ENOPROTOOPT
+                && err != NGX_EINVAL)
+            {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, err,
                               "getsockopt(TCP_FASTOPEN) %V failed, ignored",
                               &ls[i].addr_text);
