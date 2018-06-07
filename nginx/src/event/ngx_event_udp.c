@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_event_recvmsg
+// * ngx_lookup_udp_connection
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -10,8 +14,12 @@
 #include <ngx_event.h>
 
 
+// 1.15.0 udp移动到新的ngx_event_udp.c
+
 #if !(NGX_WIN32)
 
+// udp连接的附加数据
+// 串进红黑树，缓冲区里是客户端发送的数据
 struct ngx_udp_connection_s {
     ngx_rbtree_node_t   node;
     ngx_connection_t   *connection;
@@ -19,16 +27,33 @@ struct ngx_udp_connection_s {
 };
 
 
+// 专用的关闭函数
 static void ngx_close_accepted_udp_connection(ngx_connection_t *c);
+
+// 1.15新增
+// 专用的udp读取函数
 static ssize_t ngx_udp_shared_recv(ngx_connection_t *c, u_char *buf,
     size_t size);
+
+// 新udp连接插入红黑树
+// 使用crc32计算散列
+// key是客户端地址+服务器地址
 static ngx_int_t ngx_insert_udp_connection(ngx_connection_t *c);
+
+    // 清理函数，会删除红黑树节点
 static void ngx_delete_udp_connection(void *data);
+
+// 红黑树查找是否已经有连接
+// 使用crc32计算散列
+// key是客户端地址+服务器地址
 static ngx_connection_t *ngx_lookup_udp_connection(ngx_listening_t *ls,
     struct sockaddr *sockaddr, socklen_t socklen,
     struct sockaddr *local_sockaddr, socklen_t local_socklen);
 
 
+// 1.10新增函数，接受udp连接的handler
+// 流程类似ngx_event_accept
+// 1.15使用红黑树保持udp连接，支持客户端发送多包
 void
 ngx_event_recvmsg(ngx_event_t *ev)
 {
@@ -45,6 +70,8 @@ ngx_event_recvmsg(ngx_event_t *ev)
     ngx_listening_t   *ls;
     ngx_event_conf_t  *ecf;
     ngx_connection_t  *c, *lc;
+
+    // 接收数据的缓冲区
     static u_char      buffer[65535];
 
 #if (NGX_HAVE_MSGHDR_MSG_CONTROL)
@@ -61,7 +88,9 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+    // 事件已经超时
     if (ev->timedout) {
+        // 遍历监听端口列表，重新加入epoll连接事件
         if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
             return;
         }
@@ -69,27 +98,43 @@ ngx_event_recvmsg(ngx_event_t *ev)
         ev->timedout = 0;
     }
 
+    // 得到event core模块的配置，检查是否接受多个连接
     ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
 
+    // rtsig在nginx 1.9.x已经删除
     if (!(ngx_event_flags & NGX_USE_KQUEUE_EVENT)) {
+        // epoll是否允许尽可能接受多个请求
+        // 这里的ev->available仅使用1个bit的内存空间
         ev->available = ecf->multi_accept;
     }
 
+    // 事件的连接对象
     lc = ev->data;
+
+    // 事件对应的监听端口对象
     ls = lc->listening;
+
+    // 此时还没有数据可读
     ev->ready = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
+        // 清空msghdr结构体，准备读取数据
         ngx_memzero(&msg, sizeof(struct msghdr));
 
+        // 设置接收数据的缓冲区
+        // 大小是65535字节
         iov[0].iov_base = (void *) buffer;
         iov[0].iov_len = sizeof(buffer);
 
+        // 客户端的地址
         msg.msg_name = &sa;
+
+        // 设置接收数据的缓冲区
         msg.msg_namelen = sizeof(ngx_sockaddr_t);
+
         msg.msg_iov = iov;
         msg.msg_iovlen = 1;
 
@@ -114,8 +159,10 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+        // 接收udp数据
         n = recvmsg(lc->fd, &msg, 0);
 
+        // 调用失败直接返回
         if (n == -1) {
             err = ngx_socket_errno;
 
@@ -138,6 +185,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         }
 #endif
 
+        // 客户端的地址
         sockaddr = msg.msg_name;
         socklen = msg.msg_namelen;
 
@@ -145,6 +193,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             socklen = sizeof(ngx_sockaddr_t);
         }
 
+        // 0长度是unix domain socket
         if (socklen == 0) {
 
             /*
@@ -157,6 +206,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             sa.sockaddr.sa_family = ls->sockaddr->sa_family;
         }
 
+        // 服务器的地址
         local_sockaddr = ls->sockaddr;
         local_socklen = ls->socklen;
 
@@ -230,9 +280,13 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
+        // 红黑树查找是否已经有连接
+        // 使用crc32计算散列
+        // key是客户端地址+服务器地址
         c = ngx_lookup_udp_connection(ls, sockaddr, socklen, local_sockaddr,
                                       local_socklen);
 
+        // 有就直接复用，不新建
         if (c) {
 
 #if (NGX_DEBUG)
@@ -249,37 +303,55 @@ ngx_event_recvmsg(ngx_event_t *ev)
             }
 #endif
 
+            // 清空缓冲区
             ngx_memzero(&buf, sizeof(ngx_buf_t));
 
+            // 指向刚读取的数据
             buf.pos = buffer;
             buf.last = buffer + n;
 
+            // 读事件
             rev = c->read;
 
+            // 设置udp的缓冲区
             c->udp->buffer = &buf;
+
+            // udp连接可读
             rev->ready = 1;
 
+            // 执行读回调函数，从缓冲区读数据
+            // 调用的是ngx_udp_shared_recv
             rev->handler(rev);
 
+            // 读完清空缓冲区
             c->udp->buffer = NULL;
+
+            // 此时不可读
             rev->ready = 0;
 
+            // 完成一次udp accept，continue
             goto next;
         }
 
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1);
 #endif
+        // 红黑树里没有，是新连接
 
+        // 负载均衡的阈值
         ngx_accept_disabled = ngx_cycle->connection_n / 8
                               - ngx_cycle->free_connection_n;
 
+        // 接收数据成功，从连接池里获取一个新的连接
         c = ngx_get_connection(lc->fd, ev->log);
         if (c == NULL) {
             return;
         }
 
+        // ？？？
         c->shared = 1;
+
+        // udp类型的连接
         c->type = SOCK_DGRAM;
         c->socklen = socklen;
 
@@ -287,6 +359,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_active, 1);
 #endif
 
+        // 为连接创建内存池
         c->pool = ngx_create_pool(ls->pool_size, ev->log);
         if (c->pool == NULL) {
             ngx_close_accepted_udp_connection(c);
@@ -299,6 +372,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             return;
         }
 
+        // 从msghdr里拷贝地址
         ngx_memcpy(c->sockaddr, sockaddr, socklen);
 
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
@@ -309,12 +383,20 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
         *log = ls->log;
 
+        // 1.15新增
+        // 专用的udp读取函数
         c->recv = ngx_udp_shared_recv;
+
+        // udp发送函数
         c->send = ngx_udp_send;
         c->send_chain = ngx_udp_send_chain;
 
         c->log = log;
         c->pool->log = log;
+
+        // 监听端口
+        // c->listening里包含了server配置等关键信息
+        // 决定了如何处理这个连接
         c->listening = ls;
 
         if (local_sockaddr == &lsa.sockaddr) {
@@ -327,20 +409,26 @@ ngx_event_recvmsg(ngx_event_t *ev)
             ngx_memcpy(local_sockaddr, &lsa, local_socklen);
         }
 
+        // 服务器地址
         c->local_sockaddr = local_sockaddr;
         c->local_socklen = local_socklen;
 
+        // 创建连接用的缓冲区
         c->buffer = ngx_create_temp_buf(c->pool, n);
         if (c->buffer == NULL) {
             ngx_close_accepted_udp_connection(c);
             return;
         }
 
+        // 把之前收到的数据拷贝到连接里的缓冲区
+        // 注意这里，有数据拷贝的成本
         c->buffer->last = ngx_cpymem(c->buffer->last, buffer, n);
 
+        // 设置读写事件
         rev = c->read;
         wev = c->write;
 
+        // 连接立即可写
         wev->ready = 1;
 
         rev->log = log;
@@ -355,12 +443,14 @@ ngx_event_recvmsg(ngx_event_t *ev)
          *             or protection by critical section or light mutex
          */
 
+        // 连接计数增加
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_handled, 1);
 #endif
 
+        // 拷贝客户端地址字符串
         if (ls->addr_ntop) {
             c->addr_text.data = ngx_pnalloc(c->pool, ls->addr_text_max_len);
             if (c->addr_text.data == NULL) {
@@ -397,6 +487,9 @@ ngx_event_recvmsg(ngx_event_t *ev)
         }
 #endif
 
+        // 新udp连接插入红黑树
+        // 使用crc32计算散列
+        // key是客户端地址+服务器地址
         if (ngx_insert_udp_connection(c) != NGX_OK) {
             ngx_close_accepted_udp_connection(c);
             return;
@@ -405,18 +498,25 @@ ngx_event_recvmsg(ngx_event_t *ev)
         log->data = NULL;
         log->handler = NULL;
 
+        // 接受连接，收到请求的回调函数
+        // stream模块里是ngx_stream_init_connection
         ls->handler(c);
 
     next:
 
+        // epoll不处理
         if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
             ev->available -= n;
         }
 
+    // 如果ev->available = ecf->multi_accept;
+    // epoll尽可能接受多个请求，直至accept出错EAGAIN，即无新连接请求
+    // 否则epoll只接受一个请求后即退出循环
     } while (ev->available);
 }
 
 
+// 专用的关闭函数
 static void
 ngx_close_accepted_udp_connection(ngx_connection_t *c)
 {
@@ -434,22 +534,29 @@ ngx_close_accepted_udp_connection(ngx_connection_t *c)
 }
 
 
+// 1.15新增
+// 专用的udp读取函数
 static ssize_t
 ngx_udp_shared_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
     ssize_t     n;
     ngx_buf_t  *b;
 
+    // udp连接必须有udp结构体
     if (c->udp == NULL || c->udp->buffer == NULL) {
         return NGX_AGAIN;
     }
 
+    // 先看udp结构体里的缓冲
     b = c->udp->buffer;
 
+    // 看里面有没有数据
     n = ngx_min(b->last - b->pos, (ssize_t) size);
 
+    // 有就拷贝到输出缓冲区
     ngx_memcpy(buf, b->pos, n);
 
+    // 清空缓冲区
     c->udp->buffer = NULL;
     c->read->ready = 0;
 
@@ -510,6 +617,9 @@ ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
 }
 
 
+// 新udp连接插入红黑树
+// 使用crc32计算散列
+// key是客户端地址+服务器地址
 static ngx_int_t
 ngx_insert_udp_connection(ngx_connection_t *c)
 {
@@ -517,17 +627,22 @@ ngx_insert_udp_connection(ngx_connection_t *c)
     ngx_pool_cleanup_t    *cln;
     ngx_udp_connection_t  *udp;
 
+    // 指针不空已经插入
     if (c->udp) {
         return NGX_OK;
     }
 
+    // 分配内存
     udp = ngx_pcalloc(c->pool, sizeof(ngx_udp_connection_t));
     if (udp == NULL) {
         return NGX_ERROR;
     }
 
+    // 指向本连接
     udp->connection = c;
 
+    // 使用crc32计算散列
+    // key是客户端地址+服务器地址
     ngx_crc32_init(hash);
     ngx_crc32_update(&hash, (u_char *) c->sockaddr, c->socklen);
 
@@ -535,18 +650,22 @@ ngx_insert_udp_connection(ngx_connection_t *c)
         ngx_crc32_update(&hash, (u_char *) c->local_sockaddr, c->local_socklen);
     }
 
+    // 完成crc32计算
     ngx_crc32_final(hash);
 
     udp->node.key = hash;
 
+    // 清理函数，会删除红黑树节点
     cln = ngx_pool_cleanup_add(c->pool, 0);
     if (cln == NULL) {
         return NGX_ERROR;
     }
 
+    // 清理函数，会删除红黑树节点
     cln->data = c;
     cln->handler = ngx_delete_udp_connection;
 
+    // 插入红黑树
     ngx_rbtree_insert(&c->listening->rbtree, &udp->node);
 
     c->udp = udp;
@@ -555,6 +674,7 @@ ngx_insert_udp_connection(ngx_connection_t *c)
 }
 
 
+// 清理函数，会删除红黑树节点
 static void
 ngx_delete_udp_connection(void *data)
 {
@@ -564,6 +684,9 @@ ngx_delete_udp_connection(void *data)
 }
 
 
+// 红黑树查找是否已经有连接
+// 使用crc32计算散列
+// key是客户端地址+服务器地址
 static ngx_connection_t *
 ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
     socklen_t socklen, struct sockaddr *local_sockaddr, socklen_t local_socklen)
@@ -590,9 +713,12 @@ ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
 
 #endif
 
+    // 红黑树在监听端口结构体里
     node = ls->rbtree.root;
     sentinel = ls->rbtree.sentinel;
 
+    // 使用crc32计算散列
+    // key是客户端地址+服务器地址
     ngx_crc32_init(hash);
     ngx_crc32_update(&hash, (u_char *) sockaddr, socklen);
 
@@ -600,8 +726,10 @@ ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
         ngx_crc32_update(&hash, (u_char *) local_sockaddr, local_socklen);
     }
 
+    // 完成crc32计算
     ngx_crc32_final(hash);
 
+    // 红黑树查找
     while (node != sentinel) {
 
         if (hash < node->key) {
@@ -616,10 +744,13 @@ ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
 
         /* hash == node->key */
 
+        // 强制转化成udp数据
         udp = (ngx_udp_connection_t *) node;
 
+        // 本连接
         c = udp->connection;
 
+        // 比较是否是同一个客户端
         rc = ngx_cmp_sockaddr(sockaddr, socklen,
                               c->sockaddr, c->socklen, 1);
 
@@ -628,10 +759,12 @@ ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
                                   c->local_sockaddr, c->local_socklen, 1);
         }
 
+        // 相等，找到
         if (rc == 0) {
             return c;
         }
 
+        // 不同，继续左右找
         node = (rc < 0) ? node->left : node->right;
     }
 

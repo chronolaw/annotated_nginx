@@ -90,7 +90,7 @@ struct ngx_listening_s {
     // 从cycle的内存池分配，但只用了read事件
     ngx_connection_t   *connection;
 
-    // 1.15.0 新增
+    // 1.15.0 新增，管理本端口的udp客户端连接
     // 保持udp连接，支持客户端发多包
     ngx_rbtree_t        rbtree;
     ngx_rbtree_node_t   sentinel;
@@ -267,6 +267,8 @@ struct ngx_connection_s {
 #endif
 
     // 1.15.0新增
+    // udp连接的附加数据
+    // 串进红黑树，缓冲区里是客户端发送的数据
     ngx_udp_connection_t  *udp;
 
     // 本地监听端口的socketaddr，也就是listening中的sockaddr
