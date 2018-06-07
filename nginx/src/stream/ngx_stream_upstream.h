@@ -173,6 +173,9 @@ typedef struct {
     // 开始的时间，只是秒数
     time_t                             start_sec;
 
+    // 1.15新增
+    ngx_uint_t                         requests;
+
     // 1.10新增
     ngx_uint_t                         responses;
 
