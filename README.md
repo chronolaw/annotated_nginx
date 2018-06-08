@@ -70,6 +70,7 @@ mainline| nginx开发版1.15.0|无
 * [ngx_http_header_filter_module.c](/nginx/src/http/ngx_http_header_filter_module.c)
 * [ngx_http_write_filter_module.c](/nginx/src/http/ngx_http_write_filter_module.c)
 * [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
+* [ngx_http_degradation_module.c](/nginx/src/http/modules/ngx_http_degradation_module.c)
 
 ###### os/unix目录
 * [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
@@ -89,6 +90,7 @@ mainline| nginx开发版1.15.0|无
 * [ngx_palloc.c](/nginx/src/core/ngx_palloc.c)
 * [ngx_slab.c](/nginx/src/core/ngx_slab.c)
 * [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
+* [ngx_http_degradation_module.c](/nginx/src/http/modules/ngx_http_degradation_module.c)
 
 ###### 数据结构
 * [ngx_array.h](/nginx/src/core/ngx_array.h)
