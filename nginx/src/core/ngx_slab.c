@@ -109,7 +109,7 @@
 static ngx_slab_page_t *ngx_slab_alloc_pages(ngx_slab_pool_t *pool,
     ngx_uint_t pages);
 
-// 释放多个内存页，支持合并
+// 释放多个内存页，自1.7.x支持合并
 static void ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     ngx_uint_t pages);
 
@@ -1104,7 +1104,7 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 }
 
 
-// 释放多个内存页，支持合并
+// 释放多个内存页，自1.7.x支持合并
 static void
 ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     ngx_uint_t pages)

@@ -41,6 +41,7 @@ ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin)
                 // cpu等待的时间逐步加长
                 for (i = 0; i < n; i++) {
                     // #define ngx_cpu_pause()             __asm__ ("pause")
+                    // 自旋等待，降低功耗，不会引起性能下降
                     ngx_cpu_pause();
                 }
 
