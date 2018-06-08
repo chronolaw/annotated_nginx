@@ -23,7 +23,7 @@ nginx 1.15.0
 分支    |说明   |注释
 --------|-------|-----
 master  | nginx开发版1.15.0|有
-upgrade | nginx稳定版1.14.0|无
+stable  | nginx稳定版1.14.0|无
 mainline| nginx开发版1.15.0|无
 
 # 已注解
