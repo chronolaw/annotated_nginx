@@ -52,7 +52,9 @@ ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin)
         }
 
         // 占用cpu过久，让出cpu
+        // 单cpu必须让出cpu让其他进程运行
         // 之后继续try_lock，直至lock成功
+        // yield不会进入睡眠
         ngx_sched_yield();
     }
 

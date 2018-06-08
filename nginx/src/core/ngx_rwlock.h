@@ -1,3 +1,4 @@
+// annotated by chrono since 2016
 
 /*
  * Copyright (C) Ruslan Ermilov
@@ -12,6 +13,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+
+// 读写锁操作，可用于进程间通信
+// 也可以用于线程同步
 
 void ngx_rwlock_wlock(ngx_atomic_t *lock);
 void ngx_rwlock_rlock(ngx_atomic_t *lock);
