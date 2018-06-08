@@ -19,6 +19,7 @@
 #if !(NGX_WIN32)
 
 // udp连接的附加数据
+// 作为ngx_connection_t的一个成员
 // 串进红黑树，缓冲区里是客户端发送的数据
 struct ngx_udp_connection_s {
     ngx_rbtree_node_t   node;
@@ -322,6 +323,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             // 执行读回调函数ngx_stream_session_handler
             // 按阶段执行处理引擎，调用各个模块的handler
             // 从缓冲区读数据调用的是ngx_udp_shared_recv
+            // 最终读取的是udp->buffer，即本函数的buffer
             rev->handler(rev);
 
             // 读完清空缓冲区
@@ -331,6 +333,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             rev->ready = 0;
 
             // 完成一次udp accept，continue
+            // 实际上是一次udp read
             goto next;
         }
 
