@@ -14,6 +14,7 @@
 #include <ngx_core.h>
 
 // Linux下通常使用的是gcc atomic
+// 即NGX_HAVE_GCC_ATOMIC
 //#define ngx_atomic_cmp_set(lock, old, set)
 //    __sync_bool_compare_and_swap(lock, old, set)
 //
