@@ -100,28 +100,38 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 
 /* GCC 4.1 builtin atomic operations */
 
+// 肯定支持原子操作
 #define NGX_HAVE_ATOMIC_OPS  1
 
+// 原子类型实际上都是长整数
 typedef long                        ngx_atomic_int_t;
 typedef unsigned long               ngx_atomic_uint_t;
 
+// 原子整数文本表示的最大长度，T=>text
+// -1是去掉字符串里结尾的'\0'
 #if (NGX_PTR_SIZE == 8)
 #define NGX_ATOMIC_T_LEN            (sizeof("-9223372036854775808") - 1)
 #else
 #define NGX_ATOMIC_T_LEN            (sizeof("-2147483648") - 1)
 #endif
 
+// 原子类型实际上是无符号长整数
+// 使用volatile修饰，禁止编译器优化缓存，即时取值
 typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 
 
+// cas赋值
 #define ngx_atomic_cmp_set(lock, old, set)                                    \
     __sync_bool_compare_and_swap(lock, old, set)
 
+// cas加法
 #define ngx_atomic_fetch_add(value, add)                                      \
     __sync_fetch_and_add(value, add)
 
+// 内存屏障， 并发操作的同步点
 #define ngx_memory_barrier()        __sync_synchronize()
 
+// 降低cpu功耗，不让出cpu
 #if ( __i386__ || __i386 || __amd64__ || __amd64 )
 #define ngx_cpu_pause()             __asm__ ("pause")
 #else
