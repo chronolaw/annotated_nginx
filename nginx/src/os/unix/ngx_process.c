@@ -44,6 +44,7 @@ static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
 // 检查子进程结束，设置进程数组ngx_processes里的状态
 static void ngx_process_get_status(void);
 
+// 解除子进程相关的共享内存锁
 static void ngx_unlock_mutexes(ngx_pid_t pid);
 
 
@@ -666,11 +667,13 @@ ngx_process_get_status(void)
             ngx_processes[i].respawn = 0;
         }
 
+        // 解除子进程相关的共享内存锁
         ngx_unlock_mutexes(pid);
     }
 }
 
 
+// 解除子进程相关的共享内存锁
 static void
 ngx_unlock_mutexes(ngx_pid_t pid)
 {
@@ -684,6 +687,7 @@ ngx_unlock_mutexes(ngx_pid_t pid)
      * held it
      */
 
+    // accept锁
     if (ngx_accept_mutex_ptr) {
         (void) ngx_shmtx_force_unlock(&ngx_accept_mutex, pid);
     }
@@ -693,6 +697,7 @@ ngx_unlock_mutexes(ngx_pid_t pid)
      * process
      */
 
+    // 共享内存里的锁
     part = (ngx_list_part_t *) &ngx_cycle->shared_memory.part;
     shm_zone = part->elts;
 
