@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_trylock
+// * ngx_unlock
 
 /*
  * Copyright (C) Igor Sysoev
@@ -322,9 +325,13 @@ ngx_atomic_fetch_add(ngx_atomic_t *value, ngx_atomic_int_t add)
 #endif
 
 
+// 自旋锁，实现在core/ngx_spinlock.c
 void ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin);
 
+// 尝试锁定，不会阻塞
 #define ngx_trylock(lock)  (*(lock) == 0 && ngx_atomic_cmp_set(lock, 0, 1))
+
+// 解锁
 #define ngx_unlock(lock)    *(lock) = 0
 
 
