@@ -35,6 +35,7 @@ typedef struct {
 
 
 // error_log指令只能出现在最外部，不能在event{}http{}里
+// http/stream等定义了自己的error_log指令
 static ngx_command_t  ngx_errlog_commands[] = {
 
     { ngx_string("error_log"),
