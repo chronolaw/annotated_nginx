@@ -33,6 +33,7 @@ typedef struct ngx_rbtree_node_s  ngx_rbtree_node_t;
 // 通常需要以侵入式的方式使用，即作为结构体的一个成员
 // 在C语言里利用平坦内存特点，后面放自己的数据
 // 使用宏offsetof(node, color)计算得到地址
+// 参考ngx_http_limit_conn_module.c
 struct ngx_rbtree_node_s {
     // 节点的key，用于二分查找
     ngx_rbtree_key_t       key;

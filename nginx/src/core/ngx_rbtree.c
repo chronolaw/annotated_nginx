@@ -123,10 +123,17 @@ ngx_rbtree_insert_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
         temp = *p;
     }
 
+    // 插入节点
     *p = node;
+
+    // 设置父节点
     node->parent = temp;
+
+    // 左右子节点都是空，即哨兵
     node->left = sentinel;
     node->right = sentinel;
+
+    // 新节点必定是红色
     ngx_rbt_red(node);
 }
 
@@ -161,10 +168,17 @@ ngx_rbtree_insert_timer_value(ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
         temp = *p;
     }
 
+    // 插入节点
     *p = node;
+
+    // 设置父节点
     node->parent = temp;
+
+    // 左右子节点都是空，即哨兵
     node->left = sentinel;
     node->right = sentinel;
+
+    // 新节点必定是红色
     ngx_rbt_red(node);
 }
 
