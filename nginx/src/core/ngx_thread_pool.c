@@ -159,12 +159,14 @@ ngx_module_t  ngx_thread_pool_module = {
     // ngx_single_process_cycle/ngx_worker_process_cycle里调用
     // 进程开始时初始化，创建线程池
     ngx_thread_pool_init_worker,           /* init process */
+
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
 
     // 进程结束时被调用，清理线程池
     // 调用ngx_thread_pool_destroy逐个销毁线程池
     ngx_thread_pool_exit_worker,           /* exit process */
+
     NULL,                                  /* exit master */
     NGX_MODULE_V1_PADDING
 };
@@ -230,6 +232,7 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
         return NGX_ERROR;
     }
 
+    // 线程detach
     err = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     if (err) {
         ngx_log_error(NGX_LOG_ALERT, log, err,
@@ -250,6 +253,7 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
     for (n = 0; n < tp->threads; n++) {
 
         // 线程的执行函数是ngx_thread_pool_cycle，参数是线程池结构体
+        // 线程创建后立即detach
         err = pthread_create(&tid, &attr, ngx_thread_pool_cycle, tp);
         if (err) {
             ngx_log_error(NGX_LOG_ALERT, log, err,
