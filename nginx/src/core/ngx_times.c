@@ -40,6 +40,7 @@ volatile ngx_msec_t      ngx_current_msec;
 // 当前cache的时间，指向某个时间槽
 volatile ngx_time_t     *ngx_cached_time;
 
+// 各种格式的时间字符串，缓存备用
 volatile ngx_str_t       ngx_cached_err_log_time;
 volatile ngx_str_t       ngx_cached_http_time;
 volatile ngx_str_t       ngx_cached_http_log_time;
@@ -226,10 +227,12 @@ ngx_time_update(void)
     ngx_cached_http_log_iso8601.data = p3;
     ngx_cached_syslog_time.data = p4;
 
+    // 更新完毕解锁
     ngx_unlock(&ngx_time_lock);
 }
 
 
+// 1.13.10改为使用单调时间
 static ngx_msec_t
 ngx_monotonic_time(time_t sec, ngx_uint_t msec)
 {
