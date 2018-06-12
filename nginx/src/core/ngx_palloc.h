@@ -48,6 +48,7 @@ typedef struct ngx_pool_cleanup_s  ngx_pool_cleanup_t;
 struct ngx_pool_cleanup_s {
     ngx_pool_cleanup_pt   handler;      //清理函数
     void                 *data;         //传递给handler，清理用
+
     ngx_pool_cleanup_t   *next;         //链表指针，所有的清理结构体为一个链表
 };
 
@@ -58,12 +59,16 @@ typedef struct ngx_pool_large_s  ngx_pool_large_t;
 // 大块内存节点, 大于4k
 // 保存成链表方便回收利用
 struct ngx_pool_large_s {
+    // 多个大块内存串成链表，方便回收利用
     ngx_pool_large_t     *next;
+
+    // 指向malloc分配的大块内存
     void                 *alloc;
 };
 
 
 // 描述内存池的信息
+// 每个内存块都有，在最开头的部分，管理本块内存
 typedef struct {
     // 可用内存的起始位置
     // 小块内存每次都从这里分配
@@ -77,6 +82,7 @@ typedef struct {
 
     // 本节点分配失败次数
     // 失败超过4次则本节点认为满，不再参与分配
+    // 注意满的内存块不会主动回收
     ngx_uint_t            failed;
 } ngx_pool_data_t;
 
@@ -90,7 +96,7 @@ struct ngx_pool_s {
     ngx_pool_data_t       d;
 
     // 可分配的最大块
-    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k
+    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
     size_t                max;
 
     // 当前使用的内存池节点
@@ -99,7 +105,7 @@ struct ngx_pool_s {
     // 为chain做的优化，空闲缓冲区链表
     ngx_chain_t          *chain;
 
-    // 大块的内存
+    // 大块的内存，串成链表
     ngx_pool_large_t     *large;
 
     ngx_pool_cleanup_t   *cleanup;      //清理链表头指针

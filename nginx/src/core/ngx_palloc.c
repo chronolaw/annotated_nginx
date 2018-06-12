@@ -15,6 +15,7 @@
 
 
 // 在本内存池内分配小块内存
+// 不超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
 static ngx_inline void *ngx_palloc_small(ngx_pool_t *pool, size_t size,
     ngx_uint_t align);
 
@@ -49,12 +50,14 @@ ngx_create_pool(size_t size, ngx_log_t *log)
 
     // 一开始只有一个内存池节点
     p->d.next = NULL;
+
+    // 失败次数初始化为0
     p->d.failed = 0;
 
     // 池内可用的内存空间
     size = size - sizeof(ngx_pool_t);
 
-    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k
+    // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
     p->max = (size < NGX_MAX_ALLOC_FROM_POOL) ? size : NGX_MAX_ALLOC_FROM_POOL;
 
     // 刚创建，就使用自己
@@ -194,6 +197,7 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
 
 
 // 在本内存池内分配小块内存
+// 不超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
 static ngx_inline void *
 ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 {
@@ -269,6 +273,8 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
     // 成功分配内存
     m = ngx_align_ptr(m, NGX_ALIGNMENT);
+
+    // 移动空闲内存的位置
     new->d.last = m + size;
 
     // 重新设置当前节点
