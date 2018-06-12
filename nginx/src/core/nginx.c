@@ -365,7 +365,8 @@ main(int argc, char *const *argv)
     // ngx_cycle指针指向第一个cycle结构体
     ngx_cycle = &init_cycle;
 
-    //创建cycle使用的内存池，用于之后所有的内存分配，必须成功
+    // 创建cycle使用的内存池，用于之后所有的内存分配，必须成功
+    // 这个内存池很小，只有1k，因为只是临时用
     init_cycle.pool = ngx_create_pool(1024, log);
     if (init_cycle.pool == NULL) {
         return 1;
@@ -409,6 +410,7 @@ main(int argc, char *const *argv)
     ngx_slab_sizes_init();
 
     // 检查NGINX环境变量，获取之前监听的socket
+    // 用于update binary
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
         return 1;
     }

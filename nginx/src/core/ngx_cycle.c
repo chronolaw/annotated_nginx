@@ -100,6 +100,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     log = old_cycle->log;
 
     // 创建一个新内存池
+    // 大小是16k，比临时的1k要大
     pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
     if (pool == NULL) {
         return NULL;
@@ -307,6 +308,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     // 准备解析配置文件，先清零
     ngx_memzero(&conf, sizeof(ngx_conf_t));
+
+    // 配置参数数组预存10个元素
     /* STUB: init array ? */
     conf.args = ngx_array_create(pool, 10, sizeof(ngx_str_t));
     if (conf.args == NULL) {
@@ -314,6 +317,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         return NULL;
     }
 
+    // 配置解析还使用一个独立的内存池，大小是16k
     conf.temp_pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
     if (conf.temp_pool == NULL) {
         ngx_destroy_pool(pool);
@@ -1068,7 +1072,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     sp->end = zn->shm.addr + zn->shm.size;
 
     // 最小左移，通常是3
-    // 计算最小的分配内存大小
+    // 计算最小的分配内存大小，2^3=8字节
     sp->min_shift = 3;
 
     // 内存的开始地址
@@ -1097,6 +1101,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     }
 
     // 初始化slab结构
+    // 按slot和page管理这块共享内存，best-fit
     ngx_slab_init(sp);
 
     return NGX_OK;

@@ -161,6 +161,7 @@ ngx_slab_sizes_init(void)
 
 
 // 初始化slab结构
+// 按slot和page管理这块共享内存，best-fit
 // 之前需要初始化min_shift和end
 // 自己使用可以把min_shift适当调整改大一点
 void
