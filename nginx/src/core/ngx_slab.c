@@ -1053,7 +1053,8 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 
             // 多个空闲页面
             if (page->slab > pages) {
-                // 连续页面的最后一块，prev指向被分配的最后一块
+                // 连续页面的最后一块，prev指向切分后的第一块
+                // 从pages处被切成两部分
                 page[page->slab - 1].prev = (uintptr_t) &page[pages];
 
                 // 切分后的第一块的空闲数量
