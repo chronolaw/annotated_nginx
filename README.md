@@ -23,14 +23,14 @@ nginx 1.15.0
 分支    |说明   |注释
 --------|-------|-----
 master  | nginx开发版1.15.0|有
-stable  | nginx稳定版1.14.0|无
 mainline| nginx开发版1.15.0|无
+stable  | nginx稳定版1.14.0|无
 
 # 已注解
 
 ### 源码目录快捷入口
 * [src](/nginx/src/) - nginx源码目录
-* [core](/nginx/src/core) - 80%，md5/sha1/crc等较简单的功能不关注
+* [core](/nginx/src/core) - 90%，md5/sha1/crc等较简单的功能不关注
 * [event](/nginx/src/event) - 90%，只注解核心模块和epoll，select/kqueue/ssl等不关注
 * [http](/nginx/src/http) - 70%，少量modules目录里的具体功能模块有注释
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
@@ -50,6 +50,7 @@ mainline| nginx开发版1.15.0|无
 * [ngx_connection.c](/nginx/src/core/ngx_connection.c)
 * [ngx_thread_pool.h](/nginx/src/core/ngx_thread_pool.h)
 * [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
+* [ngx_palloc.c](/nginx/src/core/ngx_palloc.c)
 * [ngx_slab.c](/nginx/src/core/ngx_slab.c)
 
 ###### event目录
