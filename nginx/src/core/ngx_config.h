@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_random
+// * NGX_ALIGNMENT
+// * ngx_align
+// * ngx_align_ptr
 
 /*
  * Copyright (C) Igor Sysoev
@@ -53,9 +58,13 @@
 // 非win32，即unix
 #if !(NGX_WIN32)
 
+// 拼接宏
 #define ngx_signal_helper(n)     SIG##n
 #define ngx_signal_value(n)      ngx_signal_helper(n)
 
+// 产生随机数
+// 种子在ngx_worker_process_init里初始化
+// srandom(((unsigned) ngx_pid << 16) ^ tp->sec ^ tp->msec);
 #define ngx_random               random
 
 // 重定义unix信号，名字更易读
@@ -88,6 +97,7 @@ typedef uintptr_t       ngx_uint_t;     //无符号整数
 typedef intptr_t        ngx_flag_t;     //相当于bool，标志量用
 
 
+// 整数的字符串形式长度
 #define NGX_INT32_LEN   (sizeof("-2147483648") - 1)
 #define NGX_INT64_LEN   (sizeof("-9223372036854775808") - 1)
 
@@ -110,7 +120,10 @@ typedef intptr_t        ngx_flag_t;     //相当于bool，标志量用
 #endif
 
 // 计算字节对齐的宏
+// 上对齐到a的倍数，a是2的幂
 #define ngx_align(d, a)     (((d) + (a - 1)) & ~(a - 1))
+
+// 指针上对齐到a的倍数
 #define ngx_align_ptr(p, a)                                                   \
     (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
 
