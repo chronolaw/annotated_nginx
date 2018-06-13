@@ -52,6 +52,7 @@ stable  | nginx稳定版1.14.0|无
 * [ngx_thread_pool.c](/nginx/src/core/ngx_thread_pool.c)
 * [ngx_palloc.c](/nginx/src/core/ngx_palloc.c)
 * [ngx_slab.c](/nginx/src/core/ngx_slab.c)
+* [ngx_log.c](/nginx/src/core/ngx_log.c)
 
 ###### event目录
 * [ngx_event.h](/nginx/src/event/ngx_event.h)
