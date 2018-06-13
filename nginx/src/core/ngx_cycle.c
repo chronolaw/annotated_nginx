@@ -1269,6 +1269,8 @@ ngx_test_lockfile(u_char *file, ngx_log_t *log)
 }
 
 
+// 重新打开所有文件, logrotate
+// 收到hup信号时被调用
 void
 ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
 {
@@ -1277,6 +1279,7 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
     ngx_list_part_t  *part;
     ngx_open_file_t  *file;
 
+    // 遍历文件链表
     part = &cycle->open_files.part;
     file = part->elts;
 
@@ -1295,10 +1298,12 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
             continue;
         }
 
+        // 先flush数据
         if (file[i].flush) {
             file[i].flush(&file[i], cycle->log);
         }
 
+        // 重新打开日志文件
         // 因为使用了APPEND，所以多进程写文件是安全的
         fd = ngx_open_file(file[i].name.data, NGX_FILE_APPEND,
                            NGX_FILE_CREATE_OR_OPEN, NGX_FILE_DEFAULT_ACCESS);
@@ -1381,12 +1386,14 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
         }
 #endif
 
+        // 关闭原来的文件
         if (ngx_close_file(file[i].fd) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
                           ngx_close_file_n " \"%s\" failed",
                           file[i].name.data);
         }
 
+        // 使用新的描述符
         file[i].fd = fd;
     }
 
