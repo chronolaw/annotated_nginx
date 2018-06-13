@@ -173,6 +173,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     // 获取相关的core配置
     cscf = ngx_stream_get_module_srv_conf(s, ngx_stream_core_module);
 
+    // 拷贝配置log里的level/file/next等
     ngx_set_connection_log(c, cscf->error_log);
 
     len = ngx_sock_ntop(c->sockaddr, c->socklen, text, NGX_SOCKADDR_STRLEN, 1);
@@ -183,8 +184,14 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
     // log的一些参数
     c->log->connection = c->number;
+
+    // 记录日志时打印连接的信息
     c->log->handler = ngx_stream_log_error;
+
+    // 连接的信息从会话对象里获取
     c->log->data = s;
+
+    // action字符串 输出'while ...'
     c->log->action = "initializing session";
     c->log_error = NGX_ERROR_INFO;
 
@@ -238,7 +245,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
         }
     }
 
-    // 如果使用负载均衡功能，暂时不处理读时间
+    // 如果使用负载均衡功能，暂时不处理读事件
     // 而是加入延后队列，在accept之后再处理
     if (ngx_use_accept_mutex) {
         ngx_post_event(rev, &ngx_posted_events);

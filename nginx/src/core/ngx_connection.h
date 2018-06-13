@@ -309,6 +309,7 @@ struct ngx_connection_s {
     // 见ngx_http_write_filter_module.c
     unsigned            buffered:8;
 
+    // 连接发生错误时记录日志的级别
     unsigned            log_error:3;     /* ngx_connection_log_error_e */
 
     // 1.12.0已经删除此字段
