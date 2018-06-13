@@ -28,13 +28,17 @@ typedef struct ngx_buf_s  ngx_buf_t;
 struct ngx_buf_s {
     u_char          *pos;           //内存数据的起始位置
     u_char          *last;          //内存数据的结束位置
+
     off_t            file_pos;      //文件数据的起始偏移量
     off_t            file_last;     //文件数据的结束偏移量
 
     u_char          *start;         /* start of buffer */   //内存数据的上界
     u_char          *end;           /* end of buffer */     //内存数据的下界
+
     ngx_buf_tag_t    tag;           //void*指针，可以是任意数据
+
     ngx_file_t      *file;          //存储数据的文件对象
+
     ngx_buf_t       *shadow;
 
 
