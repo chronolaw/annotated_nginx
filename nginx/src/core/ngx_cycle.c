@@ -463,6 +463,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             continue;
         }
 
+        // 因为使用了APPEND，所以多进程写文件是安全的
         file[i].fd = ngx_open_file(file[i].name.data,
                                    NGX_FILE_APPEND,
                                    NGX_FILE_CREATE_OR_OPEN,
@@ -1298,6 +1299,7 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
             file[i].flush(&file[i], cycle->log);
         }
 
+        // 因为使用了APPEND，所以多进程写文件是安全的
         fd = ngx_open_file(file[i].name.data, NGX_FILE_APPEND,
                            NGX_FILE_CREATE_OR_OPEN, NGX_FILE_DEFAULT_ACCESS);
 

@@ -1,6 +1,9 @@
 // annotated by chrono since 2016
 //
 // * ngx_log_error_core
+// * ngx_log_open_default
+// * ngx_error_log
+// * ngx_log_set_log
 
 /*
  * Copyright (C) Igor Sysoev
@@ -200,6 +203,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     }
 
     // #define ngx_linefeed(p)          *p++ = LF;
+    // 加上一个换行符
     ngx_linefeed(p);
 
     wrote_stderr = 0;
@@ -220,6 +224,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
             goto next;
         }
 
+        // 避免磁盘满时反复写入
         if (ngx_time() == log->disk_full_time) {
 
             /*
@@ -238,6 +243,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
         n = ngx_write_fd(log->file->fd, errstr, p - errstr);
 
         // 写入失败，且错误是磁盘满
+        // 记录时间，避免磁盘满时反复写入
         if (n == -1 && ngx_errno == NGX_ENOSPC) {
             log->disk_full_time = ngx_time();
         }
@@ -449,6 +455,7 @@ ngx_log_init(u_char *prefix)
     }
 
     // 打开有前缀的日志文件
+    // 因为使用了APPEND，所以多进程写文件是安全的
     ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND,
                                     NGX_FILE_CREATE_OR_OPEN,
                                     NGX_FILE_DEFAULT_ACCESS);

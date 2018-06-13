@@ -50,11 +50,17 @@
 // 参数是消息缓冲区里剩余的空间
 typedef u_char *(*ngx_log_handler_pt) (ngx_log_t *log, u_char *buf, size_t len);
 
+// 专用的写函数指针
 typedef void (*ngx_log_writer_pt) (ngx_log_t *log, ngx_uint_t level,
     u_char *buf, size_t len);
 
 
 // 错误日志结构体
+// 多个日志对象串成一个按level降序的链表
+// 即日志级别由低到高，提高记录日志的效率
+// 一个日志链表可以理解为其他日志模型里的category
+// cycle->log, cscf->error_log, clcf->error_log
+// 因为使用了APPEND，所以多进程写文件是安全的
 struct ngx_log_s {
     // 日志对象的级别，会过滤掉低级别的日志信息
     // 即if ((log)->log_level >= level)
@@ -80,6 +86,7 @@ struct ngx_log_s {
     // 例如ngx_http_log_ctx_t，里面有请求、连接等
     void                *data;
 
+    // 专用的写函数指针
     ngx_log_writer_pt    writer;
     void                *wdata;
 
@@ -94,7 +101,8 @@ struct ngx_log_s {
     char                *action;
 
     // 下一个日志对象
-    // 多个日志对象形成一个链表
+    // 多个日志对象串成一个按level降序的链表
+    // 即日志级别由低到高，提高记录日志的效率
     ngx_log_t           *next;
 };
 
@@ -110,6 +118,8 @@ struct ngx_log_s {
 
 #define NGX_HAVE_VARIADIC_MACROS  1
 
+// 最常用的日志宏
+// level, log, err, fmt, ...
 #define ngx_log_error(level, log, ...)                                        \
     if ((log)->log_level >= level) ngx_log_error_core(level, log, __VA_ARGS__)
 
