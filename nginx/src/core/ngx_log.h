@@ -51,6 +51,7 @@
 typedef u_char *(*ngx_log_handler_pt) (ngx_log_t *log, u_char *buf, size_t len);
 
 // 专用的写函数指针
+// 可以写到syslog或者其他地方
 typedef void (*ngx_log_writer_pt) (ngx_log_t *log, ngx_uint_t level,
     u_char *buf, size_t len);
 
@@ -87,6 +88,7 @@ struct ngx_log_s {
     void                *data;
 
     // 专用的写函数指针
+    // 可以写到syslog或者其他地方
     ngx_log_writer_pt    writer;
     void                *wdata;
 

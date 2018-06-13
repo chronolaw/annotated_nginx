@@ -198,6 +198,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     }
 
     // #define NGX_LINEFEED_SIZE        1
+    // 日志过长（超过2k）则截断
     if (p > last - NGX_LINEFEED_SIZE) {
         p = last - NGX_LINEFEED_SIZE;
     }
@@ -213,6 +214,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     while (log) {
 
         // log消息级别低，不需要记录日志，直接退出循环
+        // 因为链表是level降序的，避免了遍历整个链表，提高效率
         if (log->log_level < level && !debug_connection) {
             break;
         }
@@ -517,6 +519,7 @@ ngx_log_open_default(ngx_cycle_t *cycle)
     log->log_level = NGX_LOG_ERR;
 
     // 打开文件，注意没有前缀
+    // 默认使用conf_prefix/prefix
     log->file = ngx_conf_open_file(cycle, &error_log);
     if (log->file == NULL) {
         return NGX_ERROR;
