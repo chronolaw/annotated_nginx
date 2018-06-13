@@ -95,7 +95,10 @@ struct ngx_cycle_s {
     // 内存池
     ngx_pool_t               *pool;
 
+    // old_cycle的log对象
     ngx_log_t                *log;
+
+    // 使用error_log指令设置的新log对象
     ngx_log_t                 new_log;
 
     ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */

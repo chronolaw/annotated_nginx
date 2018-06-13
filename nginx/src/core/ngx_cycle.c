@@ -437,6 +437,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
 
+    // 打开默认的日志文件
+    // 初始化new_log
     if (ngx_log_open_default(cycle) != NGX_OK) {
         goto failed;
     }
@@ -487,6 +489,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 #endif
     }
 
+    // 之前解析配置文件已经设置了新的日志对象
+    // 或者使用ngx_log_open_default使用默认的日志对象
+    // 不再使用之前的旧log
     cycle->log = &cycle->new_log;
     pool->log = &cycle->new_log;
 

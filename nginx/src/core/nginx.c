@@ -337,7 +337,7 @@ main(int argc, char *const *argv)
     // 1.13.8新增,父进程pid
     ngx_parent = ngx_getppid();
 
-    // 初始化log
+    // 初始化log，仅在配置阶段使用
     // ngx_prefix是-p后的参数，即nginx的工作目录
     // 默认是NGX_CONF_PREFIX，即/usr/local/nginx
     log = ngx_log_init(ngx_prefix);

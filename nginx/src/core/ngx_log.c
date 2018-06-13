@@ -12,8 +12,16 @@
 #include <ngx_core.h>
 
 
+// 解析最外层的error_log指令
+// 设置新的log对象
 static char *ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+// 设置日志的级别
 static char *ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log);
+
+// 日志对象按级别低到高
+// 即NGX_LOG_DEBUG=>NGX_LOG_STDERR
+// 按level降序
 static void ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log);
 
 
@@ -73,8 +81,14 @@ ngx_module_t  ngx_errlog_module = {
 };
 
 
+// 基本的log对象
+// 仅在配置阶段使用
 static ngx_log_t        ngx_log;
+
+// 使用的文件对象
+// 仅在配置阶段使用
 static ngx_open_file_t  ngx_log_file;
+
 ngx_uint_t              ngx_use_stderr = 1;
 
 
@@ -362,6 +376,9 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
 
 
 // 初始化日志
+// 默认是NGX_CONF_PREFIX，即/usr/local/nginx
+// 如果没有文件名就输出到stderr
+// 打开有前缀的日志文件
 ngx_log_t *
 ngx_log_init(u_char *prefix)
 {
@@ -372,6 +389,8 @@ ngx_log_init(u_char *prefix)
     ngx_log.file = &ngx_log_file;
     ngx_log.log_level = NGX_LOG_NOTICE;
 
+    // 由configure自动生成
+    // #define NGX_ERROR_LOG_PATH  "logs/error.log"
     name = (u_char *) NGX_ERROR_LOG_PATH;
 
     /*
@@ -381,6 +400,7 @@ ngx_log_init(u_char *prefix)
 
     nlen = ngx_strlen(name);
 
+    // 如果没有文件名就输出到stderr
     if (nlen == 0) {
         ngx_log_file.fd = ngx_stderr;
         return &ngx_log;
@@ -394,6 +414,8 @@ ngx_log_init(u_char *prefix)
     if (name[0] != '/') {
 #endif
 
+        // 取路径前缀的长度
+        // 默认是NGX_CONF_PREFIX，即/usr/local/nginx
         if (prefix) {
             plen = ngx_strlen(prefix);
 
@@ -406,6 +428,8 @@ ngx_log_init(u_char *prefix)
 #endif
         }
 
+        // 分配一块新内存，容纳前缀和文件名
+        // 多两个字节是给'/'
         if (plen) {
             name = malloc(plen + nlen + 2);
             if (name == NULL) {
@@ -424,6 +448,7 @@ ngx_log_init(u_char *prefix)
         }
     }
 
+    // 打开有前缀的日志文件
     ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND,
                                     NGX_FILE_CREATE_OR_OPEN,
                                     NGX_FILE_DEFAULT_ACCESS);
@@ -449,16 +474,25 @@ ngx_log_init(u_char *prefix)
 }
 
 
+// 打开默认的日志文件
+// 初始化new_log
 ngx_int_t
 ngx_log_open_default(ngx_cycle_t *cycle)
 {
     ngx_log_t         *log;
+
+    // #define NGX_ERROR_LOG_PATH  "logs/error.log"
     static ngx_str_t   error_log = ngx_string(NGX_ERROR_LOG_PATH);
 
+    // 在日志链表里找到一个使用文件的日志对象
+    // 有就说明已经用指令设置了日志
     if (ngx_log_get_file_log(&cycle->new_log) != NULL) {
         return NGX_OK;
     }
 
+    // 未明确使用error_log是没有，new_log是空的
+
+    // 需要初始化new_log
     if (cycle->new_log.log_level != 0) {
         /* there are some error logs, but no files */
 
@@ -472,13 +506,18 @@ ngx_log_open_default(ngx_cycle_t *cycle)
         log = &cycle->new_log;
     }
 
+    // 使用error级别
     log->log_level = NGX_LOG_ERR;
 
+    // 打开文件，注意没有前缀
     log->file = ngx_conf_open_file(cycle, &error_log);
     if (log->file == NULL) {
         return NGX_ERROR;
     }
 
+    // 日志对象按级别低到高
+    // 即NGX_LOG_DEBUG=>NGX_LOG_STDERR
+    // 按level降序
     if (log != &cycle->new_log) {
         ngx_log_insert(&cycle->new_log, log);
     }
@@ -512,6 +551,7 @@ ngx_log_redirect_stderr(ngx_cycle_t *cycle)
 }
 
 
+// 在日志链表里找到一个使用文件的日志对象
 ngx_log_t *
 ngx_log_get_file_log(ngx_log_t *head)
 {
@@ -527,6 +567,7 @@ ngx_log_get_file_log(ngx_log_t *head)
 }
 
 
+// 设置日志的级别
 static char *
 ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 {
@@ -590,6 +631,8 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 }
 
 
+// 解析最外层的error_log指令
+// 设置新的log对象
 static char *
 ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -597,10 +640,12 @@ ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     dummy = &cf->cycle->new_log;
 
+    // 解析指令，设置日志的级别，插入日志对象链表
     return ngx_log_set_log(cf, &dummy);
 }
 
 
+// 解析指令，设置日志的级别，插入日志对象链表
 char *
 ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 {
@@ -608,6 +653,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
     ngx_str_t          *value, name;
     ngx_syslog_peer_t  *peer;
 
+    // 检查指针，指向正确的log对象
     if (*head != NULL && (*head)->log_level == 0) {
         new_log = *head;
 
@@ -625,6 +671,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
     value = cf->args->elts;
 
+    // 标准输出
     if (ngx_strcmp(value[1].data, "stderr") == 0) {
         ngx_str_null(&name);
         cf->cycle->log_use_stderr = 1;
@@ -634,6 +681,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
             return NGX_CONF_ERROR;
         }
 
+    // 内存，用来调试
     } else if (ngx_strncmp(value[1].data, "memory:", 7) == 0) {
 
 #if (NGX_DEBUG)
@@ -693,6 +741,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         return NGX_CONF_ERROR;
 #endif
 
+    // syslog服务
     } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) {
         peer = ngx_pcalloc(cf->pool, sizeof(ngx_syslog_peer_t));
         if (peer == NULL) {
@@ -706,6 +755,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         new_log->writer = ngx_syslog_writer;
         new_log->wdata = peer;
 
+    // 写入到文件
     } else {
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
         if (new_log->file == NULL) {
@@ -713,10 +763,12 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         }
     }
 
+    // 设置日志的级别
     if (ngx_log_set_levels(cf, new_log) != NGX_CONF_OK) {
         return NGX_CONF_ERROR;
     }
 
+    // 插入日志对象链表
     if (*head != new_log) {
         ngx_log_insert(*head, new_log);
     }
@@ -725,11 +777,16 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 }
 
 
+// 日志对象按级别低到高
+// 即NGX_LOG_DEBUG=>NGX_LOG_STDERR
+// 按level降序
 static void
 ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log)
 {
     ngx_log_t  tmp;
 
+    // 要插入的日志对象级别低
+    // 即levle大
     if (new_log->log_level > log->log_level) {
 
         /*
@@ -737,15 +794,22 @@ ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log)
          * head and swap its contents with head
          */
 
+        // 交换两个日志对象
         tmp = *log;
         *log = *new_log;
         *new_log = tmp;
 
+        // 现在头是新的日志对象
         log->next = new_log;
         return;
     }
 
+    // 要插入的日志对象级别高
+    // 即levle小
     while (log->next) {
+        // 在链表里找到级别比它低的
+        // 即leval大
+        // 插入链表
         if (new_log->log_level > log->next->log_level) {
             new_log->next = log->next;
             log->next = new_log;
