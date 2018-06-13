@@ -58,7 +58,7 @@ typedef struct {
 // 但也可以直接管理内部的非共享内存
 // 不使用锁即可
 typedef struct {
-    // 互斥锁
+    // 互斥锁使用的两个原子变量
     ngx_shmtx_sh_t    lock;
 
     // 最小分配数量，通常是8字节
@@ -100,6 +100,8 @@ typedef struct {
     u_char           *end;
 
     // 互斥锁
+    // mtx.lock指向sh.lock
+    // ngx_shmtx_create():mtx->lock = &addr->lock;
     ngx_shmtx_t       mutex;
 
     // 记录日志的额外字符串，用户可以指定

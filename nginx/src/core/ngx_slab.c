@@ -1,5 +1,6 @@
 // annotated by chrono since 2018
 //
+// * ngx_slab_init
 // * ngx_slab_alloc_locked
 // * ngx_slab_alloc_pages
 // * ngx_slab_free_locked
