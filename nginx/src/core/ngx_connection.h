@@ -72,7 +72,13 @@ struct ngx_listening_s {
     // stream模块是ngx_stream_addr_conf_t
     void               *servers;  /* array of ngx_http_in_addr_t, for example */
 
+    // 监听端口使用的日志对象
+    // 会传递给连接对象/请求对象
     ngx_log_t           log;
+
+    // ngx_stream_optimize_servers里设置
+    // cscf->error_log
+    // ngx_configure_listening_sockets里拷贝给log
     ngx_log_t          *logp;
 
     // 内存池的初始大小

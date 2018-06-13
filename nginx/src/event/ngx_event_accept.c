@@ -218,6 +218,7 @@ ngx_event_accept(ngx_event_t *ev)
 
         ngx_memcpy(c->sockaddr, &sa, socklen);
 
+        // 连接使用一个新的日志对象
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
         if (log == NULL) {
             ngx_close_accepted_connection(c);
@@ -255,6 +256,7 @@ ngx_event_accept(ngx_event_t *ev)
             }
         }
 
+        // 从监听端口拷贝
         *log = ls->log;
 
         // 连接的收发数据函数

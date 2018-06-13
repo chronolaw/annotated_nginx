@@ -379,12 +379,14 @@ ngx_event_recvmsg(ngx_event_t *ev)
         // 从msghdr里拷贝地址
         ngx_memcpy(c->sockaddr, sockaddr, socklen);
 
+        // 连接使用一个新的日志对象
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
         if (log == NULL) {
             ngx_close_accepted_udp_connection(c);
             return;
         }
 
+        // 从监听端口拷贝
         *log = ls->log;
 
         // 1.15新增
