@@ -69,6 +69,7 @@
 
 
 // 跳过内存前面的管理结构，得到可用内存位置
+// 64位系统上占用200个字节
 // 存放slots数组，管理8/16/32/64等字节管理页
 #define ngx_slab_slots(pool)                                                  \
     (ngx_slab_page_t *) ((u_char *) (pool) + sizeof(ngx_slab_pool_t))
@@ -167,6 +168,7 @@ ngx_slab_sizes_init(void)
 // 按slot和page管理这块共享内存，best-fit
 // 之前需要初始化min_shift和end
 // 自己使用可以把min_shift适当调整改大一点
+// 分析以64位系统，4m共享内存为例
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
 {
@@ -181,6 +183,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     pool->min_size = (size_t) 1 << pool->min_shift;
 
     // 跳过内存前面的管理结构，得到可用内存位置
+    // 64位系统上占用200个字节
     // 存放slots数组，管理8/16/32/64等字节管理页
     slots = ngx_slab_slots(pool);
 
@@ -202,6 +205,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     n = ngx_pagesize_shift - pool->min_shift;
 
     // 初始化slab管理数组，有9个元素
+    // 9*32=216字节
     // 每个元素又是一个链表的头节点
     // 分别管理8/16/32/64/128/256/512/1024/2048等字节
     for (i = 0; i < n; i++) {
@@ -220,6 +224,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     }
 
     // 跳过刚才使用的数组空间
+    // 9*32=216字节
     p += n * sizeof(ngx_slab_page_t);
 
     // 统计信息
@@ -232,14 +237,20 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     ngx_memzero(pool->stats, n * sizeof(ngx_slab_stat_t));
 
     // 跳过刚才的统计信息结构体
+    // 9*32=288字节
     p += n * sizeof(ngx_slab_stat_t);
 
     // 目前可用的内存空间
     // 减去之前的slots和stats数组
+    // 目前消耗大小 => 200 + 9*(24+32) => 704
+    // 也就是说管理信息用了不到1k
     size -= n * (sizeof(ngx_slab_page_t) + sizeof(ngx_slab_stat_t));
 
     // 算一下有多少页
     // 4k页加上管理用的页数组
+    // 一个ngx_slab_page_t大小是24字节，管理4k
+    // 4000k需要1000*24=23k，这就是大概的管理成本
+    // 4m共享内存=4096k，去掉消耗有1017页，是23k+17*24，约24k
     pages = (ngx_uint_t) (size / (ngx_pagesize + sizeof(ngx_slab_page_t)));
 
     // 页数组起始地址
@@ -269,6 +280,9 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 
     // 真正可用的内存空间，去掉页数组
     // 有指针对齐,对齐到4k，可能会有内存浪费
+    // 704 + 23k + 17*24，比24k多，对齐到28k，浪费了3k多
+    // 真正可用是4m-28k，利用率约99.3%
+    // 可以简单地认为去掉内存的零头是真正可用的空间
     pool->start = ngx_align_ptr(p + pages * sizeof(ngx_slab_page_t),
                                 ngx_pagesize);
 

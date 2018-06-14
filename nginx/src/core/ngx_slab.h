@@ -21,6 +21,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
 // slab页信息
 // 管理每个内存页
+// 只有三个指针大小，64位系统上是3*8=24字节
 struct ngx_slab_page_s {
     // 指示连续空闲页的数量,NGX_SLAB_PAGE
     // 标记页面的状态：busy
@@ -43,6 +44,7 @@ struct ngx_slab_page_s {
 // 目前供商业模块ngx_api来调用
 // 目前暂无公开接口使用
 // 只能自己定位获取信息
+// 四个整数，64位系统上是4*8=32字节
 typedef struct {
     ngx_uint_t        total;
     ngx_uint_t        used;
@@ -53,6 +55,7 @@ typedef struct {
 
 
 // 管理共享内存的池
+// 64位系统上占用200个字节
 // 使用best fit算法
 // 分成8/16/32...2k/4k的多个slot，找最合适的分配
 // 但也可以直接管理内部的非共享内存
