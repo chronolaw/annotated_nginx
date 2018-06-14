@@ -29,7 +29,7 @@ static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
-// 字节对齐分配一个size - sizeof(ngx_pool_t)内存
+// 字节对齐分配一个size - sizeof(ngx_pool_t)80字节内存
 // 内存池的大小可以超过4k
 // 一开始只有一个内存池节点
 ngx_pool_t *
@@ -44,7 +44,7 @@ ngx_create_pool(size_t size, ngx_log_t *log)
         return NULL;
     }
 
-    // 设置可用的内存，减去了自身的大小
+    // 设置可用的内存，减去了自身的大小80字节
     p->d.last = (u_char *) p + sizeof(ngx_pool_t);
     p->d.end = (u_char *) p + size;
 
@@ -54,7 +54,7 @@ ngx_create_pool(size_t size, ngx_log_t *log)
     // 失败次数初始化为0
     p->d.failed = 0;
 
-    // 池内可用的内存空间
+    // 池内可用的内存空间，减去了自身的大小80字节
     size = size - sizeof(ngx_pool_t);
 
     // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
@@ -212,6 +212,7 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
         m = p->d.last;
 
         // 要求对齐，所以会有少量浪费，但cpu处理速度快
+        // 64位上最多浪费7字节
         // 向上对齐到8字节(64位), in ngx_config.h
         // #define NGX_ALIGNMENT   sizeof(unsigned long)    /* platform word */
         // #define ngx_align(d, a)     (((d) + (a - 1)) & ~(a - 1))
@@ -222,6 +223,7 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
         }
 
         // 看空间是否足够
+        // 即内存块的末尾是否能够容纳size大小
         if ((size_t) (p->d.end - m) >= size) {
             // 移动空闲内存的位置
             p->d.last = m + size;
@@ -252,14 +254,17 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     ngx_pool_t  *p, *new;
 
     // 计算当前内存池的大小
+    // 即当初创建时的大小
     psize = (size_t) (pool->d.end - (u_char *) pool);
 
     // 创建一个新节点
+    // 字节对齐分配内存,16字节的倍数
     m = ngx_memalign(NGX_POOL_ALIGNMENT, psize, pool->log);
     if (m == NULL) {
         return NULL;
     }
 
+    // 新的内存块
     new = (ngx_pool_t *) m;
 
     // 设置节点的空闲空间
@@ -267,17 +272,20 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     new->d.next = NULL;
     new->d.failed = 0;
 
-    // 跳过内存池描述信息的长度
+    // 跳过内存池描述信息的长度, 64位系统是32字节
     // 后面的max,current等没有意义，所以可以被利用
+    // 新的内存块比头节点多80-32=48字节可用
     m += sizeof(ngx_pool_data_t);
 
     // 成功分配内存
+    // 向上对齐到8字节(64位), in ngx_config.h
     m = ngx_align_ptr(m, NGX_ALIGNMENT);
 
     // 移动空闲内存的位置
     new->d.last = m + size;
 
     // 重新设置当前节点
+    // 把前面的节点失败次数增加
     for (p = pool->current; p->d.next; p = p->d.next) {
         // 分配失败次数超过5次的节点
         // 它的下一个节点作为current
@@ -287,7 +295,7 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
         }
     }
 
-    // 失败不超过四次，挂到末尾
+    // p必定是链表的最后一个，挂到末尾
     p->d.next = new;
 
     // 返回分配的内存
@@ -314,6 +322,7 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
 
     // 挂到大块链表里
     for (large = pool->large; large; large = large->next) {
+        // 找到一个空闲的节点，避免再分配内存
         if (large->alloc == NULL) {
             large->alloc = p;
             return p;

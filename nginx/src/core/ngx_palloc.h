@@ -69,6 +69,7 @@ struct ngx_pool_large_s {
 
 // 描述内存池的信息
 // 每个内存块都有，在最开头的部分，管理本块内存
+// 64位系统大小为32字节
 typedef struct {
     // 可用内存的起始位置
     // 小块内存每次都从这里分配
@@ -91,6 +92,7 @@ typedef struct {
 // 实际是由多个节点串成的单向链表
 // 每个节点分配小块内存
 // 但max、current、大块内存链表只在头节点
+// 64位系统大小为80字节
 struct ngx_pool_s {
     // 描述本内存池节点的信息
     ngx_pool_data_t       d;
