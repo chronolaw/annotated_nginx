@@ -34,6 +34,7 @@ ngx_shmtx_create(ngx_shmtx_t *mtx, ngx_shmtx_sh_t *addr, u_char *name)
     }
 
     // 默认spin是2048
+    // 即2^11=2048
     mtx->spin = 2048;
 
 #if (NGX_HAVE_POSIX_SEM)
@@ -107,6 +108,8 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
         if (ngx_ncpu > 1) {
 
             // n按2的幂增加
+            // 默认spin是2048
+            // 即2^11=2048，循环11次
             for (n = 1; n < mtx->spin; n <<= 1) {
 
                 // cpu等待的时间逐步加长
