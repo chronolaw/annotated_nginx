@@ -570,6 +570,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
     // (page->next == page) 表示还未分配实际管理的内存
 
     // 获取一个空闲页
+    // 即分配了一块4k的内存
     page = ngx_slab_alloc_pages(pool, 1);
 
     // 获取成功
@@ -640,18 +641,21 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         } else if (shift == ngx_slab_exact_shift) {
 
             // page->slab就可以用位标记内存分配情况
-            // 低位置1，标记分配了一个chunk
+            // 8字节共64bit,64*64=4096Bytes
+            // 低位置1，标记分配了第一个chunk
             page->slab = 1;
 
             // 链接到管理头节点
+            // 相当于循环链表
             // prev和next都指向slots
             page->next = &slots[slot];
 
             // 设置页的标记，exact，精确分配
             // prev可以理解为此page的管理信息
+            // prev有两部分信息，高位是指针，低位是标志
             page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
 
-            // 两个页面串起来
+            // 页面串到slot链表里
             // 即该slot管理了一个page
             slots[slot].next = page;
 
@@ -681,6 +685,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
             // 设置页的标记，big，分配大于64字节
             // prev可以理解为此page的管理信息
+            // prev有两部分信息，高位是指针，低位是标志
             page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_BIG;
 
             // 两个页面串起来
