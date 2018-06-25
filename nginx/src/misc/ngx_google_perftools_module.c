@@ -1,3 +1,9 @@
+// annotated by chrono since 2016
+//
+// sudo apt-get install google-perftools
+// ./configure --with-google_perftools_module
+// google_perftools_profiles /tmp/ngx.perf;
+// pprof --pdf /usr/local/nginx/sbin/nginx ./ngx.perf.17449 > a.pdf
 
 /*
  * Copyright (C) Igor Sysoev
@@ -22,11 +28,14 @@ static void *ngx_google_perftools_create_conf(ngx_cycle_t *cycle);
 static ngx_int_t ngx_google_perftools_worker(ngx_cycle_t *cycle);
 
 
+// 配置结构体，存储profile的文件名
 typedef struct {
     ngx_str_t  profiles;
 } ngx_google_perftools_conf_t;
 
 
+// 在配置文件里配置
+// 例如：google_perftools_profiles /tmp/ngx.perf;
 static ngx_command_t  ngx_google_perftools_commands[] = {
 
     { ngx_string("google_perftools_profiles"),
@@ -83,33 +92,42 @@ ngx_google_perftools_create_conf(ngx_cycle_t *cycle)
 }
 
 
+// worker进程启动时开始profiler
 static ngx_int_t
 ngx_google_perftools_worker(ngx_cycle_t *cycle)
 {
     u_char                       *profile;
     ngx_google_perftools_conf_t  *gptcf;
 
+    // 取配置
     gptcf = (ngx_google_perftools_conf_t *)
                 ngx_get_conf(cycle->conf_ctx, ngx_google_perftools_module);
 
+    // 没有文件名则不会profiler
     if (gptcf->profiles.len == 0) {
         return NGX_OK;
     }
 
+    // 真正的文件名需要加上进程号
+    // 分配一个临时的内存
     profile = ngx_alloc(gptcf->profiles.len + NGX_INT_T_LEN + 2, cycle->log);
     if (profile == NULL) {
         return NGX_OK;
     }
 
+    // 避免外部的环境变量干扰
     if (getenv("CPUPROFILE")) {
         /* disable inherited Profiler enabled in master process */
         ProfilerStop();
     }
 
+    // 实际产生的文件名，加进程号
     ngx_sprintf(profile, "%V.%d%Z", &gptcf->profiles, ngx_pid);
 
+    // 启动profiler
     if (ProfilerStart(profile)) {
         /* start ITIMER_PROF timer */
+        // 多线程支持
         ProfilerRegisterThread();
 
     } else {
@@ -117,6 +135,7 @@ ngx_google_perftools_worker(ngx_cycle_t *cycle)
                       "ProfilerStart(%s) failed", profile);
     }
 
+    // 文件名不再需要，释放
     ngx_free(profile);
 
     return NGX_OK;
