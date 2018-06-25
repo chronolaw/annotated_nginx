@@ -35,6 +35,7 @@ stable  | nginx稳定版1.14.0|无
 * [http](/nginx/src/http) - 70%，少量modules目录里的具体功能模块有注释
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
 * [stream](/nginx/src/stream) - 70%
+* [misc](/nginx/src/misc) - 50%
 
 #### UML图解
 [UML图示](/diagrams/readme.md)
@@ -85,6 +86,9 @@ stable  | nginx稳定版1.14.0|无
 * [ngx_stream.c](/nginx/src/stream/ngx_stream.c)
 * [ngx_stream_core_module.c](/nginx/src/stream/ngx_stream_core_module.c)
 * [ngx_stream_handler.c](/nginx/src/stream/ngx_stream_handler.c)
+
+###### misc目录
+* [ngx_google_perftools_module.c](/nginx/src/misc/ngx_google_perftools_module.c)
 
 #### 部分关键源码（功能分类）
 
