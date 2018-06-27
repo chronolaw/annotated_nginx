@@ -159,7 +159,8 @@ struct ngx_event_s {
     // 重要！！
     // 事件发生时调用的函数
     // ngx_core.h:typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
-    // 接受连接时的回调是ngx_event_accept
+    // tcp/http接受连接时的回调是ngx_event_accept
+    // udp接受连接时的回调是ngx_event_recvmsg
     ngx_event_handler_pt  handler;
 
 
@@ -174,6 +175,7 @@ struct ngx_event_s {
     ngx_log_t       *log;
 
     // 红黑树节点成员，用于把事件加入定时器
+    // 判断事件超时用
     ngx_rbtree_node_t   timer;
 
     /* the posted queue */
