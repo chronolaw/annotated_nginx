@@ -5,6 +5,7 @@
 // * ngx_configure_listening_sockets
 // * ngx_get_connection
 // * ngx_close_connection
+// * ngx_close_listening_sockets
 //
 // 1.10增加对reuseport的支持
 
