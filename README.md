@@ -15,6 +15,7 @@ Nginx1.14增加了mirror模块，支持gRPC。
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
 * [openresty_dev](https://github.com/chronolaw/openresty_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
+* [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module) - A better tools for nginx with google_perftools
 
 # 当前状态
 nginx 1.15.0
