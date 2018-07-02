@@ -668,10 +668,15 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_event_conf_t    *ecf;
 
     // events模块的配置结构体
+    // 实际上是一个存储void*指针的数组
     cf = ngx_get_conf(cycle->conf_ctx, ngx_events_module);
 
     // event_core模块的配置结构体
+    // 从数组cf里按序号查找
     ecf = (*cf)[ngx_event_core_module.ctx_index];
+
+    // 上面的两行代码相当于:
+    // ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module)
 
     if (!ngx_test_config && ngx_process <= NGX_PROCESS_MASTER) {
         ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
