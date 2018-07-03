@@ -23,6 +23,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 // 管理每个内存页
 // 只有三个指针大小，64位系统上是3*8=24字节
 struct ngx_slab_page_s {
+    // 有多种含义：
     // 指示连续空闲页的数量,NGX_SLAB_PAGE
     // 标记页面的状态：busy
     // 位图方式标记页面内部的使用情况
@@ -67,7 +68,7 @@ typedef struct {
     // 最小分配数量，通常是8字节
     size_t            min_size;
 
-    // 最小左移，通常是3
+    // 最小左移，通常是3，即2^3=8
     // ngx_init_zone_pool里设置
     // 在shm_zone[i].init之前，不能自己修改
     size_t            min_shift;
@@ -100,6 +101,7 @@ typedef struct {
     u_char           *start;
 
     // 共享内存的末尾地址
+    // 使用start和end来判断指针是否属于本内存
     u_char           *end;
 
     // 互斥锁
@@ -109,18 +111,19 @@ typedef struct {
 
     // 记录日志的额外字符串，用户可以指定
     // 共享内存错误记录日志时区分不同的共享内存
-    // 不指定则指向zera，即无特殊字符串
+    // 不指定则指向zero，即无特殊字符串
     // 被ngx_slab_error使用，外界不能用
     u_char           *log_ctx;
 
-    // 0字符
+    // '\0'字符
     u_char            zero;
 
     // 是否记录无内存异常
+    // 可以置为0,减少记录日志的操作
     unsigned          log_nomem:1;
 
     // 供用户使用，关联任意数据
-    // 方便使用最常用的数据
+    // 方便使用本内存里最常用的数据
     // 例如红黑树指针
     void             *data;
 
