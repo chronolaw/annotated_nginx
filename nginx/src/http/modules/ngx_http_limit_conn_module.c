@@ -77,6 +77,7 @@ typedef struct {
 // 配置结构体
 typedef struct {
     // 限流信息的多个数组
+    // 元素类型是ngx_http_limit_conn_limit_t
     ngx_array_t                limits;
 
     // 日志级别
