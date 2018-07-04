@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_upstream_init_zone
 
 /*
  * Copyright (C) Ruslan Ermilov
@@ -20,6 +23,8 @@ static ngx_http_upstream_rr_peer_t *ngx_http_upstream_zone_copy_peer(
     ngx_http_upstream_rr_peers_t *peers, ngx_http_upstream_rr_peer_t *src);
 
 
+// 定义在upstream{}里的zone指令
+// 声明一块共享内存
 static ngx_command_t  ngx_http_upstream_zone_commands[] = {
 
     { ngx_string("zone"),
@@ -64,6 +69,8 @@ ngx_module_t  ngx_http_upstream_zone_module = {
 };
 
 
+// 在upstream{}里的zone指令
+// 声明一块共享内存
 static char *
 ngx_http_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -72,17 +79,24 @@ ngx_http_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_upstream_srv_conf_t   *uscf;
     ngx_http_upstream_main_conf_t  *umcf;
 
+    // 本upstream{}块的配置结构体，存储server信息
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+
+    // upstream模块的主配置，存储所有的upstream{}配置
     umcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_upstream_module);
 
+    // 参数数组
     value = cf->args->elts;
 
+    // 第0个值是指令名字
+    // 第一个参数是zone名字
     if (!value[1].len) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid zone name \"%V\"", &value[1]);
         return NGX_CONF_ERROR;
     }
 
+    // 三个数组元素，后两个参数是名字和大小
     if (cf->args->nelts == 3) {
         size = ngx_parse_size(&value[2]);
 
@@ -92,6 +106,7 @@ ngx_http_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
+        // 大小至少是8*4k=64k
         if (size < (ssize_t) (8 * ngx_pagesize)) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "zone \"%V\" is too small", &value[1]);
@@ -99,24 +114,32 @@ ngx_http_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
     } else {
+        // 可以只有名字，没有大小，即大小为0
         size = 0;
     }
 
+    // 添加共享内存
+    // 在配置结构体里保存该指针
     uscf->shm_zone = ngx_shared_memory_add(cf, &value[1], size,
                                            &ngx_http_upstream_module);
     if (uscf->shm_zone == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    // 指定创建共享内存后调用的初始化函数
     uscf->shm_zone->init = ngx_http_upstream_init_zone;
+
+    // 初始化函数使用main conf
     uscf->shm_zone->data = umcf;
 
+    // 不允许重用，即重启后共享内存清空重建
     uscf->shm_zone->noreuse = 1;
 
     return NGX_CONF_OK;
 }
 
 
+// 创建共享内存后调用的初始化函数
 static ngx_int_t
 ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
@@ -127,10 +150,16 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     ngx_http_upstream_srv_conf_t   *uscf, **uscfp;
     ngx_http_upstream_main_conf_t  *umcf;
 
+    // 取slab内存池
     shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
+
+    // 初始化函数使用main conf
     umcf = shm_zone->data;
+
+    // 取upstream{}数组
     uscfp = umcf->upstreams.elts;
 
+    // 数据存在则重用
     if (shm_zone->shm.exists) {
         peers = shpool->data;
 
@@ -148,6 +177,7 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
+    // 共享内存记录日志使用的ctx字符串
     len = sizeof(" in upstream zone \"\"") + shm_zone->shm.name.len;
 
     shpool->log_ctx = ngx_slab_alloc(shpool, len);
@@ -161,15 +191,22 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     /* copy peers to shared memory */
 
+    // 共享内存池的data指针强制转换
+    // 存储本配置块的的peers
     peersp = (ngx_http_upstream_rr_peers_t **) (void *) &shpool->data;
 
+    // 遍历所有的peers数组
     for (i = 0; i < umcf->upstreams.nelts; i++) {
         uscf = uscfp[i];
 
+        // 如果不是自己则跳过
         if (uscf->shm_zone != shm_zone) {
             continue;
         }
 
+        // 找到自己的peers
+
+        // 拷贝peers到共享内存
         peers = ngx_http_upstream_zone_copy_peers(shpool, uscf);
         if (peers == NULL) {
             return NGX_ERROR;
@@ -183,6 +220,7 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 }
 
 
+// 拷贝peers到共享内存
 static ngx_http_upstream_rr_peers_t *
 ngx_http_upstream_zone_copy_peers(ngx_slab_pool_t *shpool,
     ngx_http_upstream_srv_conf_t *uscf)
