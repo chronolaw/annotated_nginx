@@ -1556,6 +1556,10 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     c->sendfile &= r->connection->sendfile;
     u->output.sendfile = c->sendfile;
 
+    if (r->connection->tcp_nopush == NGX_TCP_NOPUSH_DISABLED) {
+        c->tcp_nopush = NGX_TCP_NOPUSH_DISABLED;
+    }
+
     if (c->pool == NULL) {
 
         /* we need separate pool here to be able to cache SSL connections */
@@ -2006,6 +2010,18 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
+        }
+
+        if (c->write->ready && c->tcp_nopush == NGX_TCP_NOPUSH_SET) {
+            if (ngx_tcp_push(c->fd) == -1) {
+                ngx_log_error(NGX_LOG_CRIT, c->log, ngx_socket_errno,
+                              ngx_tcp_push_n " failed");
+                ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+
+            c->tcp_nopush = NGX_TCP_NOPUSH_UNSET;
         }
 
         return;
@@ -2901,7 +2917,8 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
     }
 
     if (r->request_body && r->request_body->temp_file
-        && r == r->main && !r->preserve_body)
+        && r == r->main && !r->preserve_body
+        && !u->conf->preserve_output)
     {
         ngx_pool_run_cleanup_file(r->pool, r->request_body->temp_file->file.fd);
         r->request_body->temp_file->file.fd = NGX_INVALID_FILE;

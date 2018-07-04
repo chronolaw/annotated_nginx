@@ -987,7 +987,12 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 return;
             }
 
-            if (r->host_start && r->host_end) {
+            if (r->schema_end) {
+                r->schema.len = r->schema_end - r->schema_start;
+                r->schema.data = r->schema_start;
+            }
+
+            if (r->host_end) {
 
                 host.len = r->host_end - r->host_start;
                 host.data = r->host_start;
