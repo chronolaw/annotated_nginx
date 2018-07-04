@@ -1,4 +1,24 @@
 
+Changes with nginx 1.15.1                                        03 Jul 2018
+
+    *) Feature: the "random" directive inside the "upstream" block.
+
+    *) Feature: improved performance when using the "hash" and "ip_hash"
+       directives with the "zone" directive.
+
+    *) Feature: the "reuseport" parameter of the "listen" directive now uses
+       SO_REUSEPORT_LB on FreeBSD 12.
+
+    *) Bugfix: HTTP/2 server push did not work if SSL was terminated by a
+       proxy server in front of nginx.
+
+    *) Bugfix: the "tcp_nopush" directive was always used on backend
+       connections.
+
+    *) Bugfix: sending a disk-buffered request body to a gRPC backend might
+       fail.
+
+
 Changes with nginx 1.15.0                                        05 Jun 2018
 
     *) Change: the "ssl" directive is deprecated; the "ssl" parameter of the
