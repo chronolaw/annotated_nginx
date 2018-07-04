@@ -18,14 +18,14 @@ Nginx1.14增加了mirror模块，支持gRPC。
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module) - A better tools for nginx with google_perftools
 
 # 当前状态
-nginx 1.15.0
+Nginx 1.15.1
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | nginx开发版1.15.1|有
-mainline| nginx开发版1.15.1|无
-stable  | nginx稳定版1.14.0|无
+master  | Nginx开发版1.15.1|有
+mainline| Nginx开发版1.15.1|无
+stable  | Nginx稳定版1.14.0|无
 
 # 已注解
 
@@ -101,6 +101,7 @@ stable  | nginx稳定版1.14.0|无
 * [ngx_slab.c](/nginx/src/core/ngx_slab.c)
 * [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
 * [ngx_http_degradation_module.c](/nginx/src/http/modules/ngx_http_degradation_module.c)
+* [ngx_http_upstream_zone_module.c](/nginx/src/http/modules/ngx_http_upstream_zone_module.c)
 
 ###### 数据结构
 * [ngx_array.h](/nginx/src/core/ngx_array.h)
