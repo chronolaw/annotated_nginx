@@ -141,24 +141,23 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     ngx_pool_cleanup_t         *cln;
     ngx_resolver_connection_t  *rec;
 
+    r = ngx_pcalloc(cf->pool, sizeof(ngx_resolver_t));
+    if (r == NULL) {
+        return NULL;
+    }
+
+    r->event = ngx_pcalloc(cf->pool, sizeof(ngx_event_t));
+    if (r->event == NULL) {
+        return NULL;
+    }
+
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
         return NULL;
     }
 
     cln->handler = ngx_resolver_cleanup;
-
-    r = ngx_calloc(sizeof(ngx_resolver_t), cf->log);
-    if (r == NULL) {
-        return NULL;
-    }
-
     cln->data = r;
-
-    r->event = ngx_calloc(sizeof(ngx_event_t), cf->log);
-    if (r->event == NULL) {
-        return NULL;
-    }
 
     ngx_rbtree_init(&r->name_rbtree, &r->name_sentinel,
                     ngx_resolver_rbtree_insert_value);
@@ -276,6 +275,11 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
         }
     }
 
+    if (n && r->connections.nelts == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "no name servers defined");
+        return NULL;
+    }
+
     return r;
 }
 
@@ -288,52 +292,42 @@ ngx_resolver_cleanup(void *data)
     ngx_uint_t                  i;
     ngx_resolver_connection_t  *rec;
 
-    if (r) {
-        ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
-                       "cleanup resolver");
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0, "cleanup resolver");
 
-        ngx_resolver_cleanup_tree(r, &r->name_rbtree);
+    ngx_resolver_cleanup_tree(r, &r->name_rbtree);
 
-        ngx_resolver_cleanup_tree(r, &r->srv_rbtree);
+    ngx_resolver_cleanup_tree(r, &r->srv_rbtree);
 
-        ngx_resolver_cleanup_tree(r, &r->addr_rbtree);
+    ngx_resolver_cleanup_tree(r, &r->addr_rbtree);
 
 #if (NGX_HAVE_INET6)
-        ngx_resolver_cleanup_tree(r, &r->addr6_rbtree);
+    ngx_resolver_cleanup_tree(r, &r->addr6_rbtree);
 #endif
 
-        if (r->event) {
-            if (r->event->timer_set) {
-                ngx_del_timer(r->event);
-            }
+    if (r->event->timer_set) {
+        ngx_del_timer(r->event);
+    }
 
-            ngx_free(r->event);
+    rec = r->connections.elts;
+
+    for (i = 0; i < r->connections.nelts; i++) {
+        if (rec[i].udp) {
+            ngx_close_connection(rec[i].udp);
         }
 
-
-        rec = r->connections.elts;
-
-        for (i = 0; i < r->connections.nelts; i++) {
-            if (rec[i].udp) {
-                ngx_close_connection(rec[i].udp);
-            }
-
-            if (rec[i].tcp) {
-                ngx_close_connection(rec[i].tcp);
-            }
-
-            if (rec[i].read_buf) {
-                ngx_resolver_free(r, rec[i].read_buf->start);
-                ngx_resolver_free(r, rec[i].read_buf);
-            }
-
-            if (rec[i].write_buf) {
-                ngx_resolver_free(r, rec[i].write_buf->start);
-                ngx_resolver_free(r, rec[i].write_buf);
-            }
+        if (rec[i].tcp) {
+            ngx_close_connection(rec[i].tcp);
         }
 
-        ngx_free(r);
+        if (rec[i].read_buf) {
+            ngx_resolver_free(r, rec[i].read_buf->start);
+            ngx_resolver_free(r, rec[i].read_buf);
+        }
+
+        if (rec[i].write_buf) {
+            ngx_resolver_free(r, rec[i].write_buf->start);
+            ngx_resolver_free(r, rec[i].write_buf);
+        }
     }
 }
 
@@ -4402,7 +4396,7 @@ ngx_udp_connect(ngx_resolver_connection_t *rec)
     if (c == NULL) {
         if (ngx_close_socket(s) == -1) {
             ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
-                          ngx_close_socket_n "failed");
+                          ngx_close_socket_n " failed");
         }
 
         return NGX_ERROR;
@@ -4488,7 +4482,7 @@ ngx_tcp_connect(ngx_resolver_connection_t *rec)
     if (c == NULL) {
         if (ngx_close_socket(s) == -1) {
             ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
-                          ngx_close_socket_n "failed");
+                          ngx_close_socket_n " failed");
         }
 
         return NGX_ERROR;
