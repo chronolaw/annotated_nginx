@@ -580,6 +580,7 @@ struct ngx_http_request_s {
 
     // http协议字符串，通常不需要关注
     ngx_str_t                         http_protocol;
+    ngx_str_t                         schema;
 
     // 发送的数据链表
     // 所有的header、body数据都会存在这里
