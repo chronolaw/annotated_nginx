@@ -114,11 +114,13 @@ ngx_http_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
     } else {
-        // 可以只有名字，没有大小，即大小为0
+        // 可以只有名字，没有大小
+        // 这样会查找之前定义的zone，共用一块内存
         size = 0;
     }
 
     // 添加共享内存
+    // 如果size==0,则查找之前定义的zone，共用一块内存
     // 在配置结构体里保存该指针
     uscf->shm_zone = ngx_shared_memory_add(cf, &value[1], size,
                                            &ngx_http_upstream_module);
@@ -160,17 +162,24 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     uscfp = umcf->upstreams.elts;
 
     // 数据存在则重用
+    // 可能是多个zone共用一块内存
     if (shm_zone->shm.exists) {
         peers = shpool->data;
 
+        // 遍历所有的peers数组
         for (i = 0; i < umcf->upstreams.nelts; i++) {
             uscf = uscfp[i];
 
+            // 如果不是自己则跳过
             if (uscf->shm_zone != shm_zone) {
                 continue;
             }
 
+            // 找到自己的peers
+
+            // 更改upstream指针，指向共享内存地址
             uscf->peer.data = peers;
+
             peers = peers->zone_next;
         }
 
@@ -207,6 +216,7 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         // 找到自己的peers
 
         // 拷贝peers到共享内存
+        // 实现“深”拷贝，里面的指针内容也拷贝
         peers = ngx_http_upstream_zone_copy_peers(shpool, uscf);
         if (peers == NULL) {
             return NGX_ERROR;
@@ -221,6 +231,7 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
 
 // 拷贝peers到共享内存
+// 实现“深”拷贝，里面的指针内容也拷贝
 static ngx_http_upstream_rr_peers_t *
 ngx_http_upstream_zone_copy_peers(ngx_slab_pool_t *shpool,
     ngx_http_upstream_srv_conf_t *uscf)
@@ -229,30 +240,37 @@ ngx_http_upstream_zone_copy_peers(ngx_slab_pool_t *shpool,
     ngx_http_upstream_rr_peer_t   *peer, **peerp;
     ngx_http_upstream_rr_peers_t  *peers, *backup;
 
+    // backup/非backup服务器IP列表
     peers = ngx_slab_alloc(shpool, sizeof(ngx_http_upstream_rr_peers_t));
     if (peers == NULL) {
         return NULL;
     }
 
+    // 拷贝整个结构体
     ngx_memcpy(peers, uscf->peer.data, sizeof(ngx_http_upstream_rr_peers_t));
 
+    // upstream块的名字
     name = ngx_slab_alloc(shpool, sizeof(ngx_str_t));
     if (name == NULL) {
         return NULL;
     }
 
+    // upstream块的名字
     name->data = ngx_slab_alloc(shpool, peers->name->len);
     if (name->data == NULL) {
         return NULL;
     }
 
+    // upstream块的名字
     ngx_memcpy(name->data, peers->name->data, peers->name->len);
     name->len = peers->name->len;
 
     peers->name = name;
 
+    // 关联到共享内存池
     peers->shpool = shpool;
 
+    // 深拷贝非backup服务器IP列表
     for (peerp = &peers->peer; *peerp; peerp = &peer->next) {
         /* pool is unlocked */
         peer = ngx_http_upstream_zone_copy_peer(peers, *peerp);
@@ -263,21 +281,25 @@ ngx_http_upstream_zone_copy_peers(ngx_slab_pool_t *shpool,
         *peerp = peer;
     }
 
+    // 没有backup服务器则结束
     if (peers->next == NULL) {
         goto done;
     }
 
+    // 拷贝backup服务器IP列表
     backup = ngx_slab_alloc(shpool, sizeof(ngx_http_upstream_rr_peers_t));
     if (backup == NULL) {
         return NULL;
     }
 
+    // 拷贝backup服务器IP列表
     ngx_memcpy(backup, peers->next, sizeof(ngx_http_upstream_rr_peers_t));
 
     backup->name = name;
 
     backup->shpool = shpool;
 
+    // 深拷贝backup服务器IP列表
     for (peerp = &backup->peer; *peerp; peerp = &peer->next) {
         /* pool is unlocked */
         peer = ngx_http_upstream_zone_copy_peer(backup, *peerp);
@@ -292,6 +314,7 @@ ngx_http_upstream_zone_copy_peers(ngx_slab_pool_t *shpool,
 
 done:
 
+    // 更改upstream指针，指向共享内存地址
     uscf->peer.data = peers;
 
     return peers;

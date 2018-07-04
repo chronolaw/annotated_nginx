@@ -94,6 +94,9 @@ typedef ngx_int_t (*ngx_http_upstream_init_peer_pt)(ngx_http_request_t *r,
 typedef struct {
     ngx_http_upstream_init_pt        init_upstream;
     ngx_http_upstream_init_peer_pt   init;
+
+    // 指向ngx_http_upstream_rr_peers_t
+    // backup/非backup服务器IP列表
     void                            *data;
 } ngx_http_upstream_peer_t;
 
@@ -149,7 +152,11 @@ typedef struct {
 
 // 每个upstream{}块的配置结构体，存储server信息
 struct ngx_http_upstream_srv_conf_s {
+    // 初始化结构体
+    // 给load balance模块用初始化结构体
+    // 定义了load-balance模块的入口，有两个回调函数，用来初始化load-balance模块
     ngx_http_upstream_peer_t         peer;
+
     void                           **srv_conf;
 
     // 存储ngx_http_upstream_server_t的数组

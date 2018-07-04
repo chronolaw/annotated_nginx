@@ -73,6 +73,7 @@ struct ngx_http_upstream_rr_peer_s {
 typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 
 // 管理IP地址列表
+// backup/非backup服务器IP列表
 struct ngx_http_upstream_rr_peers_s {
     // 服务器数量，即peer的长度
     ngx_uint_t                      number;
