@@ -580,6 +580,9 @@ struct ngx_http_request_s {
 
     // http协议字符串，通常不需要关注
     ngx_str_t                         http_protocol;
+
+    // 1.15.1新增
+    // 例如http/https/ws/wss等
     ngx_str_t                         schema;
 
     // 发送的数据链表

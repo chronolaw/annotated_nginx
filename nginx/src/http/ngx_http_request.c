@@ -1339,6 +1339,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
 
             // 1.15.1 新增r->schema
+            // 例如http/https/ws/wss等
             if (r->schema_end) {
                 r->schema.len = r->schema_end - r->schema_start;
                 r->schema.data = r->schema_start;
