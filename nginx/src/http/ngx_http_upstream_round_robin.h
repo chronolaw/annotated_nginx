@@ -57,7 +57,9 @@ struct ngx_http_upstream_rr_peer_s {
     int                             ssl_session_len;
 #endif
 
+    // 默认启用ngx_http_upstream_zone_module
 #if (NGX_HTTP_UPSTREAM_ZONE)
+    // 共享内存操作的锁
     ngx_atomic_t                    lock;
 #endif
 
@@ -75,9 +77,15 @@ struct ngx_http_upstream_rr_peers_s {
     // 服务器数量，即peer的长度
     ngx_uint_t                      number;
 
+    // 默认启用ngx_http_upstream_zone_module
 #if (NGX_HTTP_UPSTREAM_ZONE)
+    // 指向共享内存里的slab池
     ngx_slab_pool_t                *shpool;
+
+    // 共享内存操作的锁
+    // 注意，用作读写锁，提高效率
     ngx_atomic_t                    rwlock;
+
     ngx_http_upstream_rr_peers_t   *zone_next;
 #endif
 
@@ -99,6 +107,9 @@ struct ngx_http_upstream_rr_peers_s {
 };
 
 
+// 默认启用ngx_http_upstream_zone_module
+// 使用共享内存才会发生锁操作，否则不需要锁
+// 读写锁操作，使用原子变量自旋
 #if (NGX_HTTP_UPSTREAM_ZONE)
 
 #define ngx_http_upstream_rr_peers_rlock(peers)                               \
