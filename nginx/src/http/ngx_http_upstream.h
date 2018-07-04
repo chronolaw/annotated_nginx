@@ -176,6 +176,7 @@ struct ngx_http_upstream_srv_conf_s {
     // 通常来说upstream块名字里是没有端口号的
     ngx_uint_t                       no_port;  /* unsigned no_port:1 */
 
+    // 使用的共享内存指针
 #if (NGX_HTTP_UPSTREAM_ZONE)
     ngx_shm_zone_t                  *shm_zone;
 #endif

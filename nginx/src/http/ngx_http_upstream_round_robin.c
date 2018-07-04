@@ -75,11 +75,15 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
             return NGX_ERROR;
         }
 
+        // 从配置的内存池里分配内存
+        // backup/非backup服务器IP列表
         peers = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_rr_peers_t));
         if (peers == NULL) {
             return NGX_ERROR;
         }
 
+        // 从配置的内存池里分配内存
+        // 非backup服务器IP列表
         peer = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_rr_peer_t) * n);
         if (peer == NULL) {
             return NGX_ERROR;
@@ -94,6 +98,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
         peerp = &peers->peer;
 
+        // 跳过backup服务器
         for (i = 0; i < us->servers->nelts; i++) {
             if (server[i].backup) {
                 continue;
@@ -118,13 +123,18 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
             }
         }
 
+        // 指向ngx_http_upstream_rr_peers_t
+        // backup/非backup服务器IP列表
         us->peer.data = peers;
 
         /* backup servers */
 
+        // backup服务器IP列表
+
         n = 0;
         w = 0;
 
+        // 跳过非backup服务器
         for (i = 0; i < us->servers->nelts; i++) {
             if (!server[i].backup) {
                 continue;
@@ -158,6 +168,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
         peerp = &backup->peer;
 
+        // 跳过非backup服务器
         for (i = 0; i < us->servers->nelts; i++) {
             if (!server[i].backup) {
                 continue;
