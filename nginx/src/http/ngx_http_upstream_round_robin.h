@@ -60,6 +60,8 @@ struct ngx_http_upstream_rr_peer_s {
     // 默认启用ngx_http_upstream_zone_module
 #if (NGX_HTTP_UPSTREAM_ZONE)
     // 共享内存操作的锁
+    // 可以单独锁定某一个peer读写
+    // ngx_http_upstream_rr_peer_lock(peers, peer)
     ngx_atomic_t                    lock;
 #endif
 
@@ -74,8 +76,9 @@ typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 
 // 管理IP地址列表
 // backup/非backup服务器IP列表
+// 关键成员是peer
 struct ngx_http_upstream_rr_peers_s {
-    // 服务器数量，即peer的长度
+    // 服务器数量，即peer数组的长度
     ngx_uint_t                      number;
 
     // 默认启用ngx_http_upstream_zone_module
@@ -85,8 +88,11 @@ struct ngx_http_upstream_rr_peers_s {
 
     // 共享内存操作的锁
     // 注意，用作读写锁，提高效率
+    // ngx_http_upstream_rr_peers_rlock(peers)
+    // ngx_http_upstream_rr_peers_unlock(peers)
     ngx_atomic_t                    rwlock;
 
+    // 在共享内存里的下一组服务器列表
     ngx_http_upstream_rr_peers_t   *zone_next;
 #endif
 
@@ -158,7 +164,10 @@ struct ngx_http_upstream_rr_peers_s {
 // 负载均衡算法使用的数据结构，从peers.peer就可以获得可用的IP地址列表
 typedef struct {
     ngx_uint_t                      config;
+
+    // 可用的IP地址列表
     ngx_http_upstream_rr_peers_t   *peers;
+
     ngx_http_upstream_rr_peer_t    *current;
     uintptr_t                      *tried;
     uintptr_t                       data;

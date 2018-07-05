@@ -178,13 +178,18 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
             // 找到自己的peers
 
             // 更改upstream指针，指向共享内存地址
+            // data指向ngx_http_upstream_rr_peers_t
+            // backup/非backup服务器IP列表
             uscf->peer.data = peers;
 
+            // 在共享内存里的下一组服务器列表
             peers = peers->zone_next;
         }
 
         return NGX_OK;
     }
+
+    // 新建共享内存数据结构
 
     // 共享内存记录日志使用的ctx字符串
     len = sizeof(" in upstream zone \"\"") + shm_zone->shm.name.len;

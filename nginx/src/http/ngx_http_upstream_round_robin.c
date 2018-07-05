@@ -274,8 +274,10 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
     ngx_uint_t                         n;
     ngx_http_upstream_rr_peer_data_t  *rrp;
 
+    // 取负载均衡算法使用的数据
     rrp = r->upstream->peer.data;
 
+    // 没有则创建
     if (rrp == NULL) {
         rrp = ngx_palloc(r->pool, sizeof(ngx_http_upstream_rr_peer_data_t));
         if (rrp == NULL) {
@@ -285,7 +287,9 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
         r->upstream->peer.data = rrp;
     }
 
+    // 可用的IP地址列表
     rrp->peers = us->peer.data;
+
     rrp->current = NULL;
     rrp->config = 0;
 
@@ -308,6 +312,7 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
         }
     }
 
+    // 算法使用的函数指针
     r->upstream->peer.get = ngx_http_upstream_get_round_robin_peer;
     r->upstream->peer.free = ngx_http_upstream_free_round_robin_peer;
     r->upstream->peer.tries = ngx_http_upstream_tries(rrp->peers);
