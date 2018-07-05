@@ -13,6 +13,7 @@ Nginx1.14增加了mirror模块，支持gRPC。
 请参考：
 * [《Nginx完全开发指南：使用C/C++和OpenResty》](http://item.jd.com/12082107.html)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
+* [ngx_ansic_dev](https://github.com/chronolaw/ngx_ansic_dev)
 * [openresty_dev](https://github.com/chronolaw/openresty_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module) - A better tools for nginx with google_perftools
