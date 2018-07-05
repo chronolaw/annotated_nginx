@@ -132,7 +132,7 @@ static ngx_uint_t  ngx_slab_max_size;
 // 所以一个uintptr_t用位图就可以管理一个页
 static ngx_uint_t  ngx_slab_exact_size;
 
-// exact的位移，即8
+// exact的位移，即6
 static ngx_uint_t  ngx_slab_exact_shift;
 
 
@@ -155,9 +155,11 @@ ngx_slab_sizes_init(void)
     // 8 * sizeof(uintptr_t)即一个指针的总位数
     // 所以一个uintptr_t用位图就可以管理一个页
     // 4k/8*8 = 64
+    // 如果增大pagesize，8k的话就是128字节，16k就是256字节
     ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
 
-    // 计算exact的位移，即64=2^8,exact_shift=8
+    // 计算exact的位移，即64=2^6,exact_shift=6
+    // 如果增大pagesize，8k的话就是7，16k就是8
     for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) {
         /* void */
     }
