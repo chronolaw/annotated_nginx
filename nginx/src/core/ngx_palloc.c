@@ -57,6 +57,7 @@ ngx_create_pool(size_t size, ngx_log_t *log)
     // 池内可用的内存空间，减去了自身的大小80字节
     size = size - sizeof(ngx_pool_t);
 
+    // #define NGX_MAX_ALLOC_FROM_POOL  (ngx_pagesize - 1)
     // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
     p->max = (size < NGX_MAX_ALLOC_FROM_POOL) ? size : NGX_MAX_ALLOC_FROM_POOL;
 
@@ -192,6 +193,7 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
     }
 #endif
 
+    // 分配大块内存(>4k)
     return ngx_palloc_large(pool, size);
 }
 

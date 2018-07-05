@@ -23,6 +23,7 @@
 
 // 默认一个内存池块大小是16k
 // 用于cycle->pool
+// 注意，默认池大小与pagesize无关
 #define NGX_DEFAULT_POOL_SIZE    (16 * 1024)
 
 // 内存池对齐数，16字节，即128位
