@@ -5850,6 +5850,7 @@ ngx_http_upstream_cache_etag(ngx_http_request_t *r,
 #endif
 
 
+// 解析upstream{}配置块
 static char *
 ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -5870,6 +5871,8 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     u.no_resolve = 1;
     u.no_port = 1;
 
+    // 添加或查找获取一个upstream{}块
+    // 把一个ngx_http_upstream_srv_conf_s加入umcf->upstreams
     uscf = ngx_http_upstream_add(cf, &u, NGX_HTTP_UPSTREAM_CREATE
                                          |NGX_HTTP_UPSTREAM_WEIGHT
                                          |NGX_HTTP_UPSTREAM_MAX_CONNS
@@ -5882,6 +5885,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     }
 
 
+    // http模块的三级配置存储
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
@@ -5892,6 +5896,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* the upstream{}'s srv_conf */
 
+    // 为模块的配置分配存储数组
     ctx->srv_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_CONF_ERROR;
@@ -5909,6 +5914,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         return NGX_CONF_ERROR;
     }
 
+    // 所有http模块的srv/loc配置
     for (m = 0; cf->cycle->modules[m]; m++) {
         if (cf->cycle->modules[m]->type != NGX_HTTP_MODULE) {
             continue;
@@ -5935,6 +5941,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
     }
 
+    // 存储server信息的数组
     uscf->servers = ngx_array_create(cf->pool, 4,
                                      sizeof(ngx_http_upstream_server_t));
     if (uscf->servers == NULL) {
@@ -5948,6 +5955,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     cf->ctx = ctx;
     cf->cmd_type = NGX_HTTP_UPS_CONF;
 
+    // 解析内部指令
     rv = ngx_conf_parse(cf, NULL);
 
     *cf = pcf;
@@ -5956,6 +5964,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         return rv;
     }
 
+    // upstream块里应该有server指令
     if (uscf->servers->nelts == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "no servers are inside upstream");
@@ -6123,6 +6132,8 @@ not_supported:
 }
 
 
+// 添加或查找获取一个upstream{}块
+// 把一个ngx_http_upstream_srv_conf_s加入umcf->upstreams
 ngx_http_upstream_srv_conf_t *
 ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 {
@@ -6143,10 +6154,13 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         }
     }
 
+    // 取upstream主配置
     umcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_upstream_module);
 
+    // 检查upstream数组
     uscfp = umcf->upstreams.elts;
 
+    // 不能有重复
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
         if (uscfp[i]->host.len != u->host.len
@@ -6193,6 +6207,7 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         return uscfp[i];
     }
 
+    // 创建一个新的srv_conf_t
     uscf = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_srv_conf_t));
     if (uscf == NULL) {
         return NULL;
@@ -6223,6 +6238,7 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
         us->naddrs = 1;
     }
 
+    // 加入umcf->upstreams数组
     uscfp = ngx_array_push(&umcf->upstreams);
     if (uscfp == NULL) {
         return NULL;

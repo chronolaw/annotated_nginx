@@ -2,6 +2,7 @@
 //
 // * ngx_http_upstream_conf_t
 // * ngx_http_upstream_s
+// * ngx_http_upstream_srv_conf_s
 
 /*
  * Copyright (C) Igor Sysoev
@@ -76,6 +77,8 @@ typedef struct {
 // upstream模块的主配置，存储所有的upstream{}配置
 typedef struct {
     ngx_hash_t                       headers_in_hash;
+
+    // 里面的元素是ngx_http_upstream_srv_conf_t
     ngx_array_t                      upstreams;
                                              /* ngx_http_upstream_srv_conf_t */
 } ngx_http_upstream_main_conf_t;
@@ -157,6 +160,8 @@ struct ngx_http_upstream_srv_conf_s {
     // 定义了load-balance模块的入口，有两个回调函数，用来初始化load-balance模块
     ngx_http_upstream_peer_t         peer;
 
+    // 数组，存储模块的配置结构体
+    // 使用宏ngx_http_conf_upstream_srv_conf
     void                           **srv_conf;
 
     // 存储ngx_http_upstream_server_t的数组
