@@ -207,7 +207,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     n = ngx_pagesize_shift - pool->min_shift;
 
     // 初始化slab管理数组，有9个元素
-    // 9*32=216字节
+    // 9*24=216字节
     // 每个元素又是一个链表的头节点
     // 分别管理8/16/32/64/128/256/512/1024/2048等字节
     for (i = 0; i < n; i++) {
@@ -226,7 +226,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     }
 
     // 跳过刚才使用的数组空间
-    // 9*32=216字节
+    // 9*24=216字节
     p += n * sizeof(ngx_slab_page_t);
 
     // 统计信息
