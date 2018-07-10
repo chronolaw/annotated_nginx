@@ -69,7 +69,7 @@
 
 
 // 跳过内存前面的管理结构，得到可用内存位置
-// 64位系统上占用200个字节
+// 64位系统上跳过200个字节
 // 存放slots数组，管理8/16/32/64等字节管理页
 #define ngx_slab_slots(pool)                                                  \
     (ngx_slab_page_t *) ((u_char *) (pool) + sizeof(ngx_slab_pool_t))
@@ -185,11 +185,11 @@ ngx_slab_init(ngx_slab_pool_t *pool)
     pool->min_size = (size_t) 1 << pool->min_shift;
 
     // 跳过内存前面的管理结构，得到可用内存位置
-    // 64位系统上占用200个字节
+    // 64位系统上跳过200个字节
     // 存放slots数组，管理8/16/32/64等字节管理页
     slots = ngx_slab_slots(pool);
 
-    // slots数组地址，也是可用内存位置
+    // slots数组地址，也是最初的可用内存位置
     p = (u_char *) slots;
 
     // 得到可用内存数量
