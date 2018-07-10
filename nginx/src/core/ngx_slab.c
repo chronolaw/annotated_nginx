@@ -349,7 +349,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
         // 分配多个内存页
         // 调整指针，从空闲链表里摘掉
-        // 左移即除以4k，再看有无余数，计算得到分配的页数
+        // 右移即除以4k，再看有无余数，计算得到分配的页数
         // 注意返回的是page数组地址，不是真正的内存地址
         page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
                                           + ((size % ngx_pagesize) ? 1 : 0));
