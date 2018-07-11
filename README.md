@@ -31,13 +31,13 @@ stable  | Nginx稳定版1.14.0|无
 # 已注解
 
 ### 源码目录快捷入口
-* [src](/nginx/src/) - nginx源码目录
+* [src](/nginx/src/) - 70%，nginx源码目录
 * [core](/nginx/src/core) - 90%，md5/sha1/crc等较简单的功能不关注
 * [event](/nginx/src/event) - 90%，只注解核心模块和epoll，select/kqueue/ssl等不关注
 * [http](/nginx/src/http) - 70%，少量modules目录里的具体功能模块有注释
 * [os/unix](/nginx/src/os/unix) - 80%，bsd/darwin/solaris等系统不关注
 * [stream](/nginx/src/stream) - 70%
-* [misc](/nginx/src/misc) - 50%
+* [misc](/nginx/src/misc) - 100%
 
 #### UML图解
 [UML图示](/diagrams/readme.md)
