@@ -17,6 +17,7 @@
 // NGX_HAVE_POSIX_SEM
 // NGX_HAVE_GCC_ATOMIC=>NGX_HAVE_ATOMIC_OPS
 
+// ngx_shmtx_sh_t
 // 互斥锁使用的两个原子变量
 typedef struct {
 
@@ -32,6 +33,7 @@ typedef struct {
 } ngx_shmtx_sh_t;
 
 
+// ngx_shmtx_t
 typedef struct {
 #if (NGX_HAVE_ATOMIC_OPS)
     // 指向ngx_shmtx_sh_t.lock

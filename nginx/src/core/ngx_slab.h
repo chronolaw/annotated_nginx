@@ -41,6 +41,7 @@ struct ngx_slab_page_s {
 };
 
 
+// ngx_slab_stat_t
 // 各个slot分配内存的统计信息
 // 目前供商业模块ngx_api来调用
 // 目前暂无公开接口使用
@@ -55,6 +56,7 @@ typedef struct {
 } ngx_slab_stat_t;
 
 
+// ngx_slab_pool_t
 // 管理共享内存的池
 // 存放page管理信息、空闲页数量、共享内存的开始地址等
 // 64位系统上占用200个字节
