@@ -74,6 +74,7 @@ static void ngx_unload_module(void *data);
 
 
 // debug point枚举定义，宏的定义在ngx_cycle.h
+// in ngx_process.c ngx_debug_point
 static ngx_conf_enum_t  ngx_debug_points[] = {
     { ngx_string("stop"), NGX_DEBUG_POINTS_STOP },
     { ngx_string("abort"), NGX_DEBUG_POINTS_ABORT },

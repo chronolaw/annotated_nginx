@@ -723,20 +723,24 @@ ngx_unlock_mutexes(ngx_pid_t pid)
 }
 
 
+// debug断点时的动作，停止或是直接core
 void
 ngx_debug_point(void)
 {
     ngx_core_conf_t  *ccf;
 
+    // 取核心配置
     ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
                                            ngx_core_module);
 
     switch (ccf->debug_points) {
 
+    // stop，使用stop信号停止运行
     case NGX_DEBUG_POINTS_STOP:
         raise(SIGSTOP);
         break;
 
+    // 直接abort
     case NGX_DEBUG_POINTS_ABORT:
         ngx_abort();
     }

@@ -22,6 +22,8 @@
 #endif
 
 
+// 设置debug断点时的动作，停止或是直接core
+// in ngx_process.c ngx_debug_point
 #define NGX_DEBUG_POINTS_STOP   1
 #define NGX_DEBUG_POINTS_ABORT  2
 
