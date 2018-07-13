@@ -17,6 +17,7 @@
 
 
 // 错误日志的级别，0最高，8最低
+// 使用的是低7位
 #define NGX_LOG_STDERR            0
 #define NGX_LOG_EMERG             1
 #define NGX_LOG_ALERT             2

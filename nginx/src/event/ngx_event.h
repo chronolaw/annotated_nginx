@@ -266,6 +266,7 @@ typedef struct {
 // linux不支持send_lowat指令，send_lowat总是0
 // ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
+// ngx_event_actions_t
 // 全局的事件模块访问接口，是一个函数表
 // 由epoll/kqueue/select等模块实现
 // epoll的实现在modules/ngx_epoll_module.c
@@ -333,6 +334,7 @@ typedef struct {
 // 在epoll模块的ngx_epoll_init里设置，指向epoll的函数
 // ngx_event_actions = ngx_epoll_module_ctx.actions;
 extern ngx_event_actions_t   ngx_event_actions;
+
 #if (NGX_HAVE_EPOLLRDHUP)
 extern ngx_uint_t            ngx_use_epoll_rdhup;
 #endif
@@ -623,6 +625,7 @@ extern ngx_os_io_t  ngx_io;
 #define NGX_EVENT_CONF        0x02000000
 
 
+// ngx_event_conf_t
 // event_core模块的配置结构体
 typedef struct {
     // nginx每个进程可使用的连接数量，即cycle里的连接池大小
@@ -650,6 +653,7 @@ typedef struct {
 } ngx_event_conf_t;
 
 
+// ngx_event_module_t
 // 事件模块的函数指针表
 // 核心是actions，即事件处理函数
 typedef struct {

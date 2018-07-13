@@ -4,6 +4,7 @@
 // * ngx_log_open_default
 // * ngx_error_log
 // * ngx_log_set_log
+// * ngx_log_set_levels
 
 /*
  * Copyright (C) Igor Sysoev
@@ -96,6 +97,7 @@ ngx_uint_t              ngx_use_stderr = 1;
 
 
 // 错误级别与字符串的对应数组
+// ngx_log_set_levels
 static ngx_str_t err_levels[] = {
     ngx_null_string,
     ngx_string("emerg"),
@@ -108,6 +110,9 @@ static ngx_str_t err_levels[] = {
     ngx_string("debug")
 };
 
+// 调试用的级别，只打印某些特殊子系统的日志
+// 在nginx网站没有很好地文档化
+// ngx_log_set_levels
 static const char *debug_levels[] = {
     "debug_core", "debug_alloc", "debug_mutex", "debug_event",
     "debug_http", "debug_mail", "debug_stream"
@@ -584,6 +589,7 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
     ngx_uint_t   i, n, d, found;
     ngx_str_t   *value;
 
+    // 需要有有多于一个的参数
     if (cf->args->nelts == 2) {
         log->log_level = NGX_LOG_ERR;
         return NGX_CONF_OK;
@@ -591,12 +597,20 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 
     value = cf->args->elts;
 
+    // 逐个检查file之后的level参数
+    // 允许有多个debug level级别
     for (i = 2; i < cf->args->nelts; i++) {
         found = 0;
 
+        // 检查第i个参数
+
+        // 先看大的level级别
+        // info/notice/warn/error等
         for (n = 1; n <= NGX_LOG_DEBUG; n++) {
+            // 比较级别的字符串数组
             if (ngx_strcmp(value[i].data, err_levels[n].data) == 0) {
 
+                // 大级别只能设定一次，不能重复
                 if (log->log_level != 0) {
                     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                        "duplicate log level \"%V\"",
@@ -605,13 +619,20 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
                 }
 
                 log->log_level = n;
+
+                // 设置标志位，参数正确
                 found = 1;
                 break;
             }
         }
 
+        // 检查是否是debug level
+        // debug_core/debug_alloc等
         for (n = 0, d = NGX_LOG_DEBUG_FIRST; d <= NGX_LOG_DEBUG_LAST; d <<= 1) {
+            // 比较debug子系统的字符串数组
             if (ngx_strcmp(value[i].data, debug_levels[n++]) == 0) {
+
+                // 不能是大level，即低位被设置
                 if (log->log_level & ~NGX_LOG_DEBUG_ALL) {
                     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                        "invalid log level \"%V\"",
@@ -619,20 +640,27 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
                     return NGX_CONF_ERROR;
                 }
 
+                // 允许使用多个debug level，所以用逻辑位
                 log->log_level |= d;
+
+                // 设置标志位，参数正确
                 found = 1;
                 break;
             }
         }
 
 
+        // 两个字符串数字里都没有找到，参数错误
         if (!found) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid log level \"%V\"", &value[i]);
             return NGX_CONF_ERROR;
         }
+
+        // 继续检查下一个参数
     }
 
+    // 如果只是设置了debug级别，那么就打印所有的子系统
     if (log->log_level == NGX_LOG_DEBUG) {
         log->log_level = NGX_LOG_DEBUG_ALL;
     }

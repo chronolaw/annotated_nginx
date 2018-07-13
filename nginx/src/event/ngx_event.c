@@ -797,6 +797,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     // 连接计数器
     ngx_connection_counter = (ngx_atomic_t *) (shared + 1 * cl);
 
+    // 计数器置1
     (void) ngx_atomic_cmp_set(ngx_connection_counter, 0, 1);
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
