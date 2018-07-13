@@ -16,7 +16,8 @@
 
 // 真正操作共享内存的对象
 typedef struct {
-    // 共享内存的地址
+    // 共享内存的开始地址
+    // 通常就是ngx_slab_pool_t
     u_char      *addr;
 
     // 共享内存的大小

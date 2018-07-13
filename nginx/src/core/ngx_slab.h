@@ -130,7 +130,8 @@ typedef struct {
     // 例如红黑树指针
     void             *data;
 
-    // 内存的起始地址，何用？
+    // 内存的起始地址
+    // 在ngx_init_zone_pool时检测内存是否正确
     void             *addr;
 } ngx_slab_pool_t;
 

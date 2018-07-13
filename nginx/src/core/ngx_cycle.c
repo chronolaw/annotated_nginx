@@ -1082,6 +1082,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     sp->min_shift = 3;
 
     // 内存的开始地址
+    // 在ngx_init_zone_pool时检测内存是否正确
     sp->addr = zn->shm.addr;
 
     // 有原子操作就不需要使用file锁

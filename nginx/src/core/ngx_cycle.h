@@ -196,6 +196,7 @@ struct ngx_cycle_s {
 };
 
 
+// ngx_core_conf_t
 // ngx_core_module的配置结构体，在nginx.c里设置
 typedef struct {
     ngx_flag_t                daemon;       //守护进程是否启用
