@@ -27,6 +27,10 @@
 #define NGX_LOG_INFO              7
 #define NGX_LOG_DEBUG             8
 
+// 调试用的日志宏
+// 不表示级别，因为已经是debug
+// 表示所属的子系统
+// if ((log)->log_level & level)
 #define NGX_LOG_DEBUG_CORE        0x010
 #define NGX_LOG_DEBUG_ALLOC       0x020
 #define NGX_LOG_DEBUG_MUTEX       0x040
@@ -172,6 +176,7 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 
 /*********************************/
 
+// 只有在configure时使用--with-debug才会启用下面的debug宏
 #if (NGX_DEBUG)
 
 #if (NGX_HAVE_VARIADIC_MACROS)
