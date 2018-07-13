@@ -1230,6 +1230,8 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
         }
     }
 
+    // 检查是否还有未关闭的连接
+    // 有则需要debug，断点检查
     if (ngx_exiting) {
         c = cycle->connections;
         for (i = 0; i < cycle->connection_n; i++) {
