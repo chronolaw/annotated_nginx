@@ -647,6 +647,7 @@ typedef struct {
     // 使用name在event模块里查找，决定使用的事件机制
     u_char       *name;
 
+    // 针对某些连接打印调试日志
 #if (NGX_DEBUG)
     ngx_array_t   debug_connection;
 #endif

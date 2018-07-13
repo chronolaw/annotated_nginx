@@ -256,6 +256,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, accept_mutex_delay),
       NULL },
 
+    // 是否要针对某些连接打印调试日志
     { ngx_string("debug_connection"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_debug_connection,
@@ -1470,6 +1471,7 @@ ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 是否要针对某些连接打印调试日志
 static char *
 ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1502,8 +1504,10 @@ ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #endif
 
+    // 参数转化为ip地址形式
     rc = ngx_ptocidr(&value[1], &c);
 
+    // 格式正确则加入数组
     if (rc != NGX_ERROR) {
         if (rc == NGX_DONE) {
             ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
@@ -1521,6 +1525,9 @@ ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_OK;
     }
 
+
+    // rc == NGX_ERROR
+
     ngx_memzero(&u, sizeof(ngx_url_t));
     u.host = value[1];
 
@@ -1534,6 +1541,7 @@ ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 格式正确则加入数组
     cidr = ngx_array_push_n(&ecf->debug_connection, u.naddrs);
     if (cidr == NULL) {
         return NGX_CONF_ERROR;
