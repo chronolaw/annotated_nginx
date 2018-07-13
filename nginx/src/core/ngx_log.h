@@ -45,9 +45,14 @@
  * after the adding a new debug level
  */
 
+// 调试级别的上下限
 #define NGX_LOG_DEBUG_FIRST       NGX_LOG_DEBUG_CORE
 #define NGX_LOG_DEBUG_LAST        NGX_LOG_DEBUG_STREAM
+
+// 特殊调试级别，打印某个连接，最高位
 #define NGX_LOG_DEBUG_CONNECTION  0x80000000
+
+// 调试所有的子系统，注意没有最高位
 #define NGX_LOG_DEBUG_ALL         0x7ffffff0
 
 
@@ -138,6 +143,9 @@ struct ngx_log_s {
 void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
 
+// 只有在configure时使用--with-debug才会启用
+// 调试日志宏,级别固定为debug
+// 记录日志的条件使用逻辑与操作，检查子系统
 #define ngx_log_debug(level, log, ...)                                        \
     if ((log)->log_level & level)                                             \
         ngx_log_error_core(NGX_LOG_DEBUG, log, __VA_ARGS__)

@@ -213,6 +213,9 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     ngx_linefeed(p);
 
     wrote_stderr = 0;
+
+    // 是否要针对某些连接打印调试日志
+    // 指令debug_connection
     debug_connection = (log->log_level & NGX_LOG_DEBUG_CONNECTION) != 0;
 
     // 对整个日志链表执行写入操作
@@ -220,6 +223,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
         // log消息级别低，不需要记录日志，直接退出循环
         // 因为链表是level降序的，避免了遍历整个链表，提高效率
+        // 如果是针对某些连接打印调试日志那么无视日志级别
         if (log->log_level < level && !debug_connection) {
             break;
         }
