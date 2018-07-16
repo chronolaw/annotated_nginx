@@ -1,7 +1,9 @@
 // annotated by chrono since 2016
 //
+// * ngx_udp_connection_s
 // * ngx_event_recvmsg
 // * ngx_lookup_udp_connection
+// * ngx_udp_shared_recv
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -18,6 +20,7 @@
 
 #if !(NGX_WIN32)
 
+// ngx_udp_connection_t
 // udp连接的附加数据
 // 作为ngx_connection_t的一个成员
 // 串进红黑树，缓冲区里是客户端发送的数据
@@ -73,6 +76,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
     ngx_connection_t  *c, *lc;
 
     // 接收数据的缓冲区
+    // 这里写死了64k，即udp包不能超过这个大小
     static u_char      buffer[65535];
 
 #if (NGX_HAVE_MSGHDR_MSG_CONTROL)
@@ -121,6 +125,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
 
+    // 循环调用recvmsg接收udp数据
     do {
         // 清空msghdr结构体，准备读取数据
         ngx_memzero(&msg, sizeof(struct msghdr));
@@ -185,6 +190,8 @@ ngx_event_recvmsg(ngx_event_t *ev)
             continue;
         }
 #endif
+
+        // udp接收数据成功
 
         // 客户端的地址
         sockaddr = msg.msg_name;
@@ -308,6 +315,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             ngx_memzero(&buf, sizeof(ngx_buf_t));
 
             // 指向刚读取的数据
+            // 即固定的64k空间
             buf.pos = buffer;
             buf.last = buffer + n;
 
@@ -315,6 +323,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             rev = c->read;
 
             // 设置udp的缓冲区
+            // 由ngx_udp_shared_recv读取
             c->udp->buffer = &buf;
 
             // udp连接可读
@@ -507,6 +516,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
         // 接受连接，收到请求的回调函数
         // stream模块里是ngx_stream_init_connection
+        // 进入流水线阶段处理
         ls->handler(c);
 
     next:
