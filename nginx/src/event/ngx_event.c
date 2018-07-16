@@ -765,6 +765,8 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 #endif
 
     // 创建共享内存，存放负载均衡锁和统计用的原子变量
+    // 因为内存很小，而且仅用做统计，比较简单
+    // 所以不用slab管理
     shm.size = size;
     ngx_str_set(&shm.name, "nginx_shared_zone");
     shm.log = cycle->log;
@@ -915,6 +917,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
             continue;
         }
 
+        // 找到事件模块
+
         module = cycle->modules[m]->ctx;
 
         // 调用事件模块的事件初始化函数
@@ -929,6 +933,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
             exit(2);
         }
 
+        // 找到一个事件模块即退出循环
+        // 也就是说只能使用一种事件模型
         break;
     }
 
@@ -1176,6 +1182,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
 
+        // reuseport无视负载均衡，直接开始监听
         if (ls[i].reuseport) {
             if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
                 return NGX_ERROR;
@@ -1472,9 +1479,12 @@ ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 // 是否要针对某些连接打印调试日志
+// 只能在debug模式里开启
+// configure --with-debug
 static char *
 ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    // 条件编译宏，只能在debug模式里开启
 #if (NGX_DEBUG)
     ngx_event_conf_t  *ecf = conf;
 
