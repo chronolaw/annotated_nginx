@@ -53,6 +53,8 @@
 #define NGX_LOG_DEBUG_CONNECTION  0x80000000
 
 // 调试所有的子系统，注意没有最高位
+// 最高位给调试某个连接使用
+// 低三位留给了err/warn/info等日志级别
 #define NGX_LOG_DEBUG_ALL         0x7ffffff0
 
 
