@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// * ngx_shm_zone_s
 // * ngx_cycle_s
 // * ngx_core_conf_t
 
@@ -44,6 +45,7 @@ typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
 struct ngx_shm_zone_s {
     // init回调使用的数据
     // 存储与共享内存使用相关的数据，ctx
+    // 与ngx_slab_pool_t.data用法类似
     void                     *data;
 
     // os/unix/ngx_shmem.h
@@ -55,6 +57,7 @@ struct ngx_shm_zone_s {
     //     ngx_uint_t   exists;   /* unsigned  exists:1;  */
     // } ngx_shm_t;
     // 真正操作共享内存的对象
+    // shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
     ngx_shm_t                 shm;
 
     // 创建成功后回调初始化共享内存
