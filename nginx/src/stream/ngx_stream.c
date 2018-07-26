@@ -736,9 +736,10 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             // reuseport专用的函数，1.8.x没有
             // 拷贝了worker数量个的监听结构体, in ngx_connection.c
-            if (ngx_clone_listening(cf, ls) != NGX_OK) {
-                return NGX_CONF_ERROR;
-            }
+            // removed since 1.15.2
+            // if (ngx_clone_listening(cf, ls) != NGX_OK) {
+            //     return NGX_CONF_ERROR;
+            // }
 
             // 数组指针前进到下一个元素，即下一个server
             addr++;

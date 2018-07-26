@@ -1,4 +1,31 @@
 
+Changes with nginx 1.15.2                                        24 Jul 2018
+
+    *) Feature: the $ssl_preread_protocol variable in the
+       ngx_stream_ssl_preread_module.
+
+    *) Feature: now when using the "reset_timedout_connection" directive
+       nginx will reset connections being closed with the 444 code.
+
+    *) Change: a logging level of the "http request", "https proxy request",
+       "unsupported protocol", and "version too low" SSL errors has been
+       lowered from "crit" to "info".
+
+    *) Bugfix: DNS requests were not resent if initial sending of a request
+       failed.
+
+    *) Bugfix: the "reuseport" parameter of the "listen" directive was
+       ignored if the number of worker processes was specified after the
+       "listen" directive.
+
+    *) Bugfix: when using OpenSSL 1.1.0 or newer it was not possible to
+       switch off "ssl_prefer_server_ciphers" in a virtual server if it was
+       switched on in the default server.
+
+    *) Bugfix: SSL session reuse with upstream servers did not work with the
+       TLS 1.3 protocol.
+
+
 Changes with nginx 1.15.1                                        03 Jul 2018
 
     *) Feature: the "random" directive inside the "upstream" block.

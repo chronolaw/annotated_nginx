@@ -378,7 +378,8 @@ ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
     socklen_t socklen);
 
 // 1.10新函数，专为reuseport使用
-ngx_int_t ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls);
+// 1.15.2 change signature
+ngx_int_t ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls);
 
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
 

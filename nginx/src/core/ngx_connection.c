@@ -137,7 +137,7 @@ ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
 // 拷贝了worker数量个的监听结构体
 // 在ngx_stream_optimize_servers等函数创建端口时调用
 ngx_int_t
-ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
+ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls)
 {
 // configure脚本可以检测系统是否支持reuseport
 // 使用宏来控制条件编译
@@ -148,7 +148,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
     ngx_listening_t   ols;
 
     // 监听指令需要配置了reuseport
-    if (!ls->reuseport) {
+    if (!ls->reuseport || ls->worker != 0) {
         return NGX_OK;
     }
 
@@ -156,8 +156,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
     // 例如type/handler/backlog等等
     ols = *ls;
 
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
-                                           ngx_core_module);
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     // ccf->worker_processes是nginx的worker进程数
     // 拷贝了worker数量个的监听结构体
@@ -168,7 +167,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
 
         /* create a socket for each worker process */
 
-        ls = ngx_array_push(&cf->cycle->listening);
+        ls = ngx_array_push(&cycle->listening);
         if (ls == NULL) {
             return NGX_ERROR;
         }
