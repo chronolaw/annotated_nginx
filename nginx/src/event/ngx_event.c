@@ -35,8 +35,9 @@ extern ngx_module_t ngx_epoll_module;
 extern ngx_module_t ngx_select_module;
 
 
-// 只检查是否创建了配置结构体，无其他操作
+// 1.15.2之前只检查是否创建了配置结构体，无其他操作
 // 因为event模块只有一个events指令
+// 1.15.2之后增加新的代码
 static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
 
 // 在ngx_init_cycle里调用，fork子进程之前
@@ -180,8 +181,9 @@ static ngx_core_module_t  ngx_events_module_ctx = {
     ngx_string("events"),
     NULL,
 
-    // 只检查是否创建了配置结构体，无其他操作
+    // 1.15.2之前只检查是否创建了配置结构体，无其他操作
     // 因为event模块只有一个events指令
+    // 1.15.2之后增加新的代码
     ngx_event_init_conf
 };
 
@@ -640,22 +642,27 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 }
 
 
-// 只检查是否创建了配置结构体，无其他操作
+// 1.15.2之前只检查是否创建了配置结构体，无其他操作
 // 因为event模块只有一个events指令
+// 1.15.2之后增加新的代码
 static char *
 ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 {
+    // 1.15.2新增部分检查代码
 #if (NGX_HAVE_REUSEPORT)
     ngx_uint_t        i;
     ngx_listening_t  *ls;
 #endif
 
+    // 要求必须有events{}配置块
+    // 1.15.2之前只有这一段
     if (ngx_get_conf(cycle->conf_ctx, ngx_events_module) == NULL) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                       "no \"events\" section in configuration");
         return NGX_CONF_ERROR;
     }
 
+    // 检查连接数，需要大于监听端口数量
     if (cycle->connection_n < cycle->listening.nelts + 1) {
 
         /*
@@ -680,6 +687,9 @@ ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
             continue;
         }
 
+        // reuseport专用的函数，1.8.x没有
+        // 拷贝了worker数量个的监听结构体, in ngx_connection.c
+        // 从ngx_stream_optimize_servers等函数处转移过来
         if (ngx_clone_listening(cycle, &ls[i]) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
