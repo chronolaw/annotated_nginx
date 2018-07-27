@@ -744,6 +744,8 @@ ngx_debug_point(void)
     case NGX_DEBUG_POINTS_ABORT:
         ngx_abort();
     }
+
+    // 其他则无动作，不会有任何影响
 }
 
 
