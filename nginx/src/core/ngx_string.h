@@ -34,7 +34,7 @@ typedef struct {
 } ngx_keyval_t;
 
 
-// nginx变量值，目前仅用于http模块
+// nginx变量值，用于http/stream模块
 typedef struct {
     unsigned    len:28;             //字符串长度，只有28位，剩下4位留给标志位
 
@@ -65,19 +65,26 @@ typedef struct {
 #define ngx_tolower(c)      (u_char) ((c >= 'A' && c <= 'Z') ? (c | 0x20) : c)
 #define ngx_toupper(c)      (u_char) ((c >= 'a' && c <= 'z') ? (c & ~0x20) : c)
 
+// 小写化字符串到dst
 void ngx_strlow(u_char *dst, u_char *src, size_t n);
 
 
+// 字符串比较，带长度
 #define ngx_strncmp(s1, s2, n)  strncmp((const char *) s1, (const char *) s2, n)
 
 
+// 字符串比较，不带长度
 /* msvc and icc7 compile strcmp() to inline loop */
 #define ngx_strcmp(s1, s2)  strcmp((const char *) s1, (const char *) s2)
 
 
+// 查找子串
 #define ngx_strstr(s1, s2)  strstr((const char *) s1, (const char *) s2)
+
+// 字符串长度
 #define ngx_strlen(s)       strlen((const char *) s)
 
+// 字符串长度，最多n个字符查找
 size_t ngx_strnlen(u_char *p, size_t n);
 
 #define ngx_strchr(s1, c)   strchr((const char *) s1, (int) c)
@@ -188,6 +195,7 @@ u_char *ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args);
 #define ngx_vsnprintf(buf, max, fmt, args)                                   \
     ngx_vslprintf(buf, buf + (max), fmt, args)
 
+// 大小写无关比较
 ngx_int_t ngx_strcasecmp(u_char *s1, u_char *s2);
 ngx_int_t ngx_strncasecmp(u_char *s1, u_char *s2, size_t n);
 
