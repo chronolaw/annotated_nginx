@@ -2,6 +2,7 @@
 //
 // * ngx_inet_addr
 // * ngx_sock_ntop
+// * ngx_inet_ntop
 // * ngx_parse_addr
 // * ngx_inet_get_port
 // * ngx_inet_set_port
