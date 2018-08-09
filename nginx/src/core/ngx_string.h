@@ -4,6 +4,7 @@
 // * ngx_cpymem
 // * ngx_sprintf
 // * ngx_atoi
+// * ngx_cpystrn
 
 /*
  * Copyright (C) Igor Sysoev
@@ -158,6 +159,8 @@ ngx_copy(u_char *dst, u_char *src, size_t len)
 #endif
 
 
+// 内存移动，应该使用ngx_movemem
+// 与c函数不一样，它返回移动后的地址，可以简化连续移动内存
 #define ngx_memmove(dst, src, n)   (void) memmove(dst, src, n)
 #define ngx_movemem(dst, src, n)   (((u_char *) memmove(dst, src, n)) + (n))
 
@@ -167,6 +170,8 @@ ngx_copy(u_char *dst, u_char *src, size_t len)
 
 
 // 拷贝字符串
+// 保证在末尾添加'\0'
+// 与ngx_cpymem一样，返回拷贝后的末尾位置
 u_char *ngx_cpystrn(u_char *dst, u_char *src, size_t n);
 
 //在内存池里复制一个新的字符串
