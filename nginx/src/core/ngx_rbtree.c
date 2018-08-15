@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_rbtree_insert
+// * ngx_rbtree_insert_value
+// * ngx_rbtree_insert_timer_value
+// * ngx_rbtree_next
 
 /*
  * Copyright (C) Igor Sysoev
