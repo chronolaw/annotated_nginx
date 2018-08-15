@@ -171,6 +171,7 @@ ngx_slab_sizes_init(void)
 // 之前需要初始化min_shift和end
 // 自己使用可以把min_shift适当调整改大一点
 // 分析以64位系统，4m共享内存为例
+// 缺一个reinit函数，简单地清空共享内存
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
 {
