@@ -1,3 +1,5 @@
+// annotated by chrono since 2018
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -15,6 +17,8 @@
 #define NGX_HTTP_GZIP_STATIC_ALWAYS  2
 
 
+// 配置结构体，决定是否发送gzip文件
+// 是枚举值，不是flag的on/off
 typedef struct {
     ngx_uint_t  enable;
 } ngx_http_gzip_static_conf_t;
@@ -27,6 +31,7 @@ static char *ngx_http_gzip_static_merge_conf(ngx_conf_t *cf, void *parent,
 static ngx_int_t ngx_http_gzip_static_init(ngx_conf_t *cf);
 
 
+// 枚举数组，用于指令解析
 static ngx_conf_enum_t  ngx_http_gzip_static[] = {
     { ngx_string("off"), NGX_HTTP_GZIP_STATIC_OFF },
     { ngx_string("on"), NGX_HTTP_GZIP_STATIC_ON },
@@ -37,6 +42,8 @@ static ngx_conf_enum_t  ngx_http_gzip_static[] = {
 
 static ngx_command_t  ngx_http_gzip_static_commands[] = {
 
+    // 使用ngx_conf_set_enum_slot解析枚举值
+    // 转化为uint
     { ngx_string("gzip_static"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_enum_slot,
@@ -50,6 +57,8 @@ static ngx_command_t  ngx_http_gzip_static_commands[] = {
 
 static ngx_http_module_t  ngx_http_gzip_static_module_ctx = {
     NULL,                                  /* preconfiguration */
+
+    // 工作在content phase
     ngx_http_gzip_static_init,             /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -79,6 +88,8 @@ ngx_module_t  ngx_http_gzip_static_module = {
 };
 
 
+// 工作在content phase
+// 产生响应内容
 static ngx_int_t
 ngx_http_gzip_static_handler(ngx_http_request_t *r)
 {
@@ -95,25 +106,32 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
     ngx_http_core_loc_conf_t     *clcf;
     ngx_http_gzip_static_conf_t  *gzcf;
 
+    // 只接受get/head请求
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_DECLINED;
     }
 
+    // url不能是目录
     if (r->uri.data[r->uri.len - 1] == '/') {
         return NGX_DECLINED;
     }
 
+    // 取配置
     gzcf = ngx_http_get_module_loc_conf(r, ngx_http_gzip_static_module);
 
+    // 禁用则返回declined
     if (gzcf->enable == NGX_HTTP_GZIP_STATIC_OFF) {
         return NGX_DECLINED;
     }
 
     if (gzcf->enable == NGX_HTTP_GZIP_STATIC_ON) {
+        // in ngx_http_core_module.c
+        // 检查请求是否支持gzip
         rc = ngx_http_gzip_ok(r);
 
     } else {
         /* always */
+        // 不做检查，直接发送gzip
         rc = NGX_OK;
     }
 
@@ -125,6 +143,7 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
 
     log = r->connection->log;
 
+    // 给文件加gz后缀
     p = ngx_http_map_uri_to_path(r, &path, &root, sizeof(".gz") - 1);
     if (p == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -142,6 +161,7 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
 
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 
+    // 准备打开文件
     of.read_ahead = clcf->read_ahead;
     of.directio = clcf->directio;
     of.valid = clcf->open_file_cache_valid;
@@ -216,6 +236,7 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
 
     r->root_tested = !r->error_page;
 
+    // 忽略body
     rc = ngx_http_discard_request_body(r);
 
     if (rc != NGX_OK) {
@@ -312,6 +333,7 @@ ngx_http_gzip_static_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 工作在content phase
 static ngx_int_t
 ngx_http_gzip_static_init(ngx_conf_t *cf)
 {
