@@ -4,6 +4,7 @@
 // * ngx_single_process_cycle
 // * ngx_worker_process_cycle
 // * ngx_signal_worker_processes
+// * ngx_worker_process_init
 
 /*
  * Copyright (C) Igor Sysoev
@@ -912,8 +913,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
     // 设置进程名字
     // 这里可以改进一下，增加workerid，或者其他特殊标记
-    // 可以由其他模块在init_worker阶段或稍后的时刻特殊操作
     // 例如设置一个特殊的32字节字符串
+    // 注意是在init_worker阶段之后，所以模块的init_process操作是无效的
+    // 可以在init_process里放个定时器，在稍后的时刻操作
     ngx_setproctitle("worker process");
 
     // 无限循环，处理事件和信号
