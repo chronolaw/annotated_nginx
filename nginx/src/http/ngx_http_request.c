@@ -888,9 +888,11 @@ ngx_http_create_request(ngx_connection_t *c)
     // 每次rewrite就会减少，到0就不能rewrite，返回错误
     r->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
 
-    // 所有子请求最大不能超过50
-    // 在1.8版之前是200,1.10之后减少到50
-    // 每产生一个子请求，r->subrequests递减
+    // 每个请求最多只能产生50层次调用的子请求
+    // 在1.8版之前是主请求最多200个
+    // 1.10之后改变了实现方式，50是子请求的“深度”限制
+    // 所以产生子请求基本已经没有限制
+    // 每产生一个子请求，sr->subrequests递减
     r->subrequests = NGX_HTTP_MAX_SUBREQUESTS + 1;
 
     // 当前请求的状态，正在读取请求
