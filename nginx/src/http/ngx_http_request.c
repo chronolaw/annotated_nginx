@@ -2799,12 +2799,13 @@ ngx_http_run_posted_requests(ngx_connection_t *c)
 }
 
 
-// 把请求r加入到pr的延后处理链表末尾
+// 把请求r加入到主请求的延后处理链表末尾
 ngx_int_t
 ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
 {
     ngx_http_posted_request_t  **p;
 
+    // 分配一个链表节点
     if (pr == NULL) {
         pr = ngx_palloc(r->pool, sizeof(ngx_http_posted_request_t));
         if (pr == NULL) {
@@ -2812,11 +2813,14 @@ ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
         }
     }
 
+    // 填充字段
     pr->request = r;
     pr->next = NULL;
 
+    // 主请求的链表末尾
     for (p = &r->main->posted_requests; *p; p = &(*p)->next) { /* void */ }
 
+    // 加到末尾
     *p = pr;
 
     return NGX_OK;

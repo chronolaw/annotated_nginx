@@ -22,6 +22,7 @@
 // 在1.8版之前是200，限制主请求最多发出200个子请求
 // 1.10之后改变了实现方式，50是子请求的“深度”限制
 // 所以产生子请求基本已经没有限制
+// 子请求数量最多是65535 - 1000
 // 但应该尽量避免过多子请求导致处理效率降低
 #define NGX_HTTP_MAX_SUBREQUESTS           50
 
@@ -450,6 +451,7 @@ typedef ngx_int_t (*ngx_http_post_subrequest_pt)(ngx_http_request_t *r,
 // 可能Nginx今后会逐渐废弃子请求
 
 // 子请求完成后的处理函数，相当于闭包/lambda
+// 见ngx_http_core_module.c:ngx_http_subrequest
 typedef struct {
     ngx_http_post_subrequest_pt       handler;
     void                             *data;
