@@ -79,6 +79,7 @@ stable  | Nginx稳定版1.14.0|无
 * [ngx_http_limit_req_module.c](/nginx/src/http/modules/ngx_http_limit_req_module.c) 红黑树和共享内存的使用示例
 * [ngx_http_degradation_module.c](/nginx/src/http/modules/ngx_http_degradation_module.c)
 * [ngx_http_upstream_zone_module.c](/nginx/src/http/modules/ngx_http_upstream_zone_module.c)
+* [ngx_http_mirror_module.c](/nginx/src/http/modules/ngx_http_mirror_module.c)
 
 ###### os/unix目录
 * [ngx_os.h](/nginx/src/os/unix/ngx_os.h)
