@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -23,6 +25,8 @@ struct ngx_file_s {
 
     ngx_log_t                 *log;
 
+    // 利用线程池无阻塞读取文件
+    // in os/unix/ngx_files.c
 #if (NGX_THREADS || NGX_COMPAT)
     ngx_int_t                (*thread_handler)(ngx_thread_task_t *task,
                                                ngx_file_t *file);

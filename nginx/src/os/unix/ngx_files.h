@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// * ngx_rename_file
+// * ngx_create_dir
+// * ngx_thread_read
 
 /*
  * Copyright (C) Igor Sysoev

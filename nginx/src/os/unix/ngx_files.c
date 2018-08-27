@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_thread_file_ctx_t
+// * ngx_thread_read
 
 /*
  * Copyright (C) Igor Sysoev
@@ -77,8 +81,11 @@ ngx_read_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
 
 #if (NGX_THREADS)
 
+// 线程读写文件的结构体
 typedef struct {
     ngx_fd_t       fd;
+
+    // 读写标志位
     ngx_uint_t     write;   /* unsigned  write:1; */
 
     u_char        *buf;
@@ -91,6 +98,7 @@ typedef struct {
 } ngx_thread_file_ctx_t;
 
 
+// 利用线程池无阻塞读取文件
 ssize_t
 ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
     ngx_pool_t *pool)
@@ -104,6 +112,7 @@ ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
 
     task = file->thread_task;
 
+    // 如果没有task则创建
     if (task == NULL) {
         task = ngx_thread_task_alloc(pool, sizeof(ngx_thread_file_ctx_t));
         if (task == NULL) {
@@ -115,28 +124,36 @@ ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
 
     ctx = task->ctx;
 
+    // 任务已经完成
     if (task->event.complete) {
         task->event.complete = 0;
 
+        // 不能是写操作
         if (ctx->write) {
             ngx_log_error(NGX_LOG_ALERT, file->log, 0,
                           "invalid thread call, read instead of write");
             return NGX_ERROR;
         }
 
+        // 出错则失败
         if (ctx->err) {
             ngx_log_error(NGX_LOG_CRIT, file->log, ctx->err,
                           "pread() \"%s\" failed", file->name.data);
             return NGX_ERROR;
         }
 
+        // 成功返回读取的字节数
         return ctx->nbytes;
     }
 
+    // 在线程池里执行的函数
+    // 使用pread，原子定位读取数据
     task->handler = ngx_thread_read_handler;
 
+    // 读写标志位，0即只用来读数据
     ctx->write = 0;
 
+    // 给线程用的文件信息
     ctx->fd = file->fd;
     ctx->buf = buf;
     ctx->size = size;
@@ -152,6 +169,7 @@ ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
 
 #if (NGX_HAVE_PREAD)
 
+// 在线程里运行，使用pread，原子定位读取数据
 static void
 ngx_thread_read_handler(void *data, ngx_log_t *log)
 {
@@ -161,12 +179,16 @@ ngx_thread_read_handler(void *data, ngx_log_t *log)
 
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "thread read handler");
 
+    // 使用pread，原子定位读取数据
     n = pread(ctx->fd, ctx->buf, ctx->size, ctx->offset);
 
+    // -1读取出错
     if (n == -1) {
         ctx->err = ngx_errno;
 
     } else {
+        // 成功读取了n个字节
+        // 结果存在ctx里供外部处理
         ctx->nbytes = n;
         ctx->err = 0;
     }
