@@ -33,8 +33,14 @@ typedef struct ngx_connection_s      ngx_connection_t;  // ngx_connection.h
 // 一个task队列，一个done队列，使用条件变量等待task
 typedef struct ngx_thread_task_s     ngx_thread_task_t;
 
+// ssl相关数据结构
 typedef struct ngx_ssl_s             ngx_ssl_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
+
+// 1.15.0新增的管理udp会话数据结构
+// in event/ngx_event_udp.c
+// 作为ngx_connection_t的一个成员
+// 串进红黑树，缓冲区里是客户端发送的数据
 typedef struct ngx_udp_connection_s  ngx_udp_connection_t;
 
 // 事件发生时调用的函数
@@ -69,6 +75,8 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_shmem.h>
 #include <ngx_process.h>
 #include <ngx_user.h>
+
+// 加载动态库
 #include <ngx_dlopen.h>
 
 #include <ngx_parse.h>
