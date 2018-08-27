@@ -43,6 +43,7 @@
 
 
 // 内存池销毁时调用的清理函数
+// 相当于析构函数，必要的清理动作
 typedef void (*ngx_pool_cleanup_pt)(void *data);
 
 typedef struct ngx_pool_cleanup_s  ngx_pool_cleanup_t;
@@ -76,10 +77,12 @@ struct ngx_pool_large_s {
 // 64位系统大小为32字节
 typedef struct {
     // 可用内存的起始位置
+    // last的意思是分配内存后的最后位置
     // 小块内存每次都从这里分配
     u_char               *last;
 
     // 可用内存的结束位置
+    // 即此内存块的末地址
     u_char               *end;
 
     // 下一个内存池节点
