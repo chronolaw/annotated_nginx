@@ -13,6 +13,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+// 如果编译时指定宏NGX_DEBUG_PALLOC
+// 则不会启用内存池机制，都使用malloc分配内存
+// 方便使用valgrind等来检测内存问题
 
 // 在本内存池内分配小块内存
 // 不超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
