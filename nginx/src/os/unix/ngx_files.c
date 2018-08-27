@@ -159,6 +159,8 @@ ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
     ctx->size = size;
     ctx->offset = offset;
 
+    // 投递到线程池里执行
+    // 任务完成后回调event里的handler
     if (file->thread_handler(task, file) != NGX_OK) {
         return NGX_ERROR;
     }
