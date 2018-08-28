@@ -120,6 +120,7 @@ struct ngx_event_s {
     unsigned         channel:1;
     unsigned         resolver:1;
 
+    // 在进程退出时定时器是否可以忽略
     unsigned         cancelable:1;
 
 #if (NGX_HAVE_KQUEUE)
