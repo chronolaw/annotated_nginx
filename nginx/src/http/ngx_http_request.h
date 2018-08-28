@@ -83,9 +83,16 @@
 
 
 /* unused                                  1 */
+
+// 子请求的输出不会发送到客户端，而是在内存中处理
 #define NGX_HTTP_SUBREQUEST_IN_MEMORY      2
+
+// 此标记仅用于ssi filter
 #define NGX_HTTP_SUBREQUEST_WAITED         4
+
+// 子请求是父请求的完全克隆
 #define NGX_HTTP_SUBREQUEST_CLONE          8
+
 #define NGX_HTTP_SUBREQUEST_BACKGROUND     16
 
 #define NGX_HTTP_LOG_UNSAFE                1
@@ -446,9 +453,6 @@ struct ngx_http_cleanup_s {
 
 typedef ngx_int_t (*ngx_http_post_subrequest_pt)(ngx_http_request_t *r,
     void *data, ngx_int_t rc);
-
-// 子请求相关的功能代码不建议仔细研究
-// 可能Nginx今后会逐渐废弃子请求
 
 // 子请求完成后的处理函数，相当于闭包/lambda
 // 见ngx_http_core_module.c:ngx_http_subrequest
