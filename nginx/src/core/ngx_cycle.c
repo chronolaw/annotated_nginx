@@ -1044,6 +1044,7 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
     sp = (ngx_slab_pool_t *) zn->shm.addr;
 
     // 已存在就复用
+    // 依据nginx官方文档，shm.exists字段仅用于windows
     if (zn->shm.exists) {
 
         if (sp == sp->addr) {

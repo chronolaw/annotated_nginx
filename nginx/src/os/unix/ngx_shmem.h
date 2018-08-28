@@ -29,6 +29,7 @@ typedef struct {
     ngx_log_t   *log;
 
     // 是否存在，即已经创建过了
+    // 依据nginx官方文档，此字段仅用于windows
     ngx_uint_t   exists;   /* unsigned  exists:1;  */
 } ngx_shm_t;
 
