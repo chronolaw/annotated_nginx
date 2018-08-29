@@ -331,6 +331,11 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
     }
 #endif
 
+#ifdef TLS1_3_VERSION
+    SSL_CTX_set_min_proto_version(ssl->ctx, 0);
+    SSL_CTX_set_max_proto_version(ssl->ctx, TLS1_3_VERSION);
+#endif
+
 #ifdef SSL_OP_NO_COMPRESSION
     SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_COMPRESSION);
 #endif
@@ -1157,6 +1162,29 @@ ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name)
     EC_KEY_free(ecdh);
 #endif
 #endif
+#endif
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_early_data(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_uint_t enable)
+{
+    if (!enable) {
+        return NGX_OK;
+    }
+
+#ifdef SSL_ERROR_EARLY_DATA_REJECTED
+
+    /* BoringSSL */
+
+    SSL_CTX_set_early_data_enabled(ssl->ctx, 1);
+
+#else
+    ngx_log_error(NGX_LOG_WARN, ssl->log, 0,
+                  "\"ssl_early_data\" is not supported on this platform, "
+                  "ignored");
 #endif
 
     return NGX_OK;
@@ -3613,6 +3641,21 @@ ngx_ssl_get_session_reused(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     } else {
         ngx_str_set(s, ".");
     }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_early_data(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    s->len = 0;
+
+#ifdef SSL_ERROR_EARLY_DATA_REJECTED
+    if (SSL_in_early_data(c->ssl->connection)) {
+        ngx_str_set(s, "1");
+    }
+#endif
 
     return NGX_OK;
 }

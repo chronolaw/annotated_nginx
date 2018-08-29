@@ -1,4 +1,30 @@
 
+Changes with nginx 1.15.3                                        28 Aug 2018
+
+    *) Feature: now TLSv1.3 can be used with BoringSSL.
+
+    *) Feature: the "ssl_early_data" directive, currently available with
+       BoringSSL.
+
+    *) Feature: the "keepalive_timeout" and "keepalive_requests" directives
+       in the "upstream" block.
+
+    *) Bugfix: the ngx_http_dav_module did not truncate destination file
+       when copying a file over an existing one with the COPY method.
+
+    *) Bugfix: the ngx_http_dav_module used zero access rights on the
+       destination file and did not preserve file modification time when
+       moving a file between different file systems with the MOVE method.
+
+    *) Bugfix: the ngx_http_dav_module used default access rights when
+       copying a file with the COPY method.
+
+    *) Workaround: some clients might not work when using HTTP/2; the bug
+       had appeared in 1.13.5.
+
+    *) Bugfix: nginx could not be built with LibreSSL 2.8.0.
+
+
 Changes with nginx 1.15.2                                        24 Jul 2018
 
     *) Feature: the $ssl_preread_protocol variable in the
