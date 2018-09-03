@@ -89,6 +89,7 @@ typedef struct {
     ngx_hash_t       *hash;
 
     // 散列函数
+    // 通常是ngx_hash_key_lc
     ngx_hash_key_pt   key;
 
     // 散列表里的最大桶数量
