@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_hash_find
+// * ngx_hash_init
 
 /*
  * Copyright (C) Igor Sysoev
@@ -9,6 +13,7 @@
 #include <ngx_core.h>
 
 
+// 使用开放寻址法，不用链表存储key相同的元素
 void *
 ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
 {
@@ -19,17 +24,26 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
     ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "hf:\"%*s\"", len, name);
 #endif
 
+    // 在散列表数组里找存储位置
+    // 直接使用取余的方式
     elt = hash->buckets[key % hash->size];
 
+    // 位置上是空指针，则没有元素
+    // 未找到
     if (elt == NULL) {
         return NULL;
     }
 
+    // 指针非空，有元素，但需要比较key确认存在
     while (elt->value) {
+        // 看key的长度
+        // 长度不对则直接跳到下一个元素
         if (len != (size_t) elt->len) {
             goto next;
         }
 
+        // 逐个字符比较key
+        // 不对则直接跳到下一个元素
         for (i = 0; i < len; i++) {
             if (name[i] != elt->name[i]) {
                 goto next;
@@ -40,6 +54,8 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
 
     next:
 
+        // 使用len，指针对齐跳到下一个元素
+        // 如果元素是空的（while里判断），则未找到
         elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
                                                sizeof(void *));
         continue;
@@ -252,7 +268,7 @@ ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
     (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
 
 // 初始化散列表hinit
-// 输入一个ngx_hash_key_t数组，长度散nelts
+// 输入一个ngx_hash_key_t数组，长度是nelts
 ngx_int_t
 ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 {
@@ -272,6 +288,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
     }
 
     // 遍历names数组
+    // 检查待加入散列表的字符串key长度
     for (n = 0; n < nelts; n++) {
         // 桶的大小必须能够容纳任意一个字符串
         if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))

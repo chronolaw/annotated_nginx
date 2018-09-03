@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_hash_elt_t
+// * ngx_hash_init_t
 
 /*
  * Copyright (C) Igor Sysoev
@@ -20,19 +23,24 @@ typedef struct {
     void             *value;
 
     // name的实际长度
+    // name即散列表元素的key
     u_short           len;
 
+    // 存储key
+    // 在分配内存时会分配适当的大小
     u_char            name[1];
 } ngx_hash_elt_t;
 
 
 // 散列表结构体
+// 使用开放寻址法，不用链表存储key相同的元素
 typedef struct {
     // 散列桶存储位置
     // 二维数组，里面存储的是指针
     ngx_hash_elt_t  **buckets;
 
     // 数组的长度
+    // 即桶的数量
     ngx_uint_t        size;
 } ngx_hash_t;
 
@@ -47,6 +55,7 @@ typedef struct {
 
 
 // 初始化散列表的数组元素
+// 存放的是key、对应的hash和值
 typedef struct {
     ngx_str_t         key;
     ngx_uint_t        key_hash;
