@@ -30,6 +30,11 @@ typedef struct {
     ngx_pool_t  *pool;      //数组使用的内存池
 } ngx_array_t;
 
+// 简单地清空数组
+// #define ngx_array_reset(array) (array)->nelts = 0;
+
+// 判断数组为空
+// #define ngx_array_empty(array) ((array)->nelts == 0)
 
 // 使用内存池创建一个可容纳n个大小为size元素的数组，即分配了一块n*size大小的内存块
 // size参数通常要使用sizeof(T)

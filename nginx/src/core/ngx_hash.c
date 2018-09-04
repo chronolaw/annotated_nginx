@@ -35,6 +35,8 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
     }
 
     // 指针非空，有元素，但需要比较key确认存在
+    // 开放寻址法，最后一个元素只有value字段
+    // 空指针表示查找结束
     while (elt->value) {
         // 看key的长度
         // 长度不对则直接跳到下一个元素
