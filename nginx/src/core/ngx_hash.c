@@ -13,7 +13,9 @@
 #include <ngx_core.h>
 
 
-// 使用开放寻址法，不用链表存储key相同的元素
+// 表面上好像是使用开放寻址法
+// 但实际上是开链法，只是链表表现为紧凑的数组
+// 用链表存储key相同的元素
 void *
 ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
 {
@@ -35,7 +37,7 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
     }
 
     // 指针非空，有元素，但需要比较key确认存在
-    // 开放寻址法，最后一个元素只有value字段
+    // 开链法，最后一个元素只有value字段
     // 空指针表示查找结束
     while (elt->value) {
         // 看key的长度
@@ -52,6 +54,7 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
             }
         }
 
+        // key相同，返回存储的value
         return elt->value;
 
     next:
@@ -305,7 +308,10 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
         }
     }
 
+    // 到这里，hinit->bucket_size能够容纳任意names里的元素
+
     // 分配一些内存
+    // 试算hash用的数组，存储长度u_short
     // 注意，没有使用内存池
     test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
     if (test == NULL) {
@@ -319,6 +325,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 
     // 估算桶的数量
 
+    // (2 * sizeof(void *)是ngx_hash_elt_t的最小长度，即两个指针大小
     start = nelts / (bucket_size / (2 * sizeof(void *)));
     start = start ? start : 1;
 
@@ -371,8 +378,8 @@ found:
     // 得到合适的散列表大小size
 
 
-    // 初始化test数组，计算桶的长度
-    // 首先保留一个指针的大小，即8字节
+    // 初始化test数组，计算每个桶开链数组的长度
+    // 首先保留最后哨兵指针的大小，即8字节
     for (i = 0; i < size; i++) {
         test[i] = sizeof(void *);
     }
@@ -385,31 +392,39 @@ found:
         }
 
         // 取余计算散列表里的位置
+        // 存储在第key个桶里
         key = names[n].key_hash % size;
 
-        // 加上最大长度，保证可以容纳name字符串
+        // 累加key的长度，保证可以容纳name字符串
+        // 如果多个元素都落在key桶里那么所需内存就会增加
+        // 即分配开链数组
         test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
     }
 
-    // 现在test数组里存放的是合适的桶大小
+    // 现在test数组里存放的是合适的桶开链数组大小
 
     // 计算桶数组的总长度
     len = 0;
 
     // 遍历test数组，对齐后累加
     for (i = 0; i < size; i++) {
+        // 只有一个指针，即没有元素落到此桶
+        // 无需分配内存，跳过
         if (test[i] == sizeof(void *)) {
             continue;
         }
 
+        // 计算一下对齐
         test[i] = (u_short) (ngx_align(test[i], ngx_cacheline_size));
 
+        // 累加到len里
         len += test[i];
     }
 
     // 如果散列表是空指针，则从内存池创建
     // 桶数量是size个
     if (hinit->hash == NULL) {
+        // 分配内存，后面有size个桶
         hinit->hash = ngx_pcalloc(hinit->pool, sizeof(ngx_hash_wildcard_t)
                                              + size * sizeof(ngx_hash_elt_t *));
         if (hinit->hash == NULL) {
@@ -417,6 +432,7 @@ found:
             return NGX_ERROR;
         }
 
+        // 桶数组指向正确的位置
         buckets = (ngx_hash_elt_t **)
                       ((u_char *) hinit->hash + sizeof(ngx_hash_wildcard_t));
 
@@ -429,37 +445,52 @@ found:
         }
     }
 
-    // 桶数组分配内存
+    // 开链数组分配内存
     elts = ngx_palloc(hinit->pool, len + ngx_cacheline_size);
     if (elts == NULL) {
         ngx_free(test);
         return NGX_ERROR;
     }
 
+    // 再做一次对齐
     elts = ngx_align_ptr(elts, ngx_cacheline_size);
 
     // 初始化桶指针
     for (i = 0; i < size; i++) {
+        // 只有一个指针，即没有元素落到此桶
+        // 无需操作，跳过
         if (test[i] == sizeof(void *)) {
             continue;
         }
 
+        // 指向开链数组
         buckets[i] = (ngx_hash_elt_t *) elts;
+
+        // 偏移指向下一个位置
         elts += test[i];
     }
 
+    // 现在桶数组已经初始化完毕
+    // 数组里的指针指向开链数组
+
+    // 数组清零，用于后面的偏移计算
     for (i = 0; i < size; i++) {
         test[i] = 0;
     }
 
     // 数组存入散列表
     for (n = 0; n < nelts; n++) {
+        // 无需操作，跳过
         if (names[n].key.data == NULL) {
             continue;
         }
 
         // 计算hash key，简单地取余
         key = names[n].key_hash % size;
+
+        // 落到第key个桶
+        // buckets[key]是开链数组首地址
+        // 加上偏移就是链表的存储位置
         elt = (ngx_hash_elt_t *) ((u_char *) buckets[key] + test[key]);
 
         // 存放value
@@ -471,22 +502,33 @@ found:
         // 小写化key，存放在name里
         ngx_strlow(elt->name, names[n].key.data, names[n].key.len);
 
+        // 计算偏移，是下一个存储的位置
         test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
     }
 
+    // 至此全部names元素都放进了散列表
+
+    // 设置开链的末尾null指针
     for (i = 0; i < size; i++) {
+        // 空桶直接跳过
         if (buckets[i] == NULL) {
             continue;
         }
 
+        // test里存的是链表的最后位置
+        // 前面存放了names的元素
         elt = (ngx_hash_elt_t *) ((u_char *) buckets[i] + test[i]);
 
+        // 指针置null，在find时用作哨兵
         elt->value = NULL;
     }
+
+    // 至此散列表数据全部完成
 
     // 释放临时数组
     ngx_free(test);
 
+    // 设置桶数组和长度
     hinit->hash->buckets = buckets;
     hinit->hash->size = size;
 
