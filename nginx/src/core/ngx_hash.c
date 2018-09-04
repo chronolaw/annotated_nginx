@@ -711,6 +711,7 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
 }
 
 
+// 计算散列值
 ngx_uint_t
 ngx_hash_key(u_char *data, size_t len)
 {
@@ -719,6 +720,8 @@ ngx_hash_key(u_char *data, size_t len)
     key = 0;
 
     for (i = 0; i < len; i++) {
+        // 简单地对单个字符计算散列
+        //#define ngx_hash(key, c)   ((ngx_uint_t) key * 31 + c)
         key = ngx_hash(key, data[i]);
     }
 
@@ -726,6 +729,7 @@ ngx_hash_key(u_char *data, size_t len)
 }
 
 
+// 小写后再计算hash
 ngx_uint_t
 ngx_hash_key_lc(u_char *data, size_t len)
 {
@@ -741,6 +745,7 @@ ngx_hash_key_lc(u_char *data, size_t len)
 }
 
 
+// 小写化的同时计算出散列值
 ngx_uint_t
 ngx_hash_strlow(u_char *dst, u_char *src, size_t n)
 {
