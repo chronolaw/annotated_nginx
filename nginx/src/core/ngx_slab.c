@@ -477,6 +477,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
             // 1表示已经分配，0是空闲
             // 最后左移变成0,退出循环
             // i即第i个小内存块
+            // 可以优化为__builtin_ffs(page->slab) - 1
             for (m = 1, i = 0; m; m <<= 1, i++) {
                 if (page->slab & m) {
                     continue;
