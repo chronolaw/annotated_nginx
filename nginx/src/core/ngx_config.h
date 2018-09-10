@@ -135,6 +135,10 @@ typedef intptr_t        ngx_flag_t;     //相当于bool，标志量用
 #define NGX_INVALID_ARRAY_INDEX 0x80000000
 
 
+// ngx_inline通常需要配合static使用
+// 在nginx unit里的定义是：
+// static inline __attribute__((always_inline))
+
 /* TODO: auto_conf: ngx_inline   inline __inline __inline__ */
 #ifndef ngx_inline
 #define ngx_inline      inline
