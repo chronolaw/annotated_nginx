@@ -1272,7 +1272,7 @@ ngx_test_lockfile(u_char *file, ngx_log_t *log)
 
 
 // 重新打开所有文件, logrotate
-// 收到hup信号时被调用
+// 收到sigusr1信号时被调用
 void
 ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
 {
