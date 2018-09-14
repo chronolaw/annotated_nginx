@@ -14,6 +14,10 @@
 #include <ngx_core.h>
 
 
+// crc32可以用来当作简单的hash函数计算摘要
+// 但速度较慢，推荐使用ngx_murmur_hash2
+// 速度大约是crc32的10倍
+
 extern uint32_t  *ngx_crc32_table_short;
 extern uint32_t   ngx_crc32_table256[];
 
