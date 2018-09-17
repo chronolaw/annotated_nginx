@@ -36,10 +36,16 @@ static void ngx_log_memory_writer(ngx_log_t *log, ngx_uint_t level,
 static void ngx_log_memory_cleanup(void *data);
 
 
+// 写内存日志用的管理对象
 typedef struct {
+    // 内存空间的开始结束位置
     u_char        *start;
     u_char        *end;
+
+    // 当前位置
     u_char        *pos;
+
+    // 原子操作，写入的数量
     ngx_atomic_t   written;
 } ngx_log_memory_buf_t;
 
@@ -734,6 +740,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         value[1].len -= 7;
         value[1].data += 7;
 
+        // 计算需要的内存大小
         needed = sizeof("MEMLOG  :" NGX_LINEFEED)
                  + cf->conf_file->file.name.len
                  + NGX_SIZE_T_LEN
@@ -748,11 +755,13 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
             return NGX_CONF_ERROR;
         }
 
+        // 内存管理对象
         buf = ngx_pcalloc(cf->pool, sizeof(ngx_log_memory_buf_t));
         if (buf == NULL) {
             return NGX_CONF_ERROR;
         }
 
+        // 分配内存
         buf->start = ngx_pnalloc(cf->pool, size);
         if (buf->start == NULL) {
             return NGX_CONF_ERROR;
@@ -760,12 +769,15 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
         buf->end = buf->start + size;
 
+        // 打印开头的字符串
         buf->pos = ngx_slprintf(buf->start, buf->end, "MEMLOG %uz %V:%ui%N",
                                 size, &cf->conf_file->file.name,
                                 cf->conf_file->line);
 
+        // 后续全是空格，不是0
         ngx_memset(buf->pos, ' ', buf->end - buf->pos);
 
+        // 清理函数
         cln = ngx_pool_cleanup_add(cf->pool, 0);
         if (cln == NULL) {
             return NGX_CONF_ERROR;
@@ -774,6 +786,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         cln->data = new_log;
         cln->handler = ngx_log_memory_cleanup;
 
+        // 专门的内存写入函数
         new_log->writer = ngx_log_memory_writer;
         new_log->wdata = buf;
 
@@ -799,6 +812,8 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
     // 写入到文件
     } else {
+        // 加入到cycle->open_files链表里
+        // 没有打开文件，之后在init_cycle里统一打开
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
         if (new_log->file == NULL) {
             return NGX_CONF_ERROR;
@@ -881,8 +896,10 @@ ngx_log_memory_writer(ngx_log_t *log, ngx_uint_t level, u_char *buf,
         return;
     }
 
+    // 原子增加写入数量
     written = ngx_atomic_fetch_add(&mem->written, len);
 
+    // 写入的末尾位置
     p = mem->pos + written % (mem->end - mem->pos);
 
     avail = mem->end - p;
