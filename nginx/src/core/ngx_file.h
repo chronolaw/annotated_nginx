@@ -15,9 +15,17 @@
 #include <ngx_core.h>
 
 
+// 管理文件
 struct ngx_file_s {
+    // 文件描述符
     ngx_fd_t                   fd;
+
+    // 文件名
     ngx_str_t                  name;
+
+    // 文件相关的信息
+    // typedef struct stat              ngx_file_info_t;
+    // 通常使用ngx_fd_info获取
     ngx_file_info_t            info;
 
     off_t                      offset;

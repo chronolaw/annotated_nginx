@@ -466,6 +466,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
         // 因为使用了APPEND，所以多进程写文件是安全的
         // 没有调用ngx_conf_open_file
+        // 是真正的打开文件，返回文件描述符
         file[i].fd = ngx_open_file(file[i].name.data,
                                    NGX_FILE_APPEND,
                                    NGX_FILE_CREATE_OR_OPEN,
@@ -1285,6 +1286,7 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
     ngx_open_file_t  *file;
 
     // 遍历文件链表
+    // 里面存放的是日志文件
     part = &cycle->open_files.part;
     file = part->elts;
 
