@@ -87,6 +87,7 @@ struct ngx_log_s {
     ngx_atomic_uint_t    connection;
 
     // 记录写日志磁盘满错误发生的时间
+    // 避免反复写磁盘导致的阻塞
     time_t               disk_full_time;
 
     // 记录错误日志时可以执行的回调函数
