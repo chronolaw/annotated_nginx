@@ -147,7 +147,8 @@ struct ngx_cycle_s {
     ngx_rbtree_t              config_dump_rbtree;
     ngx_rbtree_node_t         config_dump_sentinel;
 
-    // 打开的文件
+    // 打开的文件，主要是日志
+    // 存储ngx_open_file_t
     ngx_list_t                open_files;
 
     // 共享内存

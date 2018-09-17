@@ -986,6 +986,7 @@ ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 }
 
 
+// 打开文件，并加入到cycle->open_files链表里
 ngx_open_file_t *
 ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
 {

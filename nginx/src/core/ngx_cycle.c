@@ -445,6 +445,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* open the new files */
 
+    // 遍历文件列表，日志文件
     part = &cycle->open_files.part;
     file = part->elts;
 
@@ -464,6 +465,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
 
         // 因为使用了APPEND，所以多进程写文件是安全的
+        // 没有调用ngx_conf_open_file
         file[i].fd = ngx_open_file(file[i].name.data,
                                    NGX_FILE_APPEND,
                                    NGX_FILE_CREATE_OR_OPEN,
@@ -480,6 +482,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             goto failed;
         }
 
+        // unix里设置close on exec，fork后自动关闭描述符
 #if !(NGX_WIN32)
         if (fcntl(file[i].fd, F_SETFD, FD_CLOEXEC) == -1) {
             ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
