@@ -2,6 +2,7 @@
 //
 // * ngx_spawn_process
 // * ngx_signal_handler
+// * ngx_init_signals
 
 /*
  * Copyright (C) Igor Sysoev
@@ -366,6 +367,8 @@ ngx_init_signals(ngx_log_t *log)
     for (sig = signals; sig->signo != 0; sig++) {
         ngx_memzero(&sa, sizeof(struct sigaction));
 
+        // 设置信号处理函数
+        // 大多是ngx_signal_handler
         if (sig->handler) {
             sa.sa_sigaction = sig->handler;
             sa.sa_flags = SA_SIGINFO;
@@ -375,6 +378,8 @@ ngx_init_signals(ngx_log_t *log)
         }
 
         sigemptyset(&sa.sa_mask);
+
+        // 安装信号处理函数
         if (sigaction(sig->signo, &sa, NULL) == -1) {
 #if (NGX_VALGRIND)
             ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,

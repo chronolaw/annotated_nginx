@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// * ngx_create_full_path
 
 /*
  * Copyright (C) Igor Sysoev
@@ -300,6 +303,7 @@ ngx_create_path(ngx_file_t *file, ngx_path_t *path)
 }
 
 
+// 从根目录开始创建目录
 ngx_err_t
 ngx_create_full_path(u_char *dir, ngx_uint_t access)
 {
@@ -314,6 +318,7 @@ ngx_create_full_path(u_char *dir, ngx_uint_t access)
     p = dir + 1;
 #endif
 
+    // 使用'/'查找目录字符串
     for ( /* void */ ; *p; p++) {
         ch = *p;
 
@@ -321,8 +326,11 @@ ngx_create_full_path(u_char *dir, ngx_uint_t access)
             continue;
         }
 
+        // 找到目录名，末尾置0
+
         *p = '\0';
 
+        // 调用系统函数创建目录
         if (ngx_create_dir(dir, access) == NGX_FILE_ERROR) {
             err = ngx_errno;
 
@@ -337,6 +345,7 @@ ngx_create_full_path(u_char *dir, ngx_uint_t access)
             }
         }
 
+        // 恢复字符串里的'/'
         *p = '/';
     }
 
