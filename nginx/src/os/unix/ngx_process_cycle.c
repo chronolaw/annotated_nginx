@@ -5,6 +5,7 @@
 // * ngx_worker_process_cycle
 // * ngx_signal_worker_processes
 // * ngx_worker_process_init
+// * ngx_reap_children
 
 /*
  * Copyright (C) Igor Sysoev
@@ -809,6 +810,9 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // 不重启进程，其他处理
+
+            // 检查是不是new_binary进程
             if (ngx_processes[i].pid == ngx_new_binary) {
 
                 ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
@@ -831,13 +835,18 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 }
             }
 
+            // 其他情况，进程数量减少
+
+            // 最后一个，末尾计数器减少
             if (i == ngx_last_process - 1) {
                 ngx_last_process--;
 
             } else {
+                // 中间的某个进程，置为无效pid
                 ngx_processes[i].pid = -1;
             }
 
+        // 非exited，正在退出状态
         } else if (ngx_processes[i].exiting || !ngx_processes[i].detached) {
             live = 1;
         }
