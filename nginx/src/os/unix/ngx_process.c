@@ -3,6 +3,7 @@
 // * ngx_spawn_process
 // * ngx_signal_handler
 // * ngx_init_signals
+// * ngx_process_get_status
 
 /*
  * Copyright (C) Igor Sysoev
@@ -664,6 +665,8 @@ ngx_process_get_status(void)
         }
 
         // 获取子进程的非正常返回值
+        // 如果worker进程使用exit(2)，那么不重启子进程
+        // 在master cycle里的ngx_reap里判断
         if (WEXITSTATUS(status) == 2 && ngx_processes[i].respawn) {
             ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
                           "%s %P exited with fatal code %d "

@@ -746,6 +746,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
         if (ngx_processes[i].exited) {
 
             if (!ngx_processes[i].detached) {
+                // 清理进程相关的channel信息
                 ngx_close_channel(ngx_processes[i].channel, cycle->log);
 
                 ngx_processes[i].channel[0] = -1;
@@ -773,8 +774,12 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 }
             }
 
+            // 检查respawn，如果是异常结束则不重启子进程
             if (ngx_processes[i].respawn
+                // 已经发送信号正在退出，不能重启
                 && !ngx_processes[i].exiting
+
+                // master进程也不能是退出状态
                 && !ngx_terminate
                 && !ngx_quit)
             {
