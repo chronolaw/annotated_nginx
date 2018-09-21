@@ -670,6 +670,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
             continue;
         }
 
+        // 通常是使用channel发送信号
         if (ch.command) {
             if (ngx_write_channel(ngx_processes[i].channel[0],
                                   &ch, sizeof(ngx_channel_t), cycle->log)
