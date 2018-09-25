@@ -67,7 +67,8 @@ ngx_socket_t     ngx_channel;
 ngx_int_t        ngx_last_process;
 
 // 创建的进程都在ngx_processes数组里
-// 此数组仅在master进程里使用，worker进程不使用
+// 此数组主要在master进程里使用
+// worker进程也用来维护其他worker进程的状态信息
 ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 // 命令行-s参数关联数组
