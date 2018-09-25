@@ -71,6 +71,8 @@ typedef struct {
 #define NGX_PROCESS_RESPAWN       -3
 #define NGX_PROCESS_JUST_RESPAWN  -4
 
+// 用于执行外部程序
+// 不与worker发生关系，没有channel通信
 #define NGX_PROCESS_DETACHED      -5
 
 

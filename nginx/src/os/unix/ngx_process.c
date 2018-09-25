@@ -337,6 +337,7 @@ ngx_pid_t
 ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
 {
     // 产生进程执行ngx_execute_proc
+    // 不与worker发生关系，没有channel通信
     return ngx_spawn_process(cycle, ngx_execute_proc, ctx, ctx->name,
                              NGX_PROCESS_DETACHED);
 }
