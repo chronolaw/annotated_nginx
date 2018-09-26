@@ -99,6 +99,10 @@ static ngx_log_t        ngx_log;
 // 仅在配置阶段使用
 static ngx_open_file_t  ngx_log_file;
 
+// 日志输出到标准错误流
+// #define ngx_stderr               STDERR_FILENO
+// 默认不使用标准流记录日志
+// 在nginx.c里置0
 ngx_uint_t              ngx_use_stderr = 1;
 
 
@@ -218,6 +222,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     // 加上一个换行符
     ngx_linefeed(p);
 
+    // 默认不输出到标准流
     wrote_stderr = 0;
 
     // 是否要针对某些连接打印调试日志
@@ -265,6 +270,8 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
             log->disk_full_time = ngx_time();
         }
 
+        // 检查文件描述符，是标准流
+        // 则置标志位
         if (log->file->fd == ngx_stderr) {
             wrote_stderr = 1;
         }
@@ -275,6 +282,8 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
         log = log->next;
     }
 
+    // 默认不使用标准流记录日志
+    // 在nginx.c里置0
     if (!ngx_use_stderr
         || level > NGX_LOG_WARN
         || wrote_stderr)
@@ -282,10 +291,14 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
         return;
     }
 
+    // 前面输出的是基本的信息：当前时间+[错误级别]+pid#tid:
+    // 调整字符串指针
     msg -= (7 + err_levels[level].len + 3);
 
+    // 重新打印日志级别
     (void) ngx_sprintf(msg, "nginx: [%V] ", &err_levels[level]);
 
+    // 输出到标准流
     (void) ngx_write_console(ngx_stderr, msg, p - msg);
 }
 

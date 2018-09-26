@@ -543,6 +543,8 @@ main(int argc, char *const *argv)
         }
     }
 
+    // 默认不使用标准流记录日志
+    // 在ngx_log.c里
     ngx_use_stderr = 0;
 
     // 启动单进程或者master/worker多进程，内部会调用fork
