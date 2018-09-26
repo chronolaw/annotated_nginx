@@ -1302,7 +1302,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             // again会继续读取，error则结束请求
             // again说明客户端发送的数据不足
             if (n == NGX_AGAIN || n == NGX_ERROR) {
-                return;
+                break;
             }
         }
 
@@ -1337,7 +1337,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
 
             if (ngx_http_process_request_uri(r) != NGX_OK) {
-                return;
+                break;
             }
 
             // 1.15.1 新增r->schema
@@ -1360,17 +1360,17 @@ ngx_http_process_request_line(ngx_event_t *rev)
                     ngx_log_error(NGX_LOG_INFO, c->log, 0,
                                   "client sent invalid host in request line");
                     ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-                    return;
+                    break;
                 }
 
                 if (rc == NGX_ERROR) {
                     ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                    return;
+                    break;
                 }
 
                 // 定位server{}块位置
                 if (ngx_http_set_virtual_server(r, &host) == NGX_ERROR) {
-                    return;
+                    break;
                 }
 
                 // 设置请求头结构体里的server成员
@@ -1383,11 +1383,11 @@ ngx_http_process_request_line(ngx_event_t *rev)
                     && ngx_http_set_virtual_server(r, &r->headers_in.server)
                        == NGX_ERROR)
                 {
-                    return;
+                    break;
                 }
 
                 ngx_http_process_request(r);
-                return;
+                break;
             }
 
 
@@ -1397,7 +1397,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 != NGX_OK)
             {
                 ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                return;
+                break;
             }
 
             c->log->action = "reading client request headers";
@@ -1409,7 +1409,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             // 立即调用ngx_http_process_request_headers，解析请求头
             ngx_http_process_request_headers(rev);
 
-            return;
+            break;
         }
 
         // 不是again则有错误
@@ -1427,7 +1427,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
             }
 
-            return;
+            break;
         }
 
         /* NGX_AGAIN: a request line parsing is still incomplete */
@@ -1443,7 +1443,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             if (rv == NGX_ERROR) {
                 ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                return;
+                break;
             }
 
             if (rv == NGX_DECLINED) {
@@ -1453,7 +1453,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client sent too long URI");
                 ngx_http_finalize_request(r, NGX_HTTP_REQUEST_URI_TOO_LARGE);
-                return;
+                break;
             }
             // 此时缓冲区已经足够大了
         }
@@ -1461,6 +1461,8 @@ ngx_http_process_request_line(ngx_event_t *rev)
         // 缓冲区没有满，那么大小是足够的，那么就再次尝试接收数据
         // 再次进入for循环，这时recv可能返回again，那么就等待下一次读事件即有数据可读
     }
+
+    ngx_http_run_posted_requests(c);
 }
 
 
@@ -1637,7 +1639,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
                 if (rv == NGX_ERROR) {
                     ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                    return;
+                    break;
                 }
 
                 if (rv == NGX_DECLINED) {
@@ -1650,7 +1652,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                                       "client sent too large request");
                         ngx_http_finalize_request(r,
                                             NGX_HTTP_REQUEST_HEADER_TOO_LARGE);
-                        return;
+                        break;
                     }
 
                     len = r->header_in->end - p;
@@ -1665,7 +1667,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
                     ngx_http_finalize_request(r,
                                             NGX_HTTP_REQUEST_HEADER_TOO_LARGE);
-                    return;
+                    break;
                 }
 
                 // 此时缓冲区已经足够大了
@@ -1680,7 +1682,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             // again会继续读取，error则结束请求
             // again说明客户端发送的数据不足
             if (n == NGX_AGAIN || n == NGX_ERROR) {
-                return;
+                break;
             }
         }
 
@@ -1714,7 +1716,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             h = ngx_list_push(&r->headers_in.headers);
             if (h == NULL) {
                 ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                return;
+                break;
             }
 
             h->hash = r->header_hash;
@@ -1730,7 +1732,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             h->lowcase_key = ngx_pnalloc(r->pool, h->key.len);
             if (h->lowcase_key == NULL) {
                 ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                return;
+                break;
             }
 
             if (h->key.len == r->lowcase_index) {
@@ -1744,7 +1746,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                                h->lowcase_key, h->key.len);
 
             if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
-                return;
+                break;
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -1777,7 +1779,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             rc = ngx_http_process_request_header(r);
 
             if (rc != NGX_OK) {
-                return;
+                break;
             }
 
             // 此时已经读取了完整的http请求头，可以开始处理请求了
@@ -1789,7 +1791,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             // 如果有子请求，那么都要处理
             ngx_http_process_request(r);
 
-            return;
+            break;
         }
 
         // agian，请求行数据不完整
@@ -1809,8 +1811,10 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                       "client sent invalid header line");
 
         ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-        return;
+        break;
     }
+
+    ngx_http_run_posted_requests(c);
 }
 
 
@@ -2428,7 +2432,8 @@ ngx_http_process_request(ngx_http_request_t *r)
     // r->main->posted_requests
     // 调用请求里的write_event_handler
     // 通常就是ngx_http_core_run_phases引擎数组处理请求
-    ngx_http_run_posted_requests(c);
+    // 1.15.4将此行删除
+    //ngx_http_run_posted_requests(c);
 }
 
 
@@ -4130,6 +4135,10 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
         n = c->recv(c, buffer, NGX_HTTP_LINGERING_BUFFER_SIZE);
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "lingering read: %z", n);
+
+        if (n == NGX_AGAIN) {
+            break;
+        }
 
         if (n == NGX_ERROR || n == 0) {
             ngx_http_close_request(r, 0);

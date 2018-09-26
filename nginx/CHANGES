@@ -1,4 +1,33 @@
 
+Changes with nginx 1.15.4                                        25 Sep 2018
+
+    *) Feature: now the "ssl_early_data" directive can be used with OpenSSL.
+
+    *) Bugfix: in the ngx_http_uwsgi_module.
+       Thanks to Chris Caputo.
+
+    *) Bugfix: connections with some gRPC backends might not be cached when
+       using the "keepalive" directive.
+
+    *) Bugfix: a socket leak might occur when using the "error_page"
+       directive to redirect early request processing errors, notably errors
+       with code 400.
+
+    *) Bugfix: the "return" directive did not change the response code when
+       returning errors if the request was redirected by the "error_page"
+       directive.
+
+    *) Bugfix: standard error pages and responses of the
+       ngx_http_autoindex_module module used the "bgcolor" attribute, and
+       might be displayed incorrectly when using custom color settings in
+       browsers.
+       Thanks to Nova DasSarma.
+
+    *) Change: the logging level of the "no suitable key share" and "no
+       suitable signature algorithm" SSL errors has been lowered from "crit"
+       to "info".
+
+
 Changes with nginx 1.15.3                                        28 Aug 2018
 
     *) Feature: now TLSv1.3 can be used with BoringSSL.
