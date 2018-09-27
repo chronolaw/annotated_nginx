@@ -5,6 +5,7 @@
 // * ngx_sprintf
 // * ngx_atoi
 // * ngx_cpystrn
+// * ngx_rstrncmp
 
 /*
  * Copyright (C) Igor Sysoev
@@ -199,16 +200,25 @@ u_char *ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args);
 ngx_int_t ngx_strcasecmp(u_char *s1, u_char *s2);
 ngx_int_t ngx_strncasecmp(u_char *s1, u_char *s2, size_t n);
 
+// 在len长度里查找子串，类似strstr
 u_char *ngx_strnstr(u_char *s1, char *s2, size_t n);
 
+// 已知s2的长度查找子串，n必须是strlen(s2)-1
 u_char *ngx_strstrn(u_char *s1, char *s2, size_t n);
 u_char *ngx_strcasestrn(u_char *s1, char *s2, size_t n);
 u_char *ngx_strlcasestrn(u_char *s1, u_char *last, u_char *s2, size_t n);
 
+// 反向比较字符串，有的时候很有用
 ngx_int_t ngx_rstrncmp(u_char *s1, u_char *s2, size_t n);
 ngx_int_t ngx_rstrncasecmp(u_char *s1, u_char *s2, size_t n);
+
+// 已知长度内存比较
 ngx_int_t ngx_memn2cmp(u_char *s1, u_char *s2, size_t n1, size_t n2);
+
+// 比较dns字符串，对-.做特殊处理
 ngx_int_t ngx_dns_strcmp(u_char *s1, u_char *s2);
+
+// 比较文件名字符串，对/做特殊处理
 ngx_int_t ngx_filename_cmp(u_char *s1, u_char *s2, size_t n);
 
 // 字符串转换为数字
