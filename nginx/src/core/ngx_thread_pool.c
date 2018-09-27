@@ -5,6 +5,7 @@
 // * ngx_thread_task_post
 // * ngx_thread_pool_cycle
 // * ngx_thread_pool_handler
+// * ngx_thread_pool_init
 
 /*
  * Copyright (C) Nginx, Inc.
