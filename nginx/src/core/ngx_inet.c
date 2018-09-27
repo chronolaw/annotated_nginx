@@ -6,6 +6,7 @@
 // * ngx_parse_addr
 // * ngx_inet_get_port
 // * ngx_inet_set_port
+// * ngx_parse_url
 
 /*
  * Copyright (C) Igor Sysoev

@@ -3,6 +3,8 @@
 // * ngx_event_accept
 // * ngx_event_recvmsg
 // * ngx_trylock_accept_mutex
+// * ngx_enable_accept_events
+// * ngx_disable_accept_events
 
 /*
  * Copyright (C) Igor Sysoev
