@@ -1191,12 +1191,15 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_UNIX_DOMAIN)
 
+        // 对于domain socket需要删除文件
         if (ls[i].sockaddr->sa_family == AF_UNIX
             && ngx_process <= NGX_PROCESS_MASTER
             && ngx_new_binary == 0)
         {
+            // 去掉前面的unix:前缀
             u_char *name = ls[i].addr_text.data + sizeof("unix:") - 1;
 
+            // 删除文件
             if (ngx_delete_file(name) == NGX_FILE_ERROR) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
                               ngx_delete_file_n " %s failed", name);
