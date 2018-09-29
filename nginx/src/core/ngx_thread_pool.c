@@ -41,6 +41,7 @@ typedef struct {
 
 
 // 描述一个线程池，与thread_pool指令对应
+// 此结构体的实际定义在c文件里，外部不可见，深度定制则不方便
 // 存储在ngx_thread_pool_conf_t里的数组里
 // 核心成员是queue，存储待处理任务
 struct ngx_thread_pool_s {
@@ -60,6 +61,7 @@ struct ngx_thread_pool_s {
     // 条件变量,用于等待任务队列queue
     ngx_thread_cond_t         cond;
 
+    // 日志对象，多线程操作也是安全的
     ngx_log_t                *log;
 
     // 线程池的名字

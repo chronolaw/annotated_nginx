@@ -74,6 +74,7 @@ struct ngx_thread_task_s {
 
 
 // 线程池结构体
+// 此结构体的实际定义在c文件里，外部不可见，深度定制则不方便
 // 线程的数量默认为32个线程
 // 任务等待队列默认是65535
 typedef struct ngx_thread_pool_s  ngx_thread_pool_t;
