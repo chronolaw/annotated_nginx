@@ -30,6 +30,7 @@ static ngx_inline void *ngx_palloc_small(ngx_pool_t *pool, size_t size,
 static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 
 // 分配大块内存(>4k),直接调用malloc
+// 挂到大块链表里方便后续的回收
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
@@ -310,6 +311,7 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
 
 // 分配大块内存(>4k),直接调用malloc
+// 挂到大块链表里方便后续的回收
 // 所以可以用jemalloc来优化
 static void *
 ngx_palloc_large(ngx_pool_t *pool, size_t size)
@@ -335,6 +337,7 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
         }
 
         // 只找三次，避免低效查找
+        // 3是一个“经验”数据
         if (n++ > 3) {
             break;
         }
@@ -401,6 +404,8 @@ ngx_pfree(ngx_pool_t *pool, void *p)
             ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
                            "free: %p", l->alloc);
             ngx_free(l->alloc);
+
+            // 指针置为空，之后可以复用节点
             l->alloc = NULL;
 
             return NGX_OK;
