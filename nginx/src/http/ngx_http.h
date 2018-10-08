@@ -1,4 +1,9 @@
 // annotated by chrono since 2016
+//
+// * ngx_http_get_module_ctx
+// * ngx_http_set_ctx
+// * ngx_http_top_header_filter
+// * ngx_http_top_body_filter
 
 /*
  * Copyright (C) Igor Sysoev
