@@ -420,7 +420,11 @@ struct ngx_http_core_loc_conf_s {
     // named location，也就是@开头的location
     unsigned      named:1;
 
+    // location精确匹配配置文件里的uri
+    // 即使用'='前缀
     unsigned      exact_match:1;
+
+    // ^~ 不使用正则，前缀匹配
     unsigned      noregex:1;
 
     unsigned      auto_redirect:1;

@@ -3596,6 +3596,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     if (cf->args->nelts == 3) {
         // 这里是标识符与名字分离
         // 例如 = root {}
+        // value[1]必须是一个匹配标志符
 
         len = value[1].len;
         mod = value[1].data;
@@ -3654,6 +3655,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             clcf->name.data = name->data + 2;
             clcf->noregex = 1;
 
+        // 使用'~'或'~*'
         } else if (name->data[0] == '~') {
 
             name->len--;
@@ -3678,6 +3680,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
         } else {
             // 没有标识符
+            // 默认是前缀匹配
 
             clcf->name = *name;
 
