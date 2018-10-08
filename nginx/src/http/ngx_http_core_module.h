@@ -176,12 +176,15 @@ typedef enum {
     NGX_HTTP_LOG_PHASE
 } ngx_http_phases;
 
+// 存储handler/checker，里面用next实现阶段的快速跳转
 typedef struct ngx_http_phase_handler_s  ngx_http_phase_handler_t;
 
+// 阶段的checker函数
 typedef ngx_int_t (*ngx_http_phase_handler_pt)(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph);
 
 // 存储handler/checker，里面用next实现阶段的快速跳转
+// 是ngx_http_phase_engine_t.handlers里的元素
 struct ngx_http_phase_handler_s {
 
     // 阶段的checker函数
@@ -215,6 +218,7 @@ typedef struct {
 } ngx_http_phase_t;
 
 
+// ngx_http_core_main_conf_t
 // 重要结构体，存储server、监听端口、变量等信息
 typedef struct {
     // 存储http{}里定义的所有server，元素是ngx_http_core_srv_conf_t
@@ -257,6 +261,7 @@ typedef struct {
 } ngx_http_core_main_conf_t;
 
 
+// ngx_http_core_srv_conf_t
 typedef struct {
     // 在ngx_http_core_server_name()里存储ngx_http_server_name_t
     /* array of the ngx_http_server_name_t, "server_name" directive */
@@ -288,6 +293,7 @@ typedef struct {
     unsigned                    captures:1;
 #endif
 
+    // 本server内的location
     ngx_http_core_loc_conf_t  **named_locations;
 } ngx_http_core_srv_conf_t;
 
@@ -604,6 +610,8 @@ struct ngx_http_location_tree_node_s {
 };
 
 
+// 启动引擎数组处理请求
+// 从phase_handler的位置开始调用模块处理
 void ngx_http_core_run_phases(ngx_http_request_t *r);
 
 // 各个阶段使用的checker
