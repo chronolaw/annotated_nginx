@@ -9,12 +9,12 @@
 #ifndef _NGINX_H_INCLUDED_
 #define _NGINX_H_INCLUDED_
 
-
 // version number format
-// 1'015'004
+// 1'015'005
 
-#define nginx_version      1015004
-#define NGINX_VERSION      "1.15.4"
+
+#define nginx_version      1015005
+#define NGINX_VERSION      "1.15.5"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 // nginx 1.7之后添加--build=Name选项
