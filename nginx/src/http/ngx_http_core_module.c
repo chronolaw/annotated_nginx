@@ -1329,6 +1329,7 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     ngx_http_core_loc_conf_t  *clcf;
 
     // 子请求不做访问控制，直接跳过本阶段
+    // 因为这是内部的请求，不需要访问控制
     // 注意不是++，而是next
     if (r != r->main) {
         r->phase_handler = ph->next;
@@ -2974,6 +2975,9 @@ ngx_http_subrequest(ngx_http_request_t *r,
         sr->filter_need_in_memory = 1;
     }
 
+    // 不是在后台，就加入主请求的延后处理队列
+    // 需要完成后由主请求处理
+    // 后台子请求不关心处理结果
     if (!sr->background) {
         if (c->data == r && r->postponed == NULL) {
             c->data = sr;
@@ -3041,6 +3045,7 @@ ngx_http_subrequest(ngx_http_request_t *r,
 }
 
 
+// 内部重定向
 ngx_int_t
 ngx_http_internal_redirect(ngx_http_request_t *r,
     ngx_str_t *uri, ngx_str_t *args)
