@@ -393,7 +393,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     // 初始化http处理引擎的阶段数组，调用ngx_array_init
-    // 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
+    // 虽然总共有11个阶段，但只初始化了8个数组，只能在这些里加handler
     // cmcf只有唯一的一个
     if (ngx_http_init_phases(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -463,7 +463,7 @@ failed:
 
 
 // 初始化http处理引擎的阶段数组，调用ngx_array_init
-// 虽然总共有11个阶段，但只初始化了7个数组，只能在这些里加handler
+// 虽然总共有11个阶段，但只初始化了8个数组，只能在这些里加handler
 static ngx_int_t
 ngx_http_init_phases(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
 {
