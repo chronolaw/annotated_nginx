@@ -474,6 +474,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev = c->read;
 
     // 处理读事件，读取请求头
+    // 设置了读事件的handler，可读时就会调用ngx_http_wait_request_handler
     rev->handler = ngx_http_wait_request_handler;
 
     // 暂时不处理写事件
@@ -508,6 +509,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     }
 #endif
 
+    // listen指令配置了代理协议，需要额外处理
     if (hc->addr_conf->proxy_protocol) {
         hc->proxy_protocol = 1;
         c->log->action = "reading PROXY protocol";
@@ -572,7 +574,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
     // 首先检查超时
     // 由定时器超时引发的，由ngx_event_expire_timers调用
-    // 超时没有发送数据，关闭连接
+    // 超时客户端没有发送数据，关闭连接
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
 
@@ -696,7 +698,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         hc->proxy_protocol = 0;
 
         // 读取proxy_protocol定义的信息
-        // 好像只支持版本1的文本形式
+        // 早期只支持版本1的文本形式
         // 见http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
         p = ngx_proxy_protocol_read(c, b->pos, b->last);
 
@@ -719,6 +721,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         }
     }
 
+    // http日志的额外信息
     c->log->action = "reading client request line";
 
     // 参数reusable表示是否可以复用，即加入队列
@@ -761,6 +764,7 @@ ngx_http_create_request(ngx_connection_t *c)
 
     // 处理的请求次数，在ngx_http_create_request里增加
     // 用来控制长连接里可处理的请求次数，指令keepalive_requests
+    // requests字段仅在http处理时有用
     c->requests++;
 
     // 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
@@ -861,8 +865,8 @@ ngx_http_create_request(ngx_connection_t *c)
     // accept的连接是主请求
     r->main = r;
 
-    // 当前只有一个请求，所有子请求最大不能超过50
-    // 在1.8版之前是200,1.10之后减少到50
+    // 当前只有一个请求，所有子请求最大调用深度不能超过50
+    // 在1.8版之前是个数200,1.10之后改变为深度50
     r->count = 1;
 
     // 得到当前时间
