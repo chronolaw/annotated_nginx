@@ -4206,17 +4206,22 @@ ngx_http_request_empty_handler(ngx_http_request_t *r)
 }
 
 
+// 发送特殊的控制标志，如last_buf/flush
+// flags使用NGX_HTTP_LAST/NGX_HTTP_FLUSH
 ngx_int_t
 ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags)
 {
     ngx_buf_t    *b;
     ngx_chain_t   out;
 
+    // 一个buffer对象
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
         return NGX_ERROR;
     }
 
+    // buffer不关联实际的内存空间
+    // 只设置控制标志位
     if (flags & NGX_HTTP_LAST) {
 
         if (r == r->main && !r->post_action) {
@@ -4235,6 +4240,7 @@ ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags)
     out.buf = b;
     out.next = NULL;
 
+    // 把buffer加入输出链，实现标志位控制
     return ngx_http_output_filter(r, &out);
 }
 
