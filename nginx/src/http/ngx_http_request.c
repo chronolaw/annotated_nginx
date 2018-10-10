@@ -1470,6 +1470,10 @@ ngx_http_process_request_line(ngx_event_t *rev)
         // 再次进入for循环，这时recv可能返回again，那么就等待下一次读事件即有数据可读
     }
 
+    // 处理主请求里延后处理的请求链表，直至处理完毕
+    // r->main->posted_requests
+    // 调用请求里的write_event_handler
+    // 通常就是ngx_http_core_run_phases引擎数组处理请求
     ngx_http_run_posted_requests(c);
 }
 
@@ -2791,6 +2795,7 @@ ngx_http_run_posted_requests(ngx_connection_t *c)
         // 获取主请求里的延后处理请求链表
         pr = r->main->posted_requests;
 
+        // 没有延后处理请求
         if (pr == NULL) {
             return;
         }
