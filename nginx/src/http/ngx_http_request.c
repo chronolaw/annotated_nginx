@@ -1826,6 +1826,10 @@ ngx_http_process_request_headers(ngx_event_t *rev)
         break;
     }
 
+    // 处理主请求里延后处理的请求链表，直至处理完毕
+    // r->main->posted_requests
+    // 调用请求里的write_event_handler
+    // 通常就是ngx_http_core_run_phases引擎数组处理请求
     ngx_http_run_posted_requests(c);
 }
 
@@ -2960,6 +2964,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     if (r != r->main) {
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+        // 子请求在后台处理，通常是mirror镜像流量
         if (r->background) {
             if (!r->logged) {
                 if (clcf->log_subrequest) {
