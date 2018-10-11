@@ -598,7 +598,7 @@ struct ngx_http_request_s {
     ngx_chain_t                      *out;
 
     // 指向主请求，即由客户端发起的请求
-    // 如果没有子请求，那么r == main
+    // 如果不是子请求，那么r == main
     ngx_http_request_t               *main;
 
     // 父请求，如果是子请求，那么指向产生它的父请求
@@ -671,7 +671,8 @@ struct ngx_http_request_s {
     // 1.8里是8位，1.10改为16位
     unsigned                          count:16;
 
-    // 子请求数量，最多不能超过50个
+    // 子请求调用层次，最多不能超过50层
+    // 实际的数量大约是65535-1000
     unsigned                          subrequests:8;
 
     // 请求的阻塞数量，用于线程池
@@ -707,6 +708,7 @@ struct ngx_http_request_s {
 
     // uri改写的次数
     // 在ngx_http_core_post_rewrite_phase里检查
+    // 目前最多10次，超过则报错不能继续处理
     unsigned                          uri_changes:4;
 
     unsigned                          request_body_in_single_buf:1;
