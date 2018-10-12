@@ -57,16 +57,22 @@ typedef struct {
 #define NGX_HTTP_MODULE           0x50545448   /* "HTTP" */
 
 // 标志指令的类型，出现的位置
+// 常用的是前三个
 #define NGX_HTTP_MAIN_CONF        0x02000000
 #define NGX_HTTP_SRV_CONF         0x04000000
 #define NGX_HTTP_LOC_CONF         0x08000000
+
+// 用于在upsteam{}里出现的指令
 #define NGX_HTTP_UPS_CONF         0x10000000
+
 #define NGX_HTTP_SIF_CONF         0x20000000
 #define NGX_HTTP_LIF_CONF         0x40000000
 #define NGX_HTTP_LMT_CONF         0x80000000
 
 
+// 因为三个配置数组都是一样的，所以需要用这几个宏来区分位置
 // 模块配置结构体在ngx_http_conf_ctx_t里存储的位置
+// 实际指向了ngx_http_conf_ctx_t里的数组指针
 // 应该与NGX_HTTP_SRV_CONF等指令对应
 #define NGX_HTTP_MAIN_CONF_OFFSET  offsetof(ngx_http_conf_ctx_t, main_conf)
 #define NGX_HTTP_SRV_CONF_OFFSET   offsetof(ngx_http_conf_ctx_t, srv_conf)
