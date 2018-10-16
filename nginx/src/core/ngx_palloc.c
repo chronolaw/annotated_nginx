@@ -155,6 +155,10 @@ ngx_reset_pool(ngx_pool_t *pool)
 
     // 遍历内存池节点，逐个重置空闲指针位置
     // 相当于释放了已经分配的内存
+    //
+    // 这里有一个问题，其他节点的块实际上只用了ngx_pool_data_t
+    // reset指针移动了ngx_pool_t大小
+    // 就浪费了80-32字节的内存
     for (p = pool; p; p = p->d.next) {
         p->d.last = (u_char *) p + sizeof(ngx_pool_t);
         p->d.failed = 0;
@@ -181,7 +185,7 @@ ngx_palloc(ngx_pool_t *pool, size_t size)
     }
 #endif
 
-    // 分配大块内存(>4k)
+    // 分配大块内存(>4k),直接调用malloc
     return ngx_palloc_large(pool, size);
 }
 
@@ -198,7 +202,7 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
     }
 #endif
 
-    // 分配大块内存(>4k)
+    // 分配大块内存(>4k),直接调用malloc
     return ngx_palloc_large(pool, size);
 }
 
