@@ -49,6 +49,7 @@ ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 
     // 实际上是设置线程的亲和性
     // 但因为nginx是单线程，所以相当于设置了进程
+    // cpu亲和性有“继承”关系，本进程里的所有线程都会绑定此cpu
     if (sched_setaffinity(0, sizeof(cpu_set_t), cpu_affinity) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
                       "sched_setaffinity() failed");
