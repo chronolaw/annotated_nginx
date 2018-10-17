@@ -33,6 +33,7 @@ ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 #elif (NGX_HAVE_SCHED_SETAFFINITY)
 
 // Linux里使用这个函数绑定cpu
+// 在ngx_worker_process_init里，模块init_process之前调用
 void
 ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 {
