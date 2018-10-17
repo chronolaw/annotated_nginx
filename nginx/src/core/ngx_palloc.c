@@ -3,6 +3,7 @@
 // * ngx_create_pool
 // * ngx_palloc_small
 // * ngx_palloc_large
+// * ngx_palloc_block
 
 /*
  * Copyright (C) Igor Sysoev

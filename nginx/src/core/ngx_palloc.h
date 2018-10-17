@@ -100,6 +100,7 @@ typedef struct {
 // 每个节点分配小块内存
 // 但max、current、大块内存链表只在头节点
 // 64位系统大小为80字节
+// 结构体里没有保存块大小的字段，由d.end-p得到
 struct ngx_pool_s {
     // 描述本内存池节点的信息
     ngx_pool_data_t       d;
