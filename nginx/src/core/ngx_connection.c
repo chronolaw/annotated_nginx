@@ -1132,6 +1132,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 #endif
     }
 
+    // 此句貌似多余，应该删除？
     return;
 }
 
