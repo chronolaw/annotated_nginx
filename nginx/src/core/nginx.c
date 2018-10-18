@@ -658,6 +658,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     }
 
     // 从环境变量字符串里切分出socket
+    // 逐个添加进cycle->listening数组
     for (p = inherited, v = p; *p; p++) {
         // 分隔符是:/;
         if (*p == ':' || *p == ';') {
@@ -688,12 +689,15 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
         }
     }
 
+    // v和p是环境变量字符串的指针，最后必须都到末尾
+    // 否则格式有错误，但只记录日志，正常添加socket描述符
     if (v != p) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                       "invalid socket number \"%s\" in " NGINX_VAR
                       " environment variable, ignoring", v);
     }
 
+    // 设置继承socket描述符的标志位
     ngx_inherited = 1;
 
     // in ngx_connection.c
