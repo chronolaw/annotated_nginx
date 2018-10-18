@@ -837,6 +837,8 @@ ngx_cleanup_environment(void *data)
 }
 
 
+// 执行新的nginx程序，热更新
+// 使用环境变量传递已经打开的文件描述符
 ngx_pid_t
 ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 {
@@ -860,6 +862,11 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
         return NGX_INVALID_PID;
     }
 
+    // #define NGINX_VAR          "NGINX"
+    // 计算环境变量字符串的长度
+    // 所有的监听端口，32位的数字
+    // ‘+1’是分隔符‘；’
+    // ‘+2’是‘=’和末尾的null
     var = ngx_alloc(sizeof(NGINX_VAR)
                     + cycle->listening.nelts * (NGX_INT32_LEN + 1) + 2,
                     cycle->log);
@@ -868,13 +875,16 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
         return NGX_INVALID_PID;
     }
 
+    // 先拷贝变量名和‘=’，注意sizeof后面不用-1
     p = ngx_cpymem(var, NGINX_VAR "=", sizeof(NGINX_VAR));
 
+    // 逐个打印文件描述符，后面接';'
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
         p = ngx_sprintf(p, "%ud;", ls[i].fd);
     }
 
+    // 字符串最后是null
     *p = '\0';
 
     env[n++] = var;
@@ -906,6 +916,7 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 本进程的pid文件改名
     if (ngx_rename_file(ccf->pid.data, ccf->oldpid.data) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       ngx_rename_file_n " %s to %s failed "
