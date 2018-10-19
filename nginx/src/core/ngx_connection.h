@@ -381,6 +381,8 @@ ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
 // 1.15.2 change signature
 ngx_int_t ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls);
 
+// 根据传递过来的socket描述符，使用系统调用获取之前设置的参数
+// 填入ngx_listeing_t结构体
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
 
 // ngx_cycle.c : init_cycle()里被调用
