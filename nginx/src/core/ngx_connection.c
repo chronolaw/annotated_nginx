@@ -354,6 +354,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
         reuseport = 0;
         olen = sizeof(int);
 
+        // SO_REUSEPORT_LB目前仅在FreeBSD里有效
 #ifdef SO_REUSEPORT_LB
 
         if (getsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT_LB,
@@ -532,6 +533,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 int  reuseport = 1;
 
+            // SO_REUSEPORT_LB目前仅在FreeBSD里有效
 #ifdef SO_REUSEPORT_LB
 
                 if (setsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT_LB,
@@ -614,6 +616,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 reuseport = 1;
 
+                // SO_REUSEPORT_LB目前仅在FreeBSD里有效
 #ifdef SO_REUSEPORT_LB
 
                 if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT_LB,
