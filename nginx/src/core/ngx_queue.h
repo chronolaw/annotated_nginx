@@ -124,6 +124,9 @@ struct ngx_queue_s {
 
 
 // 从作为数据成员的ngx_queue_t结构访问到完整的数据节点
+// q    ：指针，实际指向ngx_queue_t对象
+// type ：节点的类型，是一个名字
+// link ：节点里ngx_queue_t成员的名字
 #define ngx_queue_data(q, type, link)                                         \
     (type *) ((u_char *) q - offsetof(type, link))
 
