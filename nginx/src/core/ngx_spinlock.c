@@ -13,6 +13,7 @@
 // 自旋锁，尽量不让出cpu抢锁
 // 操作原子变量，设置为值value
 // spin通常是2048,即2^11
+// 目前仅在线程池里需要使用自旋锁
 void
 ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin)
 {
@@ -59,13 +60,19 @@ ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin)
         ngx_sched_yield();
     }
 
+// not NGX_HAVE_ATOMIC_OPS
 #else
 
+// 使用了--with-threads开启多线程功能
+// 但没有原子操作，则无法通过编译
+// 因为线程池需要使用自旋锁
 #if (NGX_THREADS)
 
 #error ngx_spinlock() or ngx_atomic_cmp_set() are not defined !
 
 #endif
+
+// 不使用线程池，则自旋锁是空实现
 
 #endif
 
