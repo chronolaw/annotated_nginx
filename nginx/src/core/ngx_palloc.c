@@ -171,6 +171,9 @@ ngx_reset_pool(ngx_pool_t *pool)
     // 指针置空，之前的内存都已经释放了
     pool->chain = NULL;
     pool->large = NULL;
+
+    // 注意cleanup链表没有清空
+    // 只有destroy时才会销毁
 }
 
 
