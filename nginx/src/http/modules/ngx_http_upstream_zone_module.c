@@ -163,6 +163,8 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     // 数据存在则重用
     // 可能是多个zone共用一块内存
+    // 依据nginx官方文档，此字段仅用于windows
+    // 在linux下可以不用考虑
     if (shm_zone->shm.exists) {
         peers = shpool->data;
 
@@ -210,15 +212,18 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     peersp = (ngx_http_upstream_rr_peers_t **) (void *) &shpool->data;
 
     // 遍历所有的peers数组
+    // uscfp是upstream{}数组
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+        // 取一个upstream{}
         uscf = uscfp[i];
 
-        // 如果不是自己则跳过
+        // 如果不是自己配置的共享内存则跳过
+        // 即查找需要在本共享内存存储的upstream{}
         if (uscf->shm_zone != shm_zone) {
             continue;
         }
 
-        // 找到自己的peers
+        // 找到需要存储的peers
 
         // 拷贝peers到共享内存
         // 实现“深”拷贝，里面的指针内容也拷贝
@@ -227,6 +232,7 @@ ngx_http_upstream_init_zone(ngx_shm_zone_t *shm_zone, void *data)
             return NGX_ERROR;
         }
 
+        // 串起了多个peers
         *peersp = peers;
         peersp = &peers->zone_next;
     }
