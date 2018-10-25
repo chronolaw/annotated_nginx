@@ -148,6 +148,7 @@ ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
 void ngx_destroy_pool(ngx_pool_t *pool);
 
 // 重置内存池，释放内存，但没有free归还给系统
+// 之前已经分配的内存块仍然保留
 // 遍历内存池节点，逐个重置空闲指针位置
 // 注意cleanup链表没有清空
 // 只有destroy时才会销毁
