@@ -1,3 +1,6 @@
+// annotated by chrono since 2016
+//
+// Please see http/modules/ngx_http_upstream_zone_module.c
 
 /*
  * Copyright (C) Ruslan Ermilov
