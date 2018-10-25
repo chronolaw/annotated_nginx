@@ -82,6 +82,9 @@ ngx_create_pool(size_t size, ngx_log_t *log)
 
 
 // 销毁内存池
+// 调用清理函数链表
+// 检查大块内存链表，直接free
+// 遍历内存池节点，逐个free
 void
 ngx_destroy_pool(ngx_pool_t *pool)
 {
@@ -140,7 +143,10 @@ ngx_destroy_pool(ngx_pool_t *pool)
 }
 
 
-// 重置内存池，释放内存
+// 重置内存池，释放内存，但没有free归还给系统
+// 遍历内存池节点，逐个重置空闲指针位置
+// 注意cleanup链表没有清空
+// 只有destroy时才会销毁
 void
 ngx_reset_pool(ngx_pool_t *pool)
 {
