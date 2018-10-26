@@ -65,6 +65,9 @@ struct ngx_http_upstream_rr_peer_s {
     ngx_atomic_t                    lock;
 #endif
 
+    // “下一个”peer的位置
+    // 为了配合共享内存
+    // nginx自1.9.0开始不再使用数组方式存储peer
     ngx_http_upstream_rr_peer_t    *next;
 
     NGX_COMPAT_BEGIN(32)
@@ -84,6 +87,7 @@ struct ngx_http_upstream_rr_peers_s {
     // 默认启用ngx_http_upstream_zone_module
 #if (NGX_HTTP_UPSTREAM_ZONE)
     // 指向共享内存里的slab池
+    // 指针不空，即表示存储在共享内存里
     ngx_slab_pool_t                *shpool;
 
     // 共享内存操作的锁
@@ -107,9 +111,11 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_str_t                      *name;
 
     // backup服务器IP列表
+    // 是一个链表，用peer->next来访问
     ngx_http_upstream_rr_peers_t   *next;
 
     // 非backup服务器IP列表
+    // 是一个链表，用peer->next来访问
     ngx_http_upstream_rr_peer_t    *peer;
 };
 
