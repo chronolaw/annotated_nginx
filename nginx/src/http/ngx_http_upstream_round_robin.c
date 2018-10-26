@@ -89,21 +89,31 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
             return NGX_ERROR;
         }
 
+        // 只有一台服务器时优化处理
         peers->single = (n == 1);
+
+        // 服务器数量
         peers->number = n;
+
+        // 是否加权，即总权重与服务器数量是否相等
         peers->weighted = (w != n);
+
+        // 总权重
         peers->total_weight = w;
+
         peers->name = &us->host;
 
         n = 0;
         peerp = &peers->peer;
 
-        // 跳过backup服务器
+        // 把ip地址拷贝进peer数组
         for (i = 0; i < us->servers->nelts; i++) {
+            // 跳过backup服务器
             if (server[i].backup) {
                 continue;
             }
 
+            // 每个server可能有多个peer，所以需要循环遍历
             for (j = 0; j < server[i].naddrs; j++) {
                 peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peer[n].socklen = server[i].addrs[j].socklen;
@@ -117,6 +127,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
 
+                // 注意这里，设置了next指针，形成链表
                 *peerp = &peer[n];
                 peerp = &peer[n].next;
                 n++;
@@ -134,8 +145,8 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
         w = 0;
 
-        // 跳过非backup服务器
         for (i = 0; i < us->servers->nelts; i++) {
+            // 跳过非backup服务器
             if (!server[i].backup) {
                 continue;
             }
@@ -168,8 +179,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
         peerp = &backup->peer;
 
-        // 跳过非backup服务器
+        // 把ip地址拷贝进peer数组
         for (i = 0; i < us->servers->nelts; i++) {
+            // 跳过非backup服务器
             if (!server[i].backup) {
                 continue;
             }
@@ -187,12 +199,14 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
 
+                // 注意这里，设置了next指针，形成链表
                 *peerp = &peer[n];
                 peerp = &peer[n].next;
                 n++;
             }
         }
 
+        // 链接到主服务器的next指针
         peers->next = backup;
 
         return NGX_OK;

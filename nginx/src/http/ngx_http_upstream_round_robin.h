@@ -108,6 +108,7 @@ struct ngx_http_upstream_rr_peers_s {
     // 只有一台服务器时优化处理
     unsigned                        single:1;
 
+    // 是否加权
     unsigned                        weighted:1;
 
     // upstream块的名字
