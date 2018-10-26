@@ -81,7 +81,9 @@ typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 // backup/非backup服务器IP列表
 // 关键成员是peer
 struct ngx_http_upstream_rr_peers_s {
-    // 服务器数量，即peer数组的长度
+    // 服务器数量
+    // 早期是peer数组的长度
+    // 但1.9.0加入共享内存后是peer链表的长度
     ngx_uint_t                      number;
 
     // 默认启用ngx_http_upstream_zone_module
@@ -97,6 +99,7 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_atomic_t                    rwlock;
 
     // 在共享内存里的下一组服务器列表
+    // 多个upsteam{}可以存在一块共享内存里
     ngx_http_upstream_rr_peers_t   *zone_next;
 #endif
 
@@ -111,7 +114,6 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_str_t                      *name;
 
     // backup服务器IP列表
-    // 是一个链表，用peer->next来访问
     ngx_http_upstream_rr_peers_t   *next;
 
     // 非backup服务器IP列表
