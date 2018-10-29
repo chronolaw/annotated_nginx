@@ -103,6 +103,7 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_http_upstream_rr_peers_t   *zone_next;
 #endif
 
+    // 总权重
     ngx_uint_t                      total_weight;
 
     // 只有一台服务器时优化处理
@@ -160,6 +161,8 @@ struct ngx_http_upstream_rr_peers_s {
     }
 
 #else
+// 不启用ngx_http_upstream_zone_module
+// 锁操作都是空实现，无动作
 
 #define ngx_http_upstream_rr_peers_rlock(peers)
 #define ngx_http_upstream_rr_peers_wlock(peers)
@@ -175,6 +178,7 @@ typedef struct {
     ngx_uint_t                      config;
 
     // 可用的IP地址列表
+    // 分在用和备用两组
     ngx_http_upstream_rr_peers_t   *peers;
 
     ngx_http_upstream_rr_peer_t    *current;
