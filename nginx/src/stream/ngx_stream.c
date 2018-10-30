@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_stream_block
+// * ngx_stream_init_phase_handlers
 // * ngx_stream_optimize_servers
 
 /*

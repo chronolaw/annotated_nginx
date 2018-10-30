@@ -2,6 +2,7 @@
 //
 // * ngx_stream_core_listen
 // * ngx_stream_core_run_phases
+// * ngx_stream_core_generic_phase
 
 /*
  * Copyright (C) Roman Arutyunyan
