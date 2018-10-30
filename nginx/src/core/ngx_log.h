@@ -149,6 +149,14 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 // 只有在configure时使用--with-debug才会启用
 // 调试日志宏,级别固定为debug
 // 记录日志的条件使用逻辑与操作，检查子系统
+//
+// 调试用的级别，只打印某些特殊子系统的日志
+// 在nginx网站没有很好地文档化
+// ngx_log_set_levels
+// static const char *debug_levels[] = {
+//     "debug_core", "debug_alloc", "debug_mutex", "debug_event",
+//     "debug_http", "debug_mail", "debug_stream"
+// };
 #define ngx_log_debug(level, log, ...)                                        \
     if ((log)->log_level & level)                                             \
         ngx_log_error_core(NGX_LOG_DEBUG, log, __VA_ARGS__)
