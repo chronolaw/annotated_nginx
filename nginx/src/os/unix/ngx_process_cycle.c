@@ -331,7 +331,12 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
 
             // nginx可执行程序不变，以当前cycle重新初始化
+            // 重新读取加载配置文件，并拷贝当前cycle的一些数据
+            // 如端口、日志文件、共享内存等
             cycle = ngx_init_cycle(cycle);
+
+            // 可能配置文件不正确，初始化失败
+            // 使用原有的cycle继续运行，不会停止服务
             if (cycle == NULL) {
                 cycle = (ngx_cycle_t *) ngx_cycle;
                 continue;
