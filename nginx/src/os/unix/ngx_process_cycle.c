@@ -617,6 +617,7 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
 
 
 // master进程调用，遍历ngx_processes数组，用kill发送信号
+// 但通常是使用channel(socket pair)发送信号
 static void
 ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 {
@@ -632,6 +633,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 
 #else
 
+    // 把信号转换为nginx自己的channel命令
     switch (signo) {
 
     case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
@@ -668,6 +670,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
                        ngx_processes[i].respawn,
                        ngx_processes[i].just_spawn);
 
+        // 无效的进程直接跳过
         if (ngx_processes[i].detached || ngx_processes[i].pid == -1) {
             continue;
         }
@@ -678,6 +681,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
             continue;
         }
 
+        // 正在退出的进程不会发送信号
         if (ngx_processes[i].exiting
             && signo == ngx_signal_value(NGX_SHUTDOWN_SIGNAL))
         {
@@ -686,6 +690,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 
         // 通常是使用channel发送信号
         if (ch.command) {
+            // channel发送成功就不会走下面的kill发送
             if (ngx_write_channel(ngx_processes[i].channel[0],
                                   &ch, sizeof(ngx_channel_t), cycle->log)
                 == NGX_OK)
@@ -694,6 +699,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
                     ngx_processes[i].exiting = 1;
                 }
 
+                // 跳过下面的kill发送代码
                 continue;
             }
         }
