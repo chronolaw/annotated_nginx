@@ -1010,9 +1010,11 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
             return NULL;
         }
 
+        // 遍历文件链表
         part = &cycle->open_files.part;
         file = part->elts;
 
+        // 查找是否已经打开过了
         for (i = 0; /* void */ ; i++) {
 
             if (i >= part->nelts) {
@@ -1028,21 +1030,27 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
                 continue;
             }
 
+            // 如果名字相同，则已经打开过
+            // 返回之前创建的对象
             if (ngx_strcmp(full.data, file[i].name.data) == 0) {
                 return &file[i];
             }
         }
     }
 
+    // 文件链表遍历完毕，没有打开过
+
     file = ngx_list_push(&cycle->open_files);
     if (file == NULL) {
         return NULL;
     }
 
+    // 有文件名，暂时置为-1,拷贝文件名
     if (name->len) {
         file->fd = NGX_INVALID_FILE;
         file->name = full;
 
+    // 无文件名，使用标准错误流
     } else {
         file->fd = ngx_stderr;
         file->name = *name;
