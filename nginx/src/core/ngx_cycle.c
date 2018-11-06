@@ -64,7 +64,10 @@ static ngx_connection_t  dumb;
 // 在main里调用,太长，以后可能会简化
 // 从old_cycle(init_cycle)里复制必要的信息，创建新cycle
 // 当reconfigure的时候old_cycle就是当前的cycle
-// 初始化core模块
+// 调用所有模块的init_module函数指针，初始化模块
+// 注意是在所有模块完成配置post configuration之后
+// 在打开日志、共享内存、端口之后才初始化模块
+// 此时还没有创建连接池（在init process里）
 ngx_cycle_t *
 ngx_init_cycle(ngx_cycle_t *old_cycle)
 {
@@ -350,6 +353,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
     // 递归执行解析动作，各个模块允许的指令配置参数
+    // 里面有http的post configration指针
     // 再解析配置文件
     if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) {
         environ = senv;
@@ -766,7 +770,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     // 调用所有模块的init_module函数指针，初始化模块
     // 注意是在所有模块完成配置post configuration之后
-    // 在打开端口之后才初始化模块
+    // 在打开日志、共享内存、端口之后才初始化模块
     // 此时还没有创建连接池（在init process里）
     if (ngx_init_modules(cycle) != NGX_OK) {
         /* fatal */
