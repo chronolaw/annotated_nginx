@@ -145,6 +145,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 #else
 
+// 此函数原型通常可以忽略，原因见上
 void
 ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, va_list args)
@@ -241,6 +242,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
         // log对象有专用的写函数指针，例如syslog
         // 那么就不写文件，调用函数写日志
+        // 可以定制writer函数，实现特殊的写日志行为，如rotate
         if (log->writer) {
             log->writer(log, level, errstr, p - errstr);
             goto next;

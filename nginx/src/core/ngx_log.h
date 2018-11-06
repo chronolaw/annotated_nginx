@@ -80,6 +80,7 @@ struct ngx_log_s {
     ngx_uint_t           log_level;
 
     // 日志文件对象
+    // 里面有日志的文件名
     ngx_open_file_t     *file;
 
     // 日志关联的连接计数
