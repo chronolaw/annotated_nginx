@@ -722,7 +722,7 @@ extern ngx_module_t           ngx_event_core_module;
 // 此处有隐患，宏末尾多了分号，如果用在函数里就会编译失败
 // 应该是个小bug，其他的xxx_get_conf没有分号
 #define ngx_event_get_conf(conf_ctx, module)                                  \
-             (*(ngx_get_conf(conf_ctx, ngx_events_module))) [module.ctx_index];
+             (*(ngx_get_conf(conf_ctx, ngx_events_module))) [module.ctx_index]
 
 
 
