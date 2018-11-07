@@ -1,4 +1,8 @@
 // annotated by chrono since 2018
+//
+// * ngx_shmtx_create
+// * ngx_shmtx_trylock
+// * ngx_shmtx_unlock
 
 /*
  * Copyright (C) Igor Sysoev
