@@ -719,8 +719,9 @@ extern ngx_module_t           ngx_event_core_module;
 
 
 // 函数宏，从cycle的conf_ctx里获得event模块的指针，然后再取数组序号
-// 此处有隐患，宏末尾多了分号，如果用在函数里就会编译失败
+// 1.15.6之前有隐患，宏末尾多了分号，如果用在函数里就会编译失败
 // 应该是个小bug，其他的xxx_get_conf没有分号
+// 1.15.6修复
 #define ngx_event_get_conf(conf_ctx, module)                                  \
              (*(ngx_get_conf(conf_ctx, ngx_events_module))) [module.ctx_index]
 
