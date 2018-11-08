@@ -1231,6 +1231,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     /* disable warning: Win32 SOCKET is u_int while UNIX socket is int */
 
+    // 如果使用epoll，那么files指针通常是null，即不会使用
     if (ngx_cycle->files && (ngx_uint_t) s >= ngx_cycle->files_n) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
                       "the new socket has number %d, "
@@ -1272,6 +1273,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     // 空闲连接计数器减少
     ngx_cycle->free_connection_n--;
 
+    // 如果使用epoll，那么files指针通常是null，即不会使用
     if (ngx_cycle->files && ngx_cycle->files[s] == NULL) {
         ngx_cycle->files[s] = c;
     }
@@ -1326,6 +1328,7 @@ ngx_free_connection(ngx_connection_t *c)
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
 
+    // 如果使用epoll，那么files指针通常是null，即不会使用
     if (ngx_cycle->files && ngx_cycle->files[c->fd] == c) {
         ngx_cycle->files[c->fd] = NULL;
     }

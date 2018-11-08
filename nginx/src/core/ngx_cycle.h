@@ -109,6 +109,7 @@ struct ngx_cycle_s {
     ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */
 
     // 文件也当做连接来处理，也是读写操作
+    // 如果使用epoll，那么这个指针通常是null，即不会使用
     ngx_connection_t        **files;
 
     // 空闲连接，使用指针串成单向链表
