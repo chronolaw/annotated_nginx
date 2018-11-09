@@ -1,4 +1,17 @@
 
+Changes with nginx 1.14.1                                        06 Nov 2018
+
+    *) Security: when using HTTP/2 a client might cause excessive memory
+       consumption (CVE-2018-16843) and CPU usage (CVE-2018-16844).
+
+    *) Security: processing of a specially crafted mp4 file with the
+       ngx_http_mp4_module might result in worker process memory disclosure
+       (CVE-2018-16845).
+
+    *) Bugfix: working with gRPC backends might result in excessive memory
+       consumption.
+
+
 Changes with nginx 1.14.0                                        17 Apr 2018
 
     *) 1.14.x stable branch.
