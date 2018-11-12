@@ -156,6 +156,8 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 // 调试日志宏,级别固定为debug
 // 注意使用&操作检查位
 // 记录日志的条件使用逻辑与操作，检查子系统
+// LOG_DEBUG=DEBUG_ALL=0x7ffffff0
+// 所以在调用log_debug时位操作总成功
 //
 // 调试用的级别，只打印某些特殊子系统的日志
 // 在nginx网站没有很好地文档化

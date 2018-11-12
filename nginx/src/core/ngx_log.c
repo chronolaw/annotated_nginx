@@ -686,6 +686,8 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
     }
 
     // 如果只是设置了debug级别，那么就打印所有的子系统
+    // LOG_DEBUG=DEBUG_ALL=0x7ffffff0
+    // 所以在调用log_debug时位操作总成功
     if (log->log_level == NGX_LOG_DEBUG) {
         log->log_level = NGX_LOG_DEBUG_ALL;
     }
