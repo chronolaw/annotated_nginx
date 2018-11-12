@@ -89,10 +89,12 @@ struct ngx_log_s {
 
     // 记录写日志磁盘满错误发生的时间
     // 避免反复写磁盘导致的阻塞
+    // 时间间隔为1秒
     time_t               disk_full_time;
 
     // 记录错误日志时可以执行的回调函数
     // 参数是消息缓冲区里剩余的空间
+    // 定制额外的信息
     // 只有高于debug才会执行
     // 例如ngx_http_log_error
     ngx_log_handler_pt   handler;
@@ -103,7 +105,10 @@ struct ngx_log_s {
 
     // 专用的写函数指针
     // 可以写到syslog或者其他地方
+    // 实现特殊的记录日志动作
     ngx_log_writer_pt    writer;
+
+    // writer相关的数据，需要用户自己管理
     void                *wdata;
 
     /*
