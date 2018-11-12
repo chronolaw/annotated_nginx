@@ -154,6 +154,7 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 // 只有在configure时使用--with-debug才会启用
 // 调试日志宏,级别固定为debug
+// 注意使用&操作检查位
 // 记录日志的条件使用逻辑与操作，检查子系统
 //
 // 调试用的级别，只打印某些特殊子系统的日志
