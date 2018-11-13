@@ -181,6 +181,8 @@ ngx_module_t  ngx_stream_core_module = {
 };
 
 
+// ngx_stream_session_handler调用
+// 读事件触发，执行处理引擎
 // 启动引擎数组处理请求
 // 从phase_handler的位置开始调用模块处理
 void
@@ -212,6 +214,7 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
         // checker会检查handler的返回值
         // 如果handler返回again/done那么就返回ok
         // 退出引擎数组的处理
+        // 等待下一次读/写事件触发
         //
         // 如果checker返回again，那么继续在引擎数组里执行
         // 模块由s->phase_handler指定，可能会有阶段的跳跃
@@ -753,6 +756,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_stream_listen_t          *ls, *als;
     ngx_stream_core_main_conf_t  *cmcf;
 
+    // 标志位，此server{}已经定义了监听端口
     cscf->listen = 1;
 
     // 获取指令后的参数数组
@@ -811,10 +815,11 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     backlog = 0;
 
-    // 检查其他参数，如bind/backlog等，但没有sndbuf/rcvbuf
+    // 检查其他参数，如bind/backlog/sndbuf/rcvbuf
     for (i = 2; i < cf->args->nelts; i++) {
 
         // 是否是udp协议，如果是udp那么type就是DGRAM，否则是STREAM
+        // win32不支持udp协议
 #if !(NGX_WIN32)
         if (ngx_strcmp(value[i].data, "udp") == 0) {
             ls->type = SOCK_DGRAM;
@@ -1051,6 +1056,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                            "the invalid \"%V\" parameter", &value[i]);
         return NGX_CONF_ERROR;
     }
+    // for循环检查参数结束
 
     // udp协议做检查，有的选项不可用: backlog/ssl/so_keepalive
     if (ls->type == SOCK_DGRAM) {

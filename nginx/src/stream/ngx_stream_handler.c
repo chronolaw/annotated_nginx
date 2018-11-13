@@ -2,6 +2,7 @@
 //
 // * ngx_stream_init_connection
 // * ngx_stream_finalize_session
+// * ngx_stream_log_session
 
 /*
  * Copyright (C) Roman Arutyunyan
