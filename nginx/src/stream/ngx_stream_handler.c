@@ -228,6 +228,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     rev = c->read;
 
     // 读事件处理函数，执行处理引擎
+    // 调用ngx_stream_core_run_phases
     rev->handler = ngx_stream_session_handler;
 
     if (addr_conf->proxy_protocol) {
@@ -355,7 +356,7 @@ ngx_stream_session_handler(ngx_event_t *rev)
     ngx_connection_t      *c;
     ngx_stream_session_t  *s;
 
-    // 从读事件获取连接和回话
+    // 从读事件获取连接和会话
     c = rev->data;
     s = c->data;
 
