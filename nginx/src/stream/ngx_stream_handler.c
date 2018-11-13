@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_stream_init_connection
+// * ngx_stream_finalize_session
 
 /*
  * Copyright (C) Roman Arutyunyan

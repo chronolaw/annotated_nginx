@@ -3,6 +3,7 @@
 // * ngx_stream_core_listen
 // * ngx_stream_core_run_phases
 // * ngx_stream_core_generic_phase
+// * ngx_stream_core_preread_phase
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -200,6 +201,12 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
     while (ph[s->phase_handler].checker) {
 
         // 调用引擎数组里的checker
+        // ngx_stream_core_generic_phase:
+        //      post_accept/preaccess/access/ssl
+        // ngx_stream_core_preread_phase:
+        //      preread
+        // ngx_stream_core_content_phase:
+        //      content
         rc = ph[s->phase_handler].checker(s, &ph[s->phase_handler]);
 
         // checker会检查handler的返回值
@@ -215,7 +222,7 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
 }
 
 
-// 处理post_accept/preaccess/access/ssl/log等阶段
+// 处理post_accept/preaccess/access/ssl等阶段
 ngx_int_t
 ngx_stream_core_generic_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph)
