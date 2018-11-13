@@ -299,9 +299,12 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
         rc = NGX_AGAIN;
 
     } else {
+        // 执行preread模块的处理函数
+        // 如果是第一次进入就会返回again
         rc = ph->handler(s);
     }
 
+    // 反复预读取数据，直至无数据或出错
     while (rc == NGX_AGAIN) {
 
         // 分配供客户端读取的内存
@@ -317,6 +320,7 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
         size = c->buffer->end - c->buffer->last;
 
         // 满则不能再读
+        // 退出循环，不再读取数据
         if (size == 0) {
             ngx_log_error(NGX_LOG_ERR, c->log, 0, "preread buffer full");
             rc = NGX_STREAM_BAD_REQUEST;
@@ -324,12 +328,14 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
         }
 
         // 客户端关闭连接
+        // 退出循环，不再读取数据
         if (c->read->eof) {
             rc = NGX_STREAM_OK;
             break;
         }
 
         // 不可读，需要加入事件监控
+        // 退出循环，不再读取数据
         if (!c->read->ready) {
             break;
         }
@@ -342,6 +348,9 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
             break;
         }
 
+        // again，已无数据可读
+        // 退出循环，不再读取数据
+        // 不再返回循环开头判断
         if (n == NGX_AGAIN) {
             break;
         }
@@ -350,9 +359,15 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
         // 小于0也可能是成功的，因为udp已经存进了buffer
         c->buffer->last += n;
 
+        // 执行preread模块的处理函数
+        // 处理读取的部分数据
         rc = ph->handler(s);
     }
 
+    // 无数据（again）、ok、出错
+    // 结束循环
+
+    // again暂时不可读，需要加入事件监控
     if (rc == NGX_AGAIN) {
         if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
             ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
@@ -363,33 +378,48 @@ ngx_stream_core_preread_phase(ngx_stream_session_t *s,
             ngx_add_timer(c->read, cscf->preread_timeout);
         }
 
+        // 下次读事件发生（有数据）再继续执行此阶段
         c->read->handler = ngx_stream_session_handler;
 
         return NGX_OK;
     }
 
+    // 到这里，preread模块应该是处理完了
+
+    // 不再需要检查超时
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
 
+    // 如果OK，那么跳过本阶段其他模块
+    // 进入下一个阶段继续处理
+    // 返回again，引擎继续运行
     if (rc == NGX_OK) {
         s->phase_handler = ph->next;
         return NGX_AGAIN;
     }
 
+    // 返回declined，模块未能处理
+    // 本阶段下一个模块继续处理，也可能进入下一个阶段
+    // 返回again，引擎继续运行
     if (rc == NGX_DECLINED) {
         s->phase_handler++;
         return NGX_AGAIN;
     }
 
+    // done，模块暂时无法继续处理
+    // 返回ok，退出引擎，下次有事件触发时继续运行
     if (rc == NGX_DONE) {
         return NGX_OK;
     }
 
+    // 最后是出错
     if (rc == NGX_ERROR) {
         rc = NGX_STREAM_INTERNAL_SERVER_ERROR;
     }
 
+    // 结束回话
+    // 关闭stream连接，销毁内存池
     ngx_stream_finalize_session(s, rc);
 
     return NGX_OK;
