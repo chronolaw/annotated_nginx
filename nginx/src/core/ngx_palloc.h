@@ -105,6 +105,9 @@ struct ngx_pool_s {
     // 描述本内存池节点的信息
     ngx_pool_data_t       d;
 
+    // 下面的字段仅在第一个块中有意义
+    // 其他块中不存在，被用于分配内存
+
     // 可分配的最大块
     // 不能超过NGX_MAX_ALLOC_FROM_POOL,即4k-1
     size_t                max;
