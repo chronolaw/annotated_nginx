@@ -1,4 +1,7 @@
 // annotated by chrono since 2016
+//
+// * ngx_pool_data_t
+// * ngx_pool_s
 
 /*
  * Copyright (C) Igor Sysoev
