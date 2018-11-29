@@ -100,7 +100,8 @@ typedef struct {
     // 是否延迟
     // 0表示burst数量的请求仍然立即处理
     // 1表示burst数量的请求需要延迟处理，保证限速
-    ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
+    // 1.15.7之前是ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
+    ngx_uint_t                   delay;
 } ngx_http_limit_req_limit_t;
 
 
@@ -688,12 +689,12 @@ ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits, ngx_uint_t n,
 
     excess = *ep;
 
-    if (excess == 0 || (*limit)->nodelay) {
+    if ((ngx_uint_t) excess <= (*limit)->delay) {
         max_delay = 0;
 
     } else {
         ctx = (*limit)->shm_zone->data;
-        max_delay = excess * 1000 / ctx->rate;
+        max_delay = (excess - (*limit)->delay) * 1000 / ctx->rate;
     }
 
     while (n--) {
@@ -733,11 +734,11 @@ ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits, ngx_uint_t n,
 
         ctx->node = NULL;
 
-        if (limits[n].nodelay) {
+        if ((ngx_uint_t) excess <= limits[n].delay) {
             continue;
         }
 
-        delay = excess * 1000 / ctx->rate;
+        delay = (excess - limits[n].delay) * 1000 / ctx->rate;
 
         if (delay > max_delay) {
             max_delay = delay;
@@ -1118,9 +1119,9 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_limit_req_conf_t  *lrcf = conf;
 
-    ngx_int_t                    burst;
+    ngx_int_t                    burst, delay;
     ngx_str_t                   *value, s;
-    ngx_uint_t                   i, nodelay;
+    ngx_uint_t                   i;
     ngx_shm_zone_t              *shm_zone;
     ngx_http_limit_req_limit_t  *limit, *limits;
 
@@ -1128,7 +1129,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     shm_zone = NULL;
     burst = 0;
-    nodelay = 0;
+    delay = 0;
 
     // 解析各个参数
     for (i = 1; i < cf->args->nelts; i++) {
@@ -1153,7 +1154,19 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             burst = ngx_atoi(value[i].data + 6, value[i].len - 6);
             if (burst <= 0) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "invalid burst rate \"%V\"", &value[i]);
+                                   "invalid burst value \"%V\"", &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "delay=", 6) == 0) {
+
+            delay = ngx_atoi(value[i].data + 6, value[i].len - 6);
+            if (delay <= 0) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid delay value \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;
             }
 
@@ -1161,7 +1174,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (ngx_strcmp(value[i].data, "nodelay") == 0) {
-            nodelay = 1;
+            delay = NGX_MAX_INT_T_VALUE / 1000;
             continue;
         }
 
@@ -1212,7 +1225,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     limit->shm_zone = shm_zone;
 
     limit->burst = burst * 1000;
-    limit->nodelay = nodelay;
+    limit->delay = delay * 1000;
 
     return NGX_CONF_OK;
 }

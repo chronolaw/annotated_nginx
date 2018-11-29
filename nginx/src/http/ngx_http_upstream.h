@@ -433,7 +433,7 @@ struct ngx_http_upstream_s {
     ngx_int_t                      (*rewrite_cookie)(ngx_http_request_t *r,
                                          ngx_table_elt_t *h);
 
-    ngx_msec_t                       timeout;
+    ngx_msec_t                       start_time;
 
     // 处理的状态信息
     ngx_http_upstream_state_t       *state;

@@ -180,6 +180,7 @@ typedef struct {
 
     // 1.10新增,下行的包数
     ngx_uint_t                         responses;
+    ngx_msec_t                         start_time;
 
     ngx_str_t                          ssl_name;
 

@@ -741,6 +741,10 @@ void ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 #endif
 
+// 1.15.7改为非static
+// 清理函数，会删除红黑树节点
+void ngx_delete_udp_connection(void *data);
+
 // 尝试获取负载均衡锁，监听端口
 // 如未获取则不监听端口
 // 内部调用ngx_enable_accept_events/ngx_disable_accept_events

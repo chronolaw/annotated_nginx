@@ -115,6 +115,8 @@ ngx_strlchr(u_char *p, u_char *last, u_char c)
 #define ngx_memzero(buf, n)       (void) memset(buf, 0, n)
 #define ngx_memset(buf, c, n)     (void) memset(buf, c, n)
 
+void ngx_explicit_memzero(void *buf, size_t n);
+
 
 // 内存拷贝，应该使用ngx_copy或者ngx_cpymem
 // 与c函数memcpy不一样，它返回拷贝后的地址，可以简化连续拷贝内存
