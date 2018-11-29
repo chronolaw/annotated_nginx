@@ -24,8 +24,8 @@ Nginx 1.15.6
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.15.6|有
-mainline| Nginx开发版1.15.6|无
+master  | Nginx开发版1.15.7|有
+mainline| Nginx开发版1.15.7|无
 stable  | Nginx稳定版1.14.0|无
 
 # 已注解
