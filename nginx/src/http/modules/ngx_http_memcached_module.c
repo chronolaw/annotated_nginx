@@ -1,3 +1,7 @@
+// annotated by chrono since 2018
+//
+// * ngx_http_memcached_pass
+// * ngx_http_memcached_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -172,6 +176,7 @@ static ngx_str_t  ngx_http_memcached_key = ngx_string("memcached_key");
 static u_char  ngx_http_memcached_end[] = CRLF "END" CRLF;
 
 
+// content handler
 static ngx_int_t
 ngx_http_memcached_handler(ngx_http_request_t *r)
 {
@@ -180,10 +185,12 @@ ngx_http_memcached_handler(ngx_http_request_t *r)
     ngx_http_memcached_ctx_t       *ctx;
     ngx_http_memcached_loc_conf_t  *mlcf;
 
+    // 必须是get或head
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
+    // 丢弃请求体
     rc = ngx_http_discard_request_body(r);
 
     if (rc != NGX_OK) {
@@ -194,6 +201,7 @@ ngx_http_memcached_handler(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // 创建上游结构体
     if (ngx_http_upstream_create(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -207,12 +215,14 @@ ngx_http_memcached_handler(ngx_http_request_t *r)
 
     u->conf = &mlcf->upstream;
 
+    // 设置回调函数
     u->create_request = ngx_http_memcached_create_request;
     u->reinit_request = ngx_http_memcached_reinit_request;
     u->process_header = ngx_http_memcached_process_header;
     u->abort_request = ngx_http_memcached_abort_request;
     u->finalize_request = ngx_http_memcached_finalize_request;
 
+    // ctx里保存请求对象
     ctx = ngx_palloc(r->pool, sizeof(ngx_http_memcached_ctx_t));
     if (ctx == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -222,14 +232,18 @@ ngx_http_memcached_handler(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_memcached_module);
 
+    // 过滤数据
     u->input_filter_init = ngx_http_memcached_filter_init;
     u->input_filter = ngx_http_memcached_filter;
     u->input_filter_ctx = ctx;
 
+    // 引用计数增加
     r->main->count++;
 
+    // 初始化上游，开始反向代理
     ngx_http_upstream_init(r);
 
+    // 必须是done
     return NGX_DONE;
 }
 
@@ -689,6 +703,7 @@ ngx_http_memcached_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+// 处理memcached_pass指令
 static char *
 ngx_http_memcached_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -722,6 +737,7 @@ ngx_http_memcached_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         clcf->auto_redirect = 1;
     }
 
+    // 取memcached_key变量
     mlcf->index = ngx_http_get_variable_index(cf, &ngx_http_memcached_key);
 
     if (mlcf->index == NGX_ERROR) {
