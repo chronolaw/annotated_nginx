@@ -1120,7 +1120,7 @@ ngx_http_core_rewrite_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
     // 调用每个模块自己的处理函数
     rc = ph->handler(r);
 
-    // 模块handler返回decline，表示不处理
+    // 模块handler返回decline，表示成功
     if (rc == NGX_DECLINED) {
         // 继续在本阶段（rewrite）里查找下一个模块
         // 索引加1

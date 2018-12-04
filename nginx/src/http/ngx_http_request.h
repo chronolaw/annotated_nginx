@@ -682,6 +682,7 @@ struct ngx_http_request_s {
 
     unsigned                          aio:1;
 
+    // ngx_http_state_e,标记当前请求所在的处理状态
     unsigned                          http_state:4;
 
     /* URI with "/." and on Win32 with "//" */
