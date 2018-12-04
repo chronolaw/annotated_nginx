@@ -4,6 +4,7 @@
 // * ngx_http_upstream_init
 // * ngx_http_upstream_init_request
 // * ngx_http_upstream_send_request
+// * ngx_http_upstream_process_header
 // * ngx_http_upstream_finalize_request
 
 /*
@@ -2502,7 +2503,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
         // 1.12.0，保存收到的字节数
         u->state->bytes_received += n;
 
-        // 读到了一些数据，加入缓冲器，长度增加
+        // 读到了一些数据，加入缓冲区，长度增加
         u->buffer.last += n;
 
 #if 0
