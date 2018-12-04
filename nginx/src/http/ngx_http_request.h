@@ -711,6 +711,7 @@ struct ngx_http_request_s {
     // 目前最多10次，超过则报错不能继续处理
     unsigned                          uri_changes:4;
 
+    // 读取body到单个内存缓冲区
     unsigned                          request_body_in_single_buf:1;
 
     // 是否把请求体数据存入文件，与request_body_no_buffering相反
