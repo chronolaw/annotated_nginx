@@ -26,7 +26,7 @@ Nginx 1.15.6
 --------|-------|-----
 master  | Nginx开发版1.15.7|有
 mainline| Nginx开发版1.15.7|无
-stable  | Nginx稳定版1.14.0|无
+stable  | Nginx稳定版1.14.2|无
 
 # 已注解
 
