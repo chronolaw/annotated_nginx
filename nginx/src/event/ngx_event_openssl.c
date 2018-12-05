@@ -296,7 +296,7 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
 
     SSL_CTX_set_options(ssl->ctx, SSL_OP_SINGLE_DH_USE);
 
-#ifdef SSL_CTRL_CLEAR_OPTIONS
+#if OPENSSL_VERSION_NUMBER >= 0x009080dfL
     /* only in 0.9.8m+ */
     SSL_CTX_clear_options(ssl->ctx,
                           SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_TLSv1);
@@ -328,6 +328,16 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
     if (!(protocols & NGX_SSL_TLSv1_3)) {
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_3);
     }
+#endif
+
+#ifdef SSL_CTX_set_min_proto_version
+    SSL_CTX_set_min_proto_version(ssl->ctx, 0);
+    SSL_CTX_set_max_proto_version(ssl->ctx, TLS1_2_VERSION);
+#endif
+
+#ifdef TLS1_3_VERSION
+    SSL_CTX_set_min_proto_version(ssl->ctx, 0);
+    SSL_CTX_set_max_proto_version(ssl->ctx, TLS1_3_VERSION);
 #endif
 
 #ifdef SSL_OP_NO_COMPRESSION
@@ -2059,10 +2069,18 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 
             /* handshake failures */
         if (n == SSL_R_BAD_CHANGE_CIPHER_SPEC                        /*  103 */
+#ifdef SSL_R_NO_SUITABLE_KEY_SHARE
+            || n == SSL_R_NO_SUITABLE_KEY_SHARE                      /*  101 */
+#endif
+#ifdef SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM
+            || n == SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM            /*  118 */
+#endif
             || n == SSL_R_BLOCK_CIPHER_PAD_IS_WRONG                  /*  129 */
             || n == SSL_R_DIGEST_CHECK_FAILED                        /*  149 */
             || n == SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST              /*  151 */
             || n == SSL_R_EXCESSIVE_MESSAGE_SIZE                     /*  152 */
+            || n == SSL_R_HTTPS_PROXY_REQUEST                        /*  155 */
+            || n == SSL_R_HTTP_REQUEST                               /*  156 */
             || n == SSL_R_LENGTH_MISMATCH                            /*  159 */
 #ifdef SSL_R_NO_CIPHERS_PASSED
             || n == SSL_R_NO_CIPHERS_PASSED                          /*  182 */
@@ -2078,6 +2096,13 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
             || n == SSL_R_UNEXPECTED_RECORD                          /*  245 */
             || n == SSL_R_UNKNOWN_ALERT_TYPE                         /*  246 */
             || n == SSL_R_UNKNOWN_PROTOCOL                           /*  252 */
+#ifdef SSL_R_NO_COMMON_SIGNATURE_ALGORITHMS
+            || n == SSL_R_NO_COMMON_SIGNATURE_ALGORITHMS             /*  253 */
+#endif
+            || n == SSL_R_UNSUPPORTED_PROTOCOL                       /*  258 */
+#ifdef SSL_R_NO_SHARED_GROUP
+            || n == SSL_R_NO_SHARED_GROUP                            /*  266 */
+#endif
             || n == SSL_R_WRONG_VERSION_NUMBER                       /*  267 */
             || n == SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC        /*  281 */
 #ifdef SSL_R_RENEGOTIATE_EXT_TOO_LONG
@@ -2093,6 +2118,9 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 #endif
 #ifdef SSL_R_INAPPROPRIATE_FALLBACK
             || n == SSL_R_INAPPROPRIATE_FALLBACK                     /*  373 */
+#endif
+#ifdef SSL_R_VERSION_TOO_LOW
+            || n == SSL_R_VERSION_TOO_LOW                            /*  396 */
 #endif
             || n == 1000 /* SSL_R_SSLV3_ALERT_CLOSE_NOTIFY */
 #ifdef SSL_R_SSLV3_ALERT_UNEXPECTED_MESSAGE
