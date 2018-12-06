@@ -229,6 +229,7 @@ typedef struct {
 
     ngx_hash_t                 headers_in_hash;
 
+    // 变量的散列表
     ngx_hash_t                 variables_hash;
 
     // 存储http里定义的所有变量

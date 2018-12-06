@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_add_variable
+// * ngx_http_get_variable
 // * ngx_http_variables_init_vars
 
 /*
@@ -445,6 +446,8 @@ ngx_http_add_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
             return NULL;
         }
 
+        // 标志位去掉weak
+        // 如果没有weak，则设置除weak外的所有位
         if (!(flags & NGX_HTTP_VAR_WEAK)) {
             v->flags &= ~NGX_HTTP_VAR_WEAK;
         }
@@ -506,6 +509,7 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
     ngx_http_variable_t        *v;
     ngx_http_core_main_conf_t  *cmcf;
 
+    // 取core配置
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
     // 在数组里查找是否已经有变量
@@ -527,6 +531,7 @@ ngx_http_add_prefix_variable(ngx_conf_t *cf, ngx_str_t *name, ngx_uint_t flags)
         }
 
         // 标志位去掉weak
+        // 如果没有weak，则设置除weak外的所有位
         if (!(flags & NGX_HTTP_VAR_WEAK)) {
             v->flags &= ~NGX_HTTP_VAR_WEAK;
         }
@@ -2729,12 +2734,15 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
                 av->index = i;
 
+                // 没有get handler或者是weak
                 if (av->get_handler == NULL
                     || (av->flags & NGX_HTTP_VAR_WEAK))
                 {
+                    // 跳出本循环
                     break;
                 }
 
+                // 跳回最上次循环continue
                 goto next;
             }
         }
