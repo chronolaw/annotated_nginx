@@ -719,6 +719,8 @@ ngx_http_variable_value_t *
 ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 {
     size_t                      len;
+    ngx_uint_t                  i, n;
+    ngx_http_variable_t        *v;
     ngx_http_variable_value_t  *vv;
     ngx_http_core_main_conf_t  *cmcf;
 
