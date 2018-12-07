@@ -849,6 +849,7 @@ ngx_http_create_request(ngx_connection_t *c)
     cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
     // 为所有变量创建数组
+    // 里面存放的是变量值
     r->variables = ngx_pcalloc(r->pool, cmcf->variables.nelts
                                         * sizeof(ngx_http_variable_value_t));
     if (r->variables == NULL) {
