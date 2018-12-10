@@ -1,6 +1,7 @@
 // annotated by chrono since 2016
 //
 // * ngx_http_upstream_init_round_robin
+// * ngx_http_upstream_init_round_robin_peer
 
 /*
  * Copyright (C) Igor Sysoev

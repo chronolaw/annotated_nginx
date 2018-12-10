@@ -61,6 +61,7 @@
 #define NGX_HTTP_UPSTREAM_IGN_VARY           0x00000200
 
 
+// 上游的收发状态
 typedef struct {
     ngx_uint_t                       status;
     ngx_msec_t                       response_time;
@@ -68,6 +69,9 @@ typedef struct {
     ngx_msec_t                       header_time;
     ngx_msec_t                       queue_time;
     off_t                            response_length;
+
+    // 收到的字节数
+    // ngx_http_upstream_process_header里增加
     off_t                            bytes_received;
 
     ngx_str_t                       *peer;
@@ -153,6 +157,7 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_MAX_CONNS     0x0100
 
 
+// ngx_http_upstream_srv_conf_t
 // 每个upstream{}块的配置结构体，存储server信息
 struct ngx_http_upstream_srv_conf_s {
     // 初始化结构体
@@ -197,6 +202,7 @@ typedef struct {
 } ngx_http_upstream_local_t;
 
 
+//  ngx_http_upstream_conf_t;
 // 需要设置超时时间、缓冲、限速等必要的参数，才能正确地连接上游服务器
 typedef struct {
     ngx_http_upstream_srv_conf_t    *upstream;
@@ -368,6 +374,7 @@ typedef void (*ngx_http_upstream_handler_pt)(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 
 
+// ngx_http_upstream_t
 // 定义了upstream机制需要的所有信息
 struct ngx_http_upstream_s {
     ngx_http_upstream_handler_pt     read_event_handler;

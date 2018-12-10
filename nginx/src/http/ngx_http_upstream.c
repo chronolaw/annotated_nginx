@@ -620,6 +620,7 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         return;
     }
 
+    // 获取当前请求里的upstream结构
     u = r->upstream;
 
 #if (NGX_HTTP_CACHE)
@@ -671,6 +672,7 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 
     u->store = u->conf->store;
 
+    // 检查客户端断连
     if (!u->store && !r->post_action && !u->conf->ignore_client_abort) {
         r->read_event_handler = ngx_http_upstream_rd_check_broken_connection;
         r->write_event_handler = ngx_http_upstream_wr_check_broken_connection;
@@ -694,6 +696,7 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         return;
     }
 
+    // 是否要求上游keep alive
     if (u->conf->socket_keepalive) {
         u->peer.so_keepalive = 1;
     }
@@ -712,6 +715,7 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 
     u->writer.pool = r->pool;
 
+    // 上游的连接状态，可能连接多个，所以是数组
     if (r->upstream_states == NULL) {
 
         r->upstream_states = ngx_array_create(r->pool, 1,
@@ -745,6 +749,8 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
     cln->data = r;
     u->cleanup = &cln->handler;
 
+    // 没有手工指定上游地址
+    // 使用upsteam{}配置，负载均衡
     if (u->resolved == NULL) {
 
         uscf = u->conf->upstream;
@@ -851,6 +857,7 @@ found:
         return;
     }
 
+    // 设置upstream服务器配置
     u->upstream = uscf;
 
 #if (NGX_HTTP_SSL)
@@ -864,6 +871,7 @@ found:
         return;
     }
 
+    // 开始连接上游的时间
     u->peer.start_time = ngx_current_msec;
 
     if (u->conf->next_upstream_tries
@@ -1325,6 +1333,7 @@ failed:
 }
 
 
+// 上游连接读写事件的处理函数
 static void
 ngx_http_upstream_handler(ngx_event_t *ev)
 {
@@ -1332,12 +1341,16 @@ ngx_http_upstream_handler(ngx_event_t *ev)
     ngx_http_request_t   *r;
     ngx_http_upstream_t  *u;
 
+    // c是上游连接
     c = ev->data;
     r = c->data;
 
     u = r->upstream;
+
+    // c改指向下游连接
     c = r->connection;
 
+    // 记录日志使用下游连接
     ngx_http_set_log_request(c->log, r);
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -1348,6 +1361,7 @@ ngx_http_upstream_handler(ngx_event_t *ev)
         ev->timedout = 0;
     }
 
+    // 处理上游的读写事件
     if (ev->write) {
         u->write_event_handler(r, u);
 
@@ -1636,7 +1650,10 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     c->data = r;
 
+    // 最后会调到u->write_event_handler
     c->write->handler = ngx_http_upstream_handler;
+
+    // 最后会调到u->read_event_handler
     c->read->handler = ngx_http_upstream_handler;
 
     // 设置写事件handler，要发送请求
@@ -2535,8 +2552,11 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
             continue;
         }
 
+        // ok or error
         break;
     }
+
+    // 解析头ok or error
 
     // 返回头无效，数据出错，尝试下一个后端服务器
     if (rc == NGX_HTTP_UPSTREAM_INVALID_HEADER) {
@@ -2626,6 +2646,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 //
 //    ngx_http_upstream_process_body_in_memory(r, u);
 
+    // 发送数据给下游，之前已经正确处理了上游的响应头
     ngx_http_upstream_send_response(r, u);
 }
 
@@ -3153,6 +3174,9 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // 判断u->buffering标志位
+    // 0表示只有一块缓冲区，需要使用filter处理
+    // 数据在内存里做处理
     if (!u->buffering) {
 
 #if (NGX_HTTP_CACHE)
@@ -3163,6 +3187,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
 #endif
 
+        // 检查过滤器，如果模块没有设置就使用默认的
         if (u->input_filter == NULL) {
             u->input_filter_init = ngx_http_upstream_non_buffered_filter_init;
             u->input_filter = ngx_http_upstream_non_buffered_filter;
@@ -3175,6 +3200,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
         r->limit_rate = 0;
 
+        // 过滤器初始化
         if (u->input_filter_init(u->input_filter_ctx) == NGX_ERROR) {
             ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
             return;
@@ -3187,6 +3213,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
         n = u->buffer.last - u->buffer.pos;
 
+        // 执行过滤
         if (n) {
             u->buffer.last = u->buffer.pos;
 
