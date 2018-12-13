@@ -2848,7 +2848,7 @@ ngx_http_subrequest(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    // ???
+    // 已经设置标志位，不允许再设置
     if (r->subrequest_in_memory) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "nested in-memory subrequest \"%V\"", uri);

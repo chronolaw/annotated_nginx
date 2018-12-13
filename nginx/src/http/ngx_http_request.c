@@ -2981,6 +2981,8 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             }
 
             r->done = 1;
+
+            // background则直接结束子请求
             ngx_http_finalize_connection(r);
             return;
         }
@@ -3002,6 +3004,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             return;
         }
 
+        // 检查父请求
         pr = r->parent;
 
         if (r == c->data) {
@@ -3037,6 +3040,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
             r->write_event_handler = ngx_http_request_finalizer;
 
+            // NGX_HTTP_SUBREQUEST_WAITED
             if (r->waited) {
                 r->done = 1;
             }

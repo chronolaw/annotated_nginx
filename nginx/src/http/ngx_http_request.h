@@ -727,9 +727,11 @@ struct ngx_http_request_s {
     // 1-不缓存请求体数据
     unsigned                          request_body_no_buffering:1;
 
-    // 要求upstream的数据都在内存里，方便处理
+    // 要求子请求的数据都在内存里，方便处理
+    // 同时置filter_need_in_memory
     unsigned                          subrequest_in_memory:1;
 
+    // NGX_HTTP_SUBREQUEST_WAITED
     unsigned                          waited:1;
 
 #if (NGX_HTTP_CACHE)
@@ -817,7 +819,9 @@ struct ngx_http_request_s {
     unsigned                          stat_writing:1;
     unsigned                          stat_processing:1;
 
+    // NGX_HTTP_SUBREQUEST_BACKGROUND
     unsigned                          background:1;
+
     unsigned                          health_check:1;
 
     /* used to parse HTTP headers */
