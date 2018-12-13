@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_postpone_filter
+// * ngx_http_postpone_filter_in_memory
 
 /*
  * Copyright (C) Igor Sysoev
@@ -12,6 +16,10 @@
 
 static ngx_int_t ngx_http_postpone_filter_add(ngx_http_request_t *r,
     ngx_chain_t *in);
+
+// NGX_HTTP_SUBREQUEST_IN_MEMORY
+// 如果没有输出链表就新建缓冲区并挂上
+// 全部拷贝到r->out里
 static ngx_int_t ngx_http_postpone_filter_in_memory(ngx_http_request_t *r,
     ngx_chain_t *in);
 static ngx_int_t ngx_http_postpone_filter_init(ngx_conf_t *cf);
@@ -62,6 +70,9 @@ ngx_http_postpone_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http postpone filter \"%V?%V\" %p", &r->uri, &r->args, in);
 
+    // NGX_HTTP_SUBREQUEST_IN_MEMORY
+    // 如果没有输出链表就新建缓冲区并挂上
+    // 全部拷贝到r->out里
     if (r->subrequest_in_memory) {
         return ngx_http_postpone_filter_in_memory(r, in);
     }
@@ -177,6 +188,9 @@ found:
 }
 
 
+// NGX_HTTP_SUBREQUEST_IN_MEMORY
+// 如果没有输出链表就新建缓冲区并挂上
+// 全部拷贝到r->out里
 static ngx_int_t
 ngx_http_postpone_filter_in_memory(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -185,17 +199,21 @@ ngx_http_postpone_filter_in_memory(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // r是子请求
     c = r->connection;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http postpone filter in memory");
 
+    // 如果没有输出链表就新建缓冲区并挂上
     if (r->out == NULL) {
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+        // 有长度头则使用
         if (r->headers_out.content_length_n != -1) {
             len = r->headers_out.content_length_n;
 
+            // 不能超过指令设置的4k/8k
             if (len > clcf->subrequest_output_buffer_size) {
                 ngx_log_error(NGX_LOG_ERR, c->log, 0,
                               "too big subrequest response: %uz", len);
@@ -203,14 +221,17 @@ ngx_http_postpone_filter_in_memory(ngx_http_request_t *r, ngx_chain_t *in)
             }
 
         } else {
+            // 没有则使用指令设置的
             len = clcf->subrequest_output_buffer_size;
         }
 
+        // 就创建一块，全部拷贝
         b = ngx_create_temp_buf(r->pool, len);
         if (b == NULL) {
             return NGX_ERROR;
         }
 
+        // 就创建一块，全部拷贝
         b->last_buf = 1;
 
         r->out = ngx_alloc_chain_link(r->pool);
@@ -224,6 +245,7 @@ ngx_http_postpone_filter_in_memory(ngx_http_request_t *r, ngx_chain_t *in)
 
     b = r->out->buf;
 
+    // 全部拷贝
     for ( /* void */ ; in; in = in->next) {
 
         if (ngx_buf_special(in->buf)) {
@@ -245,6 +267,8 @@ ngx_http_postpone_filter_in_memory(ngx_http_request_t *r, ngx_chain_t *in)
         in->buf->pos = in->buf->last;
     }
 
+    // 注意返回ok，而不是next filter
+    // 中断了过滤链表
     return NGX_OK;
 }
 
