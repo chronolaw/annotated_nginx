@@ -1,4 +1,25 @@
 
+Changes with nginx 1.15.8                                        25 Dec 2018
+
+    *) Feature: the $upstream_bytes_sent variable.
+       Thanks to Piotr Sikora.
+
+    *) Feature: new directives in vim syntax highlighting scripts.
+       Thanks to Gena Makhomed.
+
+    *) Bugfix: in the "proxy_cache_background_update" directive.
+
+    *) Bugfix: in the "geo" directive when using unix domain listen sockets.
+
+    *) Workaround: the "ignoring stale global SSL error ... bad length"
+       alerts might appear in logs when using the "ssl_early_data" directive
+       with OpenSSL.
+
+    *) Bugfix: in nginx/Windows.
+
+    *) Bugfix: in the ngx_http_autoindex_module on 32-bit platforms.
+
+
 Changes with nginx 1.15.7                                        27 Nov 2018
 
     *) Feature: the "proxy_requests" directive in the stream module.
