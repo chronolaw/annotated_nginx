@@ -73,6 +73,9 @@ typedef struct {
     // 收到的字节数
     // ngx_http_upstream_process_header里增加
     off_t                            bytes_received;
+
+    // 发送到后端的字节数
+    // 1.15.8新增
     off_t                            bytes_sent;
 
     ngx_str_t                       *peer;
