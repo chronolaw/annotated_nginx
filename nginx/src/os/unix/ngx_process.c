@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// * ngx_debug_point
 // * ngx_spawn_process
 // * ngx_signal_handler
 // * ngx_init_signals
@@ -746,12 +747,15 @@ ngx_debug_point(void)
     switch (ccf->debug_points) {
 
     // stop，使用stop信号停止运行
+    // 之后可以用gdb调试
     case NGX_DEBUG_POINTS_STOP:
         raise(SIGSTOP);
         break;
 
     // 直接abort
+    // 产生coredump，再用gdb调试
     case NGX_DEBUG_POINTS_ABORT:
+        // ngx_config.h:#define ngx_abort       abort
         ngx_abort();
     }
 
