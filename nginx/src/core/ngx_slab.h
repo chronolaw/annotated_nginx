@@ -19,6 +19,7 @@
 
 typedef struct ngx_slab_page_s  ngx_slab_page_t;
 
+// ngx_slab_page_t
 // slab页信息
 // 管理每个内存页
 // 只有三个指针大小，64位系统上是3*8=24字节
