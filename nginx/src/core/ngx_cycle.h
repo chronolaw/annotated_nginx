@@ -33,6 +33,7 @@ typedef struct ngx_shm_zone_s  ngx_shm_zone_t;
 
 typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
 
+// ngx_shm_zone_t
 // nginx共享内存结构体
 // 使用共享内存锁保证安全
 //
