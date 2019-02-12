@@ -1019,6 +1019,7 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
         // 算出使用的page数组位置
         // 指针减去内存池地址，再除以4k取整
+        // 此处是冗余计算，会在之后的版本里删除
         n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
 
         // 位运算去掉高位，得到连续页数量
