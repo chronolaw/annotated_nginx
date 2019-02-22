@@ -110,6 +110,9 @@ ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
     // 拷贝addr的字符串形式
     ngx_memcpy(ls->addr_text.data, text, len);
 
+    // 1.15.0 新增，管理本端口的udp客户端连接
+    // 保持udp连接，支持客户端发多包
+    // 但对于tcp连接来说浪费了点空间
 #if !(NGX_WIN32)
     ngx_rbtree_init(&ls->rbtree, &ls->sentinel, ngx_udp_rbtree_insert_value);
 #endif
