@@ -1,4 +1,20 @@
 
+Changes with nginx 1.15.9                                        26 Feb 2019
+
+    *) Feature: variables support in the "ssl_certificate" and
+       "ssl_certificate_key" directives.
+
+    *) Feature: the "poll" method is now available on Windows when using
+       Windows Vista or newer.
+
+    *) Bugfix: if the "select" method was used on Windows and an error
+       occurred while establishing a backend connection, nginx waited for
+       the connection establishment timeout to expire.
+
+    *) Bugfix: the "proxy_upload_rate" and "proxy_download_rate" directives
+       in the stream module worked incorrectly when proxying UDP datagrams.
+
+
 Changes with nginx 1.15.8                                        25 Dec 2018
 
     *) Feature: the $upstream_bytes_sent variable.

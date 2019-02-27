@@ -325,6 +325,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
             // udp连接可读
             rev->ready = 1;
+            rev->active = 0;
 
             // 执行读回调函数ngx_stream_session_handler
             // 按阶段执行处理引擎，调用各个模块的handler
@@ -339,6 +340,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
             // 此时不可读
             rev->ready = 0;
+            rev->active = 1;
 
             // 完成一次udp accept，continue
             // 实际上是一次udp read
@@ -444,6 +446,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         wev = c->write;
 
         // 连接立即可写
+        rev->active = 1;
         wev->ready = 1;
 
         rev->log = log;
@@ -574,7 +577,9 @@ ngx_udp_shared_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     // 清空缓冲区
     c->udp->buffer = NULL;
+
     c->read->ready = 0;
+    c->read->active = 1;
 
     return n;
 }

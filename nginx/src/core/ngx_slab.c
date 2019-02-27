@@ -1019,14 +1019,15 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
         // 算出使用的page数组位置
         // 指针减去内存池地址，再除以4k取整
-        // 此处是冗余计算，会在之后的版本里删除
-        n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+        // 此处是冗余计算，在1.15.9后的版本里删除
+        //n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+        //ngx_slab_free_pages(pool, &pool->pages[n], size);
 
         // 位运算去掉高位，得到连续页数量
         size = slab & ~NGX_SLAB_PAGE_START;
 
         // 释放多个内存页，支持合并
-        ngx_slab_free_pages(pool, &pool->pages[n], size);
+        ngx_slab_free_pages(pool, page, size);
 
         // 调试用宏，内存放入垃圾数据
         // 正式环境不会起作用
