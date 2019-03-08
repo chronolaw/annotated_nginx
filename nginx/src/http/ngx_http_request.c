@@ -12,6 +12,8 @@
 // * ngx_http_set_write_handler
 // * ngx_http_writer
 //
+// * ngx_http_ssl_handshake
+//
 // * ngx_http_log_request
 // * ngx_http_free_request
 // * ngx_http_close_connection
@@ -943,6 +945,8 @@ ngx_http_alloc_request(ngx_connection_t *c)
 
 #if (NGX_HTTP_SSL)
 
+// ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
+// 进入ssl握手处理，而不是直接读取http头
 static void
 ngx_http_ssl_handshake(ngx_event_t *rev)
 {
