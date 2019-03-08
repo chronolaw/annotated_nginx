@@ -984,10 +984,11 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         return;
     }
 
+    // 是否代理协议，不是则size=1
     size = hc->proxy_protocol ? sizeof(buf) : 1;
 
     // 读取数据
-    // 通常只读取1个字节
+    // 通常只读取1个字节，是ssl的版本号
     n = recv(c->fd, (char *) buf, size, MSG_PEEK);
 
     err = ngx_socket_errno;
@@ -1065,11 +1066,14 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
+            // 取ssl模块的各种配置
             sscf = ngx_http_get_module_srv_conf(hc->conf_ctx,
                                                 ngx_http_ssl_module);
 
             // 创建ssl连接对象
             // 在event/ngx_event_openssl.c
+            // #define NGX_SSL_BUFFER   1
+            // 默认启用ssl缓冲
             if (ngx_ssl_create_connection(&sscf->ssl, c, NGX_SSL_BUFFER)
                 != NGX_OK)
             {

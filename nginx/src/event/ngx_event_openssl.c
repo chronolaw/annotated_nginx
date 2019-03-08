@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_ssl_create_connection
+// * ngx_ssl_handshake
 
 /*
  * Copyright (C) Igor Sysoev
@@ -1485,6 +1489,8 @@ ngx_ssl_new_client_session(ngx_ssl_conn_t *ssl_conn, ngx_ssl_session_t *sess)
 }
 
 
+// 创建ssl连接对象
+// #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
 ngx_int_t
 ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
 {
@@ -1495,6 +1501,8 @@ ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
         return NGX_ERROR;
     }
 
+    // 默认会开启缓冲，16k，可改小
+    // ssl_buffer_size size;
     sc->buffer = ((flags & NGX_SSL_BUFFER) != 0);
     sc->buffer_size = ssl->buffer_size;
 
@@ -1579,6 +1587,7 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
 }
 
 
+// 开始ssl握手
 ngx_int_t
 ngx_ssl_handshake(ngx_connection_t *c)
 {
@@ -1597,12 +1606,15 @@ ngx_ssl_handshake(ngx_connection_t *c)
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_do_handshake: %d", n);
 
+    // 握手成功
     if (n == 1) {
 
+        // 重新关注读事件，0表示ET
         if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
             return NGX_ERROR;
         }
 
+        // 重新关注写事件，0表示ET
         if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -1611,8 +1623,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
         ngx_ssl_handshake_log(c);
 #endif
 
+        // 标记握手成功
         c->ssl->handshaked = 1;
 
+        // 设置连接的读写关联处理函数
+        // 后续的读写都用ssl的加密来操作
         c->recv = ngx_ssl_recv;
         c->send = ngx_ssl_write;
         c->recv_chain = ngx_ssl_recv_chain;
@@ -1631,9 +1646,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
 #endif
 #endif
 
+        // 握手成功
         return NGX_OK;
     }
 
+    // 握手失败，检查错误原因
     sslerr = SSL_get_error(c->ssl->connection, n);
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_get_error: %d", sslerr);

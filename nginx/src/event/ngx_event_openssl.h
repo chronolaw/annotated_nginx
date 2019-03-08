@@ -82,13 +82,20 @@ struct ngx_ssl_s {
 };
 
 
+// typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 // 是ngx_connection_t的成员，处理ssl
 struct ngx_ssl_connection_s {
     ngx_ssl_conn_t             *connection;
+
+    // openssl的ctx数据
     SSL_CTX                    *session_ctx;
 
     ngx_int_t                   last;
     ngx_buf_t                  *buf;
+
+    // #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
+    // 默认会开启缓冲，16k，可改小
+    // ssl_buffer_size size;
     size_t                      buffer_size;
 
     ngx_connection_handler_pt   handler;
@@ -103,7 +110,10 @@ struct ngx_ssl_connection_s {
 
     unsigned                    handshaked:1;
     unsigned                    renegotiation:1;
+
+    // #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
     unsigned                    buffer:1;
+
     unsigned                    no_wait_shutdown:1;
     unsigned                    no_send_shutdown:1;
     unsigned                    handshake_buffer_set:1;
@@ -169,7 +179,9 @@ typedef struct {
 #define NGX_SSL_TLSv1_3  0x0040
 
 
+// 默认启用ssl缓冲
 #define NGX_SSL_BUFFER   1
+
 #define NGX_SSL_CLIENT   2
 
 #define NGX_SSL_BUFSIZE  16384
@@ -216,6 +228,9 @@ ngx_int_t ngx_ssl_session_ticket_keys(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_array_t *paths);
 
 ngx_int_t ngx_ssl_session_cache_init(ngx_shm_zone_t *shm_zone, void *data);
+
+// 创建ssl连接对象
+// #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
 ngx_int_t ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c,
     ngx_uint_t flags);
 
@@ -283,12 +298,17 @@ ngx_int_t ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 
 
+// 开始ssl握手
 ngx_int_t ngx_ssl_handshake(ngx_connection_t *c);
+
+// 连接的读写关联处理函数
+// 后续的读写都用ssl的加密来操作
 ssize_t ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size);
 ssize_t ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size);
 ssize_t ngx_ssl_recv_chain(ngx_connection_t *c, ngx_chain_t *cl, off_t limit);
 ngx_chain_t *ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
+
 void ngx_ssl_free_buffer(ngx_connection_t *c);
 ngx_int_t ngx_ssl_shutdown(ngx_connection_t *c);
 void ngx_cdecl ngx_ssl_error(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
