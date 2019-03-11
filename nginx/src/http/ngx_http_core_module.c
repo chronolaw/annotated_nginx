@@ -2139,6 +2139,7 @@ ngx_http_set_exten(ngx_http_request_t *r)
 }
 
 
+// 计算etag
 ngx_int_t
 ngx_http_set_etag(ngx_http_request_t *r)
 {
@@ -2151,31 +2152,41 @@ ngx_http_set_etag(ngx_http_request_t *r)
         return NGX_OK;
     }
 
+    // 添加一个头
     etag = ngx_list_push(&r->headers_out.headers);
     if (etag == NULL) {
         return NGX_ERROR;
     }
 
+    // hash=1表示启用头
     etag->hash = 1;
+
+    // 设置key
     ngx_str_set(&etag->key, "ETag");
 
+    // 分配value的内存,off_t+time_t的长度再加3
     etag->value.data = ngx_pnalloc(r->pool, NGX_OFF_T_LEN + NGX_TIME_T_LEN + 3);
     if (etag->value.data == NULL) {
         etag->hash = 0;
         return NGX_ERROR;
     }
 
+    // 打印字符串作为etag
+    // 修改时间+长度，然后有两个引号和‘-’
     etag->value.len = ngx_sprintf(etag->value.data, "\"%xT-%xO\"",
                                   r->headers_out.last_modified_time,
                                   r->headers_out.content_length_n)
                       - etag->value.data;
 
+    // 最后设置输出头的指针关联
     r->headers_out.etag = etag;
 
     return NGX_OK;
 }
 
 
+// 弱etag，多了个“W/”
+// 参考ngx_http_image_filter_module
 void
 ngx_http_weak_etag(ngx_http_request_t *r)
 {
@@ -2189,6 +2200,7 @@ ngx_http_weak_etag(ngx_http_request_t *r)
         return;
     }
 
+    // 已经是弱etag则不处理
     if (etag->value.len > 2
         && etag->value.data[0] == 'W'
         && etag->value.data[1] == '/')
@@ -2202,6 +2214,7 @@ ngx_http_weak_etag(ngx_http_request_t *r)
         return;
     }
 
+    // 多分配两个字符
     p = ngx_pnalloc(r->pool, etag->value.len + 2);
     if (p == NULL) {
         r->headers_out.etag->hash = 0;
@@ -2209,6 +2222,7 @@ ngx_http_weak_etag(ngx_http_request_t *r)
         return;
     }
 
+    // 添加“w/”即可
     len = ngx_sprintf(p, "W/%V", &etag->value) - p;
 
     etag->value.data = p;
