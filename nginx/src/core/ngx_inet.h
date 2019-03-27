@@ -100,6 +100,10 @@ typedef struct {
 
     in_port_t                 port;
     in_port_t                 default_port;
+
+    // 1.15.10新增，range listen
+    in_port_t                 last_port;
+
     int                       family;
 
     unsigned                  listen:1;
@@ -164,6 +168,7 @@ ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
 in_port_t ngx_inet_get_port(struct sockaddr *sa);
 
 void ngx_inet_set_port(struct sockaddr *sa, in_port_t port);
+ngx_uint_t ngx_inet_wildcard(struct sockaddr *sa);
 
 
 #endif /* _NGX_INET_H_INCLUDED_ */

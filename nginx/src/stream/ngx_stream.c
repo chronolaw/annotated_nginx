@@ -535,7 +535,10 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     ngx_stream_conf_addr_t  *addr;
 
     // 得到监听端口结构体里的socket地址
-    sa = &listen->sockaddr.sockaddr;
+    // before 1.15.10
+    //sa = &listen->sockaddr.sockaddr;
+
+    sa = listen->sockaddr;
 
     // 得到监听端口结构体里的端口
     // 1.11.x后使用函数ngx_inet_get_port
@@ -648,9 +651,12 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
                 continue;
             }
 
+            // before 1.15.10
+            //ls = ngx_create_listening(cf, &addr[i].opt.sockaddr.sockaddr,
+
             // 添加到cycle的监听端口数组，只是添加，没有其他动作
             // 这里的ls是ngx_listening_t
-            ls = ngx_create_listening(cf, &addr[i].opt.sockaddr.sockaddr,
+            ls = ngx_create_listening(cf, addr[i].opt.sockaddr,
                                       addr[i].opt.socklen);
             if (ls == NULL) {
                 return NGX_CONF_ERROR;
@@ -757,12 +763,9 @@ static ngx_int_t
 ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_stream_conf_addr_t *addr)
 {
-    u_char                *p;
-    size_t                 len;
     ngx_uint_t             i;
     struct sockaddr_in    *sin;
     ngx_stream_in_addr_t  *addrs;
-    u_char                 buf[NGX_SOCKADDR_STRLEN];
 
     // 分配内存，数量是stport->naddrs
     stport->addrs = ngx_pcalloc(cf->pool,
@@ -777,8 +780,10 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     // 为数组元素赋值
     for (i = 0; i < stport->naddrs; i++) {
 
+        //sin = &addr[i].opt.sockaddr.sockaddr_in;
+
         // 从ngx_stream_listen_t里得到ip地址
-        sin = &addr[i].opt.sockaddr.sockaddr_in;
+        sin = (struct sockaddr_in *) addr[i].opt.sockaddr;
 
         // 拷贝到数组里
         addrs[i].addr = sin->sin_addr.s_addr;
@@ -792,23 +797,26 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
 #endif
         addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
+        // before 1.15.10
         // socket地址转换为字符串
         // 参数1表示字符串里含有端口，即xxxx:port
-        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
-                            buf, NGX_SOCKADDR_STRLEN, 1);
+        //len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
+        //                    buf, NGX_SOCKADDR_STRLEN, 1);
 
-        // 分配内存，准备拷贝地址字符串
-        p = ngx_pnalloc(cf->pool, len);
-        if (p == NULL) {
-            return NGX_ERROR;
-        }
+        //// 分配内存，准备拷贝地址字符串
+        //p = ngx_pnalloc(cf->pool, len);
+        //if (p == NULL) {
+        //    return NGX_ERROR;
+        //}
 
-        // 拷贝地址字符串
-        ngx_memcpy(p, buf, len);
+        //// 拷贝地址字符串
+        //ngx_memcpy(p, buf, len);
 
-        // 设置地址字符串
-        addrs[i].conf.addr_text.len = len;
-        addrs[i].conf.addr_text.data = p;
+        //// 设置地址字符串
+        //addrs[i].conf.addr_text.len = len;
+        //addrs[i].conf.addr_text.data = p;
+
+        addrs[i].conf.addr_text = addr[i].opt.addr_text;
     }
 
     return NGX_OK;
@@ -821,12 +829,9 @@ static ngx_int_t
 ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_stream_conf_addr_t *addr)
 {
-    u_char                 *p;
-    size_t                  len;
     ngx_uint_t              i;
     struct sockaddr_in6    *sin6;
     ngx_stream_in6_addr_t  *addrs6;
-    u_char                  buf[NGX_SOCKADDR_STRLEN];
 
     stport->addrs = ngx_pcalloc(cf->pool,
                                 stport->naddrs * sizeof(ngx_stream_in6_addr_t));
@@ -838,7 +843,7 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
 
     for (i = 0; i < stport->naddrs; i++) {
 
-        sin6 = &addr[i].opt.sockaddr.sockaddr_in6;
+        sin6 = (struct sockaddr_in6 *) addr[i].opt.sockaddr;
         addrs6[i].addr6 = sin6->sin6_addr;
 
         addrs6[i].conf.ctx = addr[i].opt.ctx;
@@ -846,19 +851,7 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs6[i].conf.ssl = addr[i].opt.ssl;
 #endif
         addrs6[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
-
-        len = ngx_sock_ntop(&addr[i].opt.sockaddr.sockaddr, addr[i].opt.socklen,
-                            buf, NGX_SOCKADDR_STRLEN, 1);
-
-        p = ngx_pnalloc(cf->pool, len);
-        if (p == NULL) {
-            return NGX_ERROR;
-        }
-
-        ngx_memcpy(p, buf, len);
-
-        addrs6[i].conf.addr_text.len = len;
-        addrs6[i].conf.addr_text.data = p;
+        addrs6[i].conf.addr_text = addr[i].opt.addr_text;
     }
 
     return NGX_OK;

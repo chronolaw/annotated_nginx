@@ -68,10 +68,14 @@ typedef struct {
     // socket地址，使用union适应各种情形
     // 主要使用的是u.sockaddr
     // 1.11.x改为在ngx_inet.h里定义的ngx_sockaddr_t，简化了代码
-    ngx_sockaddr_t                 sockaddr;
+    // 1.15.10后又改成了指针形式的数组
+    //ngx_sockaddr_t                 sockaddr;
+
+    struct sockaddr               *sockaddr;
 
     // socket地址长度
     socklen_t                      socklen;
+    ngx_str_t                      addr_text;
 
     /* server ctx */
     // 监听端口所在的server{}配置数组
