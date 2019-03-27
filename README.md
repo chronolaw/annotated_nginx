@@ -4,11 +4,10 @@ Annotated Nginx Source（中文）
 # 简介
 Nginx源码分析，注解代码，帮助学习Nginx。
 
-Nginx1.10增加了动态模块、http2、reuseport。
-
-Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
-
-Nginx1.14增加了mirror模块，支持gRPC。
+* Nginx1.10增加了动态模块、http2、reuseport。
+* Nginx1.11.x里的stream模块的变动较大，完善了阶段处理。
+* Nginx1.14增加了mirror模块，支持gRPC。
+* Nginx1.15.10增加了range listen,指令“ssl_certificate”可从变量里加载证书。
 
 请参考：
 * [《Nginx完全开发指南：使用C/C++和OpenResty》](http://item.jd.com/12082107.html)
@@ -19,13 +18,13 @@ Nginx1.14增加了mirror模块，支持gRPC。
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module) - A better tools for nginx with google_perftools
 
 # 当前状态
-Nginx 1.15.9
+Nginx 1.15.10
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.15.9|有
-mainline| Nginx开发版1.15.9|无
+master  | Nginx开发版1.15.10|有
+mainline| Nginx开发版1.15.10|无
 stable  | Nginx稳定版1.14.2|无
 
 # 已注解
