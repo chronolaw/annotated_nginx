@@ -1758,6 +1758,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             if (r->header_in->pos == r->header_in->end) {
 
                 // 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+                // 如果数据超过了配置的缓存区大小4k，返回declined
                 // 使用了hc->busy/free等成员
                 rv = ngx_http_alloc_large_header_buffer(r, 0);
 
@@ -1766,6 +1767,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                     break;
                 }
 
+                // 如果数据超过了配置的缓存区大小4k，返回declined
                 if (rv == NGX_DECLINED) {
                     p = r->header_name_start;
 
@@ -1794,6 +1796,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
                     break;
                 }
 
+                // rv == ok
                 // 此时缓冲区已经足够大了
             }
 
@@ -2021,6 +2024,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
 
 
 // 为接收http头数据分配一个大的缓冲区，拷贝已经接收的数据
+// 如果数据超过了配置的缓存区大小4k，返回declined
 // 使用了hc->busy/free等成员
 static ngx_int_t
 ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
