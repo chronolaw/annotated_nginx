@@ -2396,6 +2396,7 @@ ngx_http_process_request_header(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
+    // http1.1不允许没有host头
     if (r->headers_in.host == NULL && r->http_version > NGX_HTTP_VERSION_10) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                    "client sent HTTP/1.1 request without \"Host\" header");
@@ -2403,6 +2404,7 @@ ngx_http_process_request_header(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
+    // content_length不能是非数字
     if (r->headers_in.content_length) {
         r->headers_in.content_length_n =
                             ngx_atoof(r->headers_in.content_length->value.data,
@@ -2416,6 +2418,7 @@ ngx_http_process_request_header(ngx_http_request_t *r)
         }
     }
 
+    // 不支持trace方法
     if (r->method == NGX_HTTP_TRACE) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                       "client sent TRACE method");
