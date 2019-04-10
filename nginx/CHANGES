@@ -1,4 +1,9 @@
 
+Changes with nginx 1.15.11                                       09 Apr 2019
+
+    *) Bugfix: in the "ssl_stapling_file" directive on Windows.
+
+
 Changes with nginx 1.15.10                                       26 Mar 2019
 
     *) Change: when using a hostname in the "listen" directive nginx now
