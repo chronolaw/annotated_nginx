@@ -2533,6 +2533,8 @@ ngx_http_auth_basic_user(ngx_http_request_t *r)
 
 #if (NGX_HTTP_GZIP)
 
+// 检查accept_encoding
+// 决定是否可以gzip
 ngx_int_t
 ngx_http_gzip_ok(ngx_http_request_t *r)
 {
@@ -2542,17 +2544,22 @@ ngx_http_gzip_ok(ngx_http_request_t *r)
     ngx_table_elt_t           *e, *d, *ae;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 避免重复检测
     r->gzip_tested = 1;
 
+    // 子请求不处理
     if (r != r->main) {
         return NGX_DECLINED;
     }
 
+    // 取accept_encoding
+    // 没有则不gzip
     ae = r->headers_in.accept_encoding;
     if (ae == NULL) {
         return NGX_DECLINED;
     }
 
+    // 长度不等于gzip
     if (ae->value.len < sizeof("gzip") - 1) {
         return NGX_DECLINED;
     }
@@ -2566,7 +2573,9 @@ ngx_http_gzip_ok(ngx_http_request_t *r)
      *   Opera:   "gzip, deflate"
      */
 
+    // 优化，通常gzip都是第一个选项
     if (ngx_memcmp(ae->value.data, "gzip,", 5) != 0
+        // 否则再字符串比较查找，判断qvalue
         && ngx_http_gzip_accept_encoding(&ae->value) != NGX_OK)
     {
         return NGX_DECLINED;
@@ -2574,10 +2583,12 @@ ngx_http_gzip_ok(ngx_http_request_t *r)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+    // ie6特殊
     if (r->headers_in.msie6 && clcf->gzip_disable_msie6) {
         return NGX_DECLINED;
     }
 
+    // 指令的版本设置
     if (r->http_version < clcf->gzip_http_version) {
         return NGX_DECLINED;
     }
