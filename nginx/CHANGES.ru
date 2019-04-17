@@ -1,4 +1,11 @@
 
+Изменения в nginx 1.15.12                                         16.04.2019
+
+    *) Исправление: в рабочем процессе мог произойти segmentation fault,
+       если в директивах ssl_certificate или ssl_certificate_key
+       использовались переменные и был включён OCSP stapling.
+
+
 Изменения в nginx 1.15.11                                         09.04.2019
 
     *) Исправление: в директиве ssl_stapling_file на Windows.

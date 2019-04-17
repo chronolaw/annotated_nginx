@@ -1,4 +1,11 @@
 
+Changes with nginx 1.15.12                                       16 Apr 2019
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       variables were used in the "ssl_certificate" or "ssl_certificate_key"
+       directives and OCSP stapling was enabled.
+
+
 Changes with nginx 1.15.11                                       09 Apr 2019
 
     *) Bugfix: in the "ssl_stapling_file" directive on Windows.
