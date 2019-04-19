@@ -1365,6 +1365,7 @@ ngx_http_request_body_length_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
+// 解析分块传输的body数据
 static ngx_int_t
 ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -1407,8 +1408,11 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
                            cl->buf->file_pos,
                            cl->buf->file_last - cl->buf->file_pos);
 
+            // in ngx_http_parse.c
+            // 解析chunked数据
             rc = ngx_http_parse_chunked(r, cl->buf, rb->chunked);
 
+            // ok表示一个chunk解析完成
             if (rc == NGX_OK) {
 
                 /* a chunk has been parsed successfully */
