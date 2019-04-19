@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -16,7 +18,10 @@ typedef struct {
 } ngx_http_chunked_filter_ctx_t;
 
 
+// 加入过滤链表
 static ngx_int_t ngx_http_chunked_filter_init(ngx_conf_t *cf);
+
+// 拖尾数据
 static ngx_chain_t *ngx_http_chunked_create_trailers(ngx_http_request_t *r,
     ngx_http_chunked_filter_ctx_t *ctx);
 
@@ -56,12 +61,14 @@ static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
 
 
+// header过滤函数
 static ngx_int_t
 ngx_http_chunked_header_filter(ngx_http_request_t *r)
 {
     ngx_http_core_loc_conf_t       *clcf;
     ngx_http_chunked_filter_ctx_t  *ctx;
 
+    // 304,204，子请求，head不处理
     if (r->headers_out.status == NGX_HTTP_NOT_MODIFIED
         || r->headers_out.status == NGX_HTTP_NO_CONTENT
         || r->headers_out.status < NGX_HTTP_OK
@@ -71,20 +78,26 @@ ngx_http_chunked_header_filter(ngx_http_request_t *r)
         return ngx_http_next_header_filter(r);
     }
 
+    // 没有提供content_length就是chunked
     if (r->headers_out.content_length_n == -1
         || r->expect_trailers)
     {
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+        // HTTP/1.1使用chunked
+        // 默认chunked_transfer_encoding on;
         if (r->http_version >= NGX_HTTP_VERSION_11
             && clcf->chunked_transfer_encoding)
         {
+            // 要求拖尾则删除长度头
             if (r->expect_trailers) {
                 ngx_http_clear_content_length(r);
             }
 
+            // 分块标记
             r->chunked = 1;
 
+            // ctx
             ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_chunked_filter_ctx_t));
             if (ctx == NULL) {
                 return NGX_ERROR;
@@ -101,6 +114,7 @@ ngx_http_chunked_header_filter(ngx_http_request_t *r)
 }
 
 
+// body过滤函数
 static ngx_int_t
 ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
@@ -111,6 +125,7 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_chain_t                    *out, *cl, *tl, **ll;
     ngx_http_chunked_filter_ctx_t  *ctx;
 
+    // 没数据，不分块，head请求
     if (in == NULL || !r->chunked || r->header_only) {
         return ngx_http_next_body_filter(r, in);
     }
@@ -123,6 +138,7 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     size = 0;
     cl = in;
 
+    // 拷贝缓冲区数据
     for ( ;; ) {
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http chunk: %O", ngx_buf_size(cl->buf));
@@ -151,7 +167,9 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         cl = cl->next;
     }
 
+    // 看大小
     if (size) {
+        // 拿一个缓冲区节点
         tl = ngx_chain_get_free_buf(r->pool, &ctx->free);
         if (tl == NULL) {
             return NGX_ERROR;
@@ -160,6 +178,7 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         b = tl->buf;
         chunk = b->start;
 
+        // 分配一小块内存，容纳16进制数据
         if (chunk == NULL) {
             /* the "0000000000000000" is 64-bit hexadecimal string */
 
@@ -176,12 +195,16 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         b->memory = 0;
         b->temporary = 1;
         b->pos = chunk;
+
+        // 打印16进制长度size
         b->last = ngx_sprintf(chunk, "%xO" CRLF, size);
 
         tl->next = out;
         out = tl;
     }
 
+    // 最后一块会创建trailer
+    // 没有trailer就是'0\r\n'
     if (cl->buf->last_buf) {
         tl = ngx_http_chunked_create_trailers(r, ctx);
         if (tl == NULL) {
@@ -196,6 +219,8 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             tl->buf->pos += 2;
         }
 
+    // 不是最后一块
+    // 加一个crlf表示数据块结束
     } else if (size > 0) {
         tl = ngx_chain_get_free_buf(r->pool, &ctx->free);
         if (tl == NULL) {
@@ -225,6 +250,8 @@ ngx_http_chunked_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 
+// 最后一块会创建trailer
+// 没有trailer就是'0\r\n'
 static ngx_chain_t *
 ngx_http_chunked_create_trailers(ngx_http_request_t *r,
     ngx_http_chunked_filter_ctx_t *ctx)
@@ -328,6 +355,7 @@ ngx_http_chunked_create_trailers(ngx_http_request_t *r,
 }
 
 
+// 加入过滤链表
 static ngx_int_t
 ngx_http_chunked_filter_init(ngx_conf_t *cf)
 {
