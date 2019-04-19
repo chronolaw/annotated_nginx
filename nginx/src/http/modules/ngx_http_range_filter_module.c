@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_range_header_filter
+// * ngx_http_range_body_filter
 
 /*
  * Copyright (C) Igor Sysoev
@@ -176,6 +180,7 @@ ngx_http_range_header_filter(ngx_http_request_t *r)
         goto next_filter;
     }
 
+    // if range header
     if (r->headers_in.if_range) {
 
         if_range = &r->headers_in.if_range->value;
