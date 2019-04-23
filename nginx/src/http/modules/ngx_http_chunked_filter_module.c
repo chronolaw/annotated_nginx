@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// * ngx_http_chunked_header_filter
 
 /*
  * Copyright (C) Igor Sysoev
@@ -109,6 +110,8 @@ ngx_http_chunked_header_filter(ngx_http_request_t *r)
             r->keepalive = 0;
         }
     }
+
+    // 有content_length就不开启chunked
 
     return ngx_http_next_header_filter(r);
 }

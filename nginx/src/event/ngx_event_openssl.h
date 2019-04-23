@@ -176,6 +176,8 @@ typedef struct {
 #define NGX_SSL_TLSv1    0x0008
 #define NGX_SSL_TLSv1_1  0x0010
 #define NGX_SSL_TLSv1_2  0x0020
+
+// tls1.3要求openssl 1.1.1+
 #define NGX_SSL_TLSv1_3  0x0040
 
 
@@ -254,6 +256,7 @@ ngx_ssl_session_t *ngx_ssl_get0_session(ngx_connection_t *c);
 ngx_int_t ngx_ssl_check_host(ngx_connection_t *c, ngx_str_t *name);
 
 
+// 调用底层api获取各种变量
 ngx_int_t ngx_ssl_get_protocol(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_cipher_name(ngx_connection_t *c, ngx_pool_t *pool,
