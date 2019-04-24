@@ -412,6 +412,7 @@ struct ngx_http_request_s {
 
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
+    ngx_str_t                         schema;
 
     ngx_chain_t                      *out;
     ngx_http_request_t               *main;
@@ -496,6 +497,10 @@ struct ngx_http_request_s {
     unsigned                          gzip_tested:1;
     unsigned                          gzip_ok:1;
     unsigned                          gzip_vary:1;
+#endif
+
+#if (NGX_PCRE)
+    unsigned                          realloc_captures:1;
 #endif
 
     unsigned                          proxy:1;

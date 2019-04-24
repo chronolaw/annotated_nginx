@@ -251,6 +251,13 @@ static ngx_command_t  ngx_http_grpc_commands[] = {
       offsetof(ngx_http_grpc_loc_conf_t, upstream.local),
       NULL },
 
+    { ngx_string("grpc_socket_keepalive"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_grpc_loc_conf_t, upstream.socket_keepalive),
+      NULL },
+
     { ngx_string("grpc_connect_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -4165,6 +4172,7 @@ ngx_http_grpc_create_loc_conf(ngx_conf_t *cf)
      */
 
     conf->upstream.local = NGX_CONF_UNSET_PTR;
+    conf->upstream.socket_keepalive = NGX_CONF_UNSET;
     conf->upstream.next_upstream_tries = NGX_CONF_UNSET_UINT;
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
@@ -4219,6 +4227,9 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_ptr_value(conf->upstream.local,
                               prev->upstream.local, NULL);
+
+    ngx_conf_merge_value(conf->upstream.socket_keepalive,
+                              prev->upstream.socket_keepalive, 0);
 
     ngx_conf_merge_uint_value(conf->upstream.next_upstream_tries,
                               prev->upstream.next_upstream_tries, 0);
@@ -4586,7 +4597,7 @@ ngx_http_grpc_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     clcf->handler = ngx_http_grpc_handler;
 
-    if (clcf->name.data[clcf->name.len - 1] == '/') {
+    if (clcf->name.len && clcf->name.data[clcf->name.len - 1] == '/') {
         clcf->auto_redirect = 1;
     }
 
@@ -4639,6 +4650,7 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
 
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
+        ngx_ssl_cleanup_ctx(glcf->upstream.ssl);
         return NGX_ERROR;
     }
 
@@ -4686,6 +4698,13 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
         if (ngx_ssl_crl(cf, glcf->upstream.ssl, &glcf->ssl_crl) != NGX_OK) {
             return NGX_ERROR;
         }
+    }
+
+    if (ngx_ssl_client_session_cache(cf, glcf->upstream.ssl,
+                                     glcf->upstream.ssl_session_reuse)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
     }
 
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation

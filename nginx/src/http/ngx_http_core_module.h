@@ -65,8 +65,9 @@ typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
 
 
 typedef struct {
-    ngx_sockaddr_t             sockaddr;
+    struct sockaddr           *sockaddr;
     socklen_t                  socklen;
+    ngx_str_t                  addr_text;
 
     unsigned                   set:1;
     unsigned                   default_server:1;
@@ -100,8 +101,6 @@ typedef struct {
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
     char                      *accept_filter;
 #endif
-
-    u_char                     addr[NGX_SOCKADDR_STRLEN + 1];
 } ngx_http_listen_opt_t;
 
 
@@ -183,6 +182,9 @@ typedef struct {
 
     /* server ctx */
     ngx_http_conf_ctx_t        *ctx;
+
+    u_char                     *file_name;
+    ngx_uint_t                  line;
 
     ngx_str_t                   server_name;
 
