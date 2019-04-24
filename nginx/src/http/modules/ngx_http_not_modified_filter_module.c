@@ -1,5 +1,6 @@
 // annotated by chrono since 2016
 //
+// 检查是否有if_modified_since和if_none_match头
 
 /*
  * Copyright (C) Igor Sysoev
