@@ -25,7 +25,7 @@ Nginx 1.15.12(1.16.0)
 --------|-------|-----
 master  | Nginx开发版1.15.12|有
 mainline| Nginx开发版1.15.12|无
-stable  | Nginx稳定版1.14.2|无
+stable  | Nginx稳定版1.16.0|无
 
 # 已注解
 
