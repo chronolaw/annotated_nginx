@@ -1,5 +1,7 @@
 // annotated by chrono since 2017
 //
+// * ngx_proxy_protocol_read
+// * ngx_proxy_protocol_write
 
 /*
  * Copyright (C) Roman Arutyunyan
@@ -50,6 +52,12 @@ static u_char *ngx_proxy_protocol_v2_read(ngx_connection_t *c, u_char *buf,
     u_char *last);
 
 
+// proxy tcp4 src_ip dst_ip src_port dst_port
+//
+// PROXY TCP4 192.168.0.1 192.168.0.11 56324 443\r\n
+// GET / HTTP/1.1\r\n
+// Host: 192.168.0.11\r\n
+// \r\n
 u_char *
 ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
 {
@@ -62,12 +70,15 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
     p = buf;
     len = last - buf;
 
+    // v2, binary
     if (len >= sizeof(ngx_proxy_protocol_header_t)
         && memcmp(p, signature, sizeof(signature) - 1) == 0)
     {
         return ngx_proxy_protocol_v2_read(c, buf, last);
     }
 
+    // version 1, ascii, human readable
+    // 'PROXY '
     if (len < 8 || ngx_strncmp(p, "PROXY ", 6) != 0) {
         goto invalid;
     }
@@ -82,6 +93,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         goto skip;
     }
 
+    // 'TCP4' or 'TCP6'
     if (len < 5 || ngx_strncmp(p, "TCP", 3) != 0
         || (p[3] != '4' && p[3] != '6') || p[4] != ' ')
     {
@@ -181,6 +193,7 @@ ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last)
 {
     ngx_uint_t  port, lport;
 
+    //#define NGX_PROXY_PROTOCOL_MAX_HEADER  107
     if (last - buf < NGX_PROXY_PROTOCOL_MAX_HEADER) {
         return NULL;
     }
