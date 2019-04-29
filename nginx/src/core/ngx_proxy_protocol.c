@@ -100,9 +100,11 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         goto invalid;
     }
 
+    // 跳过'TCP4' or 'TCP6'
     p += 5;
     addr = p;
 
+    // 看客户端ip地址，找到空格
     for ( ;; ) {
         if (p == last) {
             goto invalid;
@@ -123,6 +125,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         }
     }
 
+    // 客户端地址proxy_protocol_addr,分配内存
     len = p - addr - 1;
     c->proxy_protocol_addr.data = ngx_pnalloc(c->pool, len);
 
@@ -134,6 +137,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
     ngx_memcpy(c->proxy_protocol_addr.data, addr, len);
     c->proxy_protocol_addr.len = len;
 
+    // 跳过服务器地址
     for ( ;; ) {
         if (p == last) {
             goto invalid;
@@ -144,6 +148,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
         }
     }
 
+    // 找客户端端口号后的空格
     port = p;
 
     for ( ;; ) {
@@ -158,6 +163,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
 
     len = p - port - 1;
 
+    // ascii to number
     n = ngx_atoi(port, len);
 
     if (n < 0 || n > 65535) {
@@ -171,6 +177,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
                    "PROXY protocol address: %V %d", &c->proxy_protocol_addr,
                    c->proxy_protocol_port);
 
+    // 跳过服务器端口号
 skip:
 
     for ( /* void */ ; p < last - 1; p++) {
