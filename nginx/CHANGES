@@ -1,7 +1,20 @@
 
-Changes with nginx 1.16.0                                        23 Apr 2019
+Changes with nginx 1.17.0                                        21 May 2019
 
-    *) 1.16.x stable branch.
+    *) Feature: variables support in the "limit_rate" and "limit_rate_after"
+       directives.
+
+    *) Feature: variables support in the "proxy_upload_rate" and
+       "proxy_download_rate" directives in the stream module.
+
+    *) Change: minimum supported OpenSSL version is 0.9.8.
+
+    *) Change: now the postpone filter is always built.
+
+    *) Bugfix: the "include" directive did not work inside the "if" and
+       "limit_except" blocks.
+
+    *) Bugfix: in byte ranges processing.
 
 
 Changes with nginx 1.15.12                                       16 Apr 2019

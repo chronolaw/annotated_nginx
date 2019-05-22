@@ -304,9 +304,17 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     // 处理限速，不研究
+    if (!r->limit_rate_set) {
+        r->limit_rate = ngx_http_complex_value_size(r, clcf->limit_rate, 0);
+        r->limit_rate_set = 1;
+    }
+
     if (r->limit_rate) {
-        if (r->limit_rate_after == 0) {
-            r->limit_rate_after = clcf->limit_rate_after;
+
+        if (!r->limit_rate_after_set) {
+            r->limit_rate_after = ngx_http_complex_value_size(r,
+                                                    clcf->limit_rate_after, 0);
+            r->limit_rate_after_set = 1;
         }
 
         limit = (off_t) r->limit_rate * (ngx_time() - r->start_sec + 1)

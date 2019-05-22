@@ -54,9 +54,10 @@
 #define NGX_DIRECT_CONF      0x00010000
 
 #define NGX_MAIN_CONF        0x01000000     //指令出现在配置文件的最外层
+#define NGX_ANY_CONF         0xFF000000     //指令可以在任意位置出现
+
 
 // in 1.8.1 #define NGX_ANY_CONF         0x0F000000
-#define NGX_ANY_CONF         0x1F000000     //指令可以在任意位置出现
 
 
 
