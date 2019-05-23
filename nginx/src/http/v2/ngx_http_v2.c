@@ -1,3 +1,7 @@
+// annotated by chrono since 2016
+//
+// * ngx_http_v2_init
+// * ngx_http_v2_read_handler
 
 /*
  * Copyright (C) Nginx, Inc.
@@ -226,6 +230,7 @@ static ngx_http_v2_parse_header_t  ngx_http_v2_parse_headers[] = {
 };
 
 
+// http2特殊的读事件处理函数
 void
 ngx_http_v2_init(ngx_event_t *rev)
 {
@@ -236,15 +241,21 @@ ngx_http_v2_init(ngx_event_t *rev)
     ngx_http_v2_main_conf_t   *h2mcf;
     ngx_http_v2_connection_t  *h2c;
 
+    // 连接对象
     c = rev->data;
+
+    // 连接对象里获取配置数组， 在ngx_http_init_connection里设置的
+    // 重要的是conf_ctx，server的配置数组
     hc = c->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "init http2 connection");
 
     c->log->action = "processing HTTP/2 connection";
 
+    // http2的配置
     h2mcf = ngx_http_get_module_main_conf(hc->conf_ctx, ngx_http_v2_module);
 
+    // 接收缓冲区
     if (h2mcf->recv_buffer == NULL) {
         h2mcf->recv_buffer = ngx_palloc(ngx_cycle->pool,
                                         h2mcf->recv_buffer_size);
@@ -254,32 +265,42 @@ ngx_http_v2_init(ngx_event_t *rev)
         }
     }
 
+    // http2连接对象
     h2c = ngx_pcalloc(c->pool, sizeof(ngx_http_v2_connection_t));
     if (h2c == NULL) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 保存tcp连接
     h2c->connection = c;
+
+    // 保存配置数组
     h2c->http_connection = hc;
 
+    // http2收发窗口大小
     h2c->send_window = NGX_HTTP_V2_DEFAULT_WINDOW;
     h2c->recv_window = NGX_HTTP_V2_MAX_WINDOW;
 
     h2c->init_window = NGX_HTTP_V2_DEFAULT_WINDOW;
 
+    // 默认帧大小是16k
     h2c->frame_size = NGX_HTTP_V2_DEFAULT_FRAME_SIZE;
 
+    // http2的配置
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 
+    // 并发push数量
     h2c->concurrent_pushes = h2scf->concurrent_pushes;
 
+    // http2的内存池
     h2c->pool = ngx_create_pool(h2scf->pool_size, h2c->connection->log);
     if (h2c->pool == NULL) {
         ngx_http_close_connection(c);
         return;
     }
 
+    // 挂上清理函数
     cln = ngx_pool_cleanup_add(c->pool, 0);
     if (cln == NULL) {
         ngx_http_close_connection(c);
@@ -296,6 +317,7 @@ ngx_http_v2_init(ngx_event_t *rev)
         return;
     }
 
+    // 流设置
     if (ngx_http_v2_send_settings(h2c) == NGX_ERROR) {
         ngx_http_close_connection(c);
         return;
@@ -316,13 +338,19 @@ ngx_http_v2_init(ngx_event_t *rev)
     ngx_queue_init(&h2c->dependencies);
     ngx_queue_init(&h2c->closed);
 
+    // 原来存的是配置数组，现在是http2结构
     c->data = h2c;
 
+    // 读写handler用http2的
     rev->handler = ngx_http_v2_read_handler;
+
+    // 注意写handler不再是空了
+    // http2可以双向同时读写
     c->write->handler = ngx_http_v2_write_handler;
 
     c->idle = 1;
 
+    // 服务器一开始还是要读取数据
     ngx_http_v2_read_handler(rev);
 }
 

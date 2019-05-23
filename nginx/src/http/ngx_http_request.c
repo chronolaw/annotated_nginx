@@ -485,7 +485,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     // 暂时不处理写事件
     c->write->handler = ngx_http_empty_handler;
 
-    // http 2.0使用特殊的读事件处理函数ngx_http_v2_init
+    // http2使用特殊的读事件处理函数ngx_http_v2_init
 #if (NGX_HTTP_V2)
     if (hc->addr_conf->http2) {
         rev->handler = ngx_http_v2_init;
