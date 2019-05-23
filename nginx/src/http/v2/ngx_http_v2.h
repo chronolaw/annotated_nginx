@@ -1,3 +1,8 @@
+// annotated by chrono since 2016
+//
+// * NGX_HTTP_V2_DATA_FRAME
+// * NGX_HTTP_V2_AUTHORITY_INDEX
+
 /*
  * Copyright (C) Nginx, Inc.
  * Copyright (C) Valentin V. Bartenev
@@ -13,21 +18,33 @@
 #include <ngx_http.h>
 
 
+// 在tls的alpn扩展里识别http2
+// 第一个0x02是长度
 #define NGX_HTTP_V2_ALPN_ADVERTISE       "\x02h2"
+
+// 旧的npn标志，同alpn
 #define NGX_HTTP_V2_NPN_ADVERTISE        NGX_HTTP_V2_ALPN_ADVERTISE
 
 #define NGX_HTTP_V2_STATE_BUFFER_SIZE    16
 
+// 默认帧大小， 2^14
 #define NGX_HTTP_V2_DEFAULT_FRAME_SIZE   (1 << 14)
+
+// 最大帧， 2^24，即头部的三个字节
 #define NGX_HTTP_V2_MAX_FRAME_SIZE       ((1 << 24) - 1)
 
+// hpack头部压缩
 #define NGX_HTTP_V2_INT_OCTETS           4
 #define NGX_HTTP_V2_MAX_FIELD                                                 \
     (127 + (1 << (NGX_HTTP_V2_INT_OCTETS - 1) * 7) - 1)
 
 #define NGX_HTTP_V2_STREAM_ID_SIZE       4
 
+// 帧头大小，9字节
 #define NGX_HTTP_V2_FRAME_HEADER_SIZE    9
+
+// 3字节长度后是1字节类型
+// 定义的各种帧类型
 
 /* frame types */
 #define NGX_HTTP_V2_DATA_FRAME           0x0
@@ -41,6 +58,8 @@
 #define NGX_HTTP_V2_WINDOW_UPDATE_FRAME  0x8
 #define NGX_HTTP_V2_CONTINUATION_FRAME   0x9
 
+// 类型后是1字节标志位
+
 /* frame flags */
 #define NGX_HTTP_V2_NO_FLAG              0x00
 #define NGX_HTTP_V2_ACK_FLAG             0x01
@@ -49,6 +68,7 @@
 #define NGX_HTTP_V2_PADDED_FLAG          0x08
 #define NGX_HTTP_V2_PRIORITY_FLAG        0x20
 
+// 流量窗口
 #define NGX_HTTP_V2_MAX_WINDOW           ((1U << 31) - 1)
 #define NGX_HTTP_V2_DEFAULT_WINDOW       65535
 
@@ -100,6 +120,7 @@ typedef struct {
 
 
 
+// 头部压缩
 typedef struct {
     ngx_http_v2_header_t           **entries;
 
@@ -115,6 +136,7 @@ typedef struct {
 } ngx_http_v2_hpack_t;
 
 
+// 连接状态
 struct ngx_http_v2_connection_s {
     ngx_connection_t                *connection;
     ngx_http_connection_t           *http_connection;
@@ -176,6 +198,7 @@ struct ngx_http_v2_node_s {
 };
 
 
+// http2流
 struct ngx_http_v2_stream_s {
     ngx_http_request_t              *request;
     ngx_http_v2_connection_t        *connection;
@@ -375,6 +398,7 @@ size_t ngx_http_v2_huff_encode(u_char *src, size_t len, u_char *dst,
 #define NGX_HTTP_V2_ENCODE_RAW            0
 #define NGX_HTTP_V2_ENCODE_HUFF           0x80
 
+// hpack字典索引值
 #define NGX_HTTP_V2_AUTHORITY_INDEX       1
 
 #define NGX_HTTP_V2_METHOD_INDEX          2
