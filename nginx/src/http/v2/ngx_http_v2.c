@@ -365,9 +365,13 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
     ngx_http_v2_main_conf_t   *h2mcf;
     ngx_http_v2_connection_t  *h2c;
 
+    // 连接对象
     c = rev->data;
+
+    // 原来存的是配置数组，现在是http2结构
     h2c = c->data;
 
+    // 异步事件机制判断超时
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         ngx_http_v2_finalize_connection(h2c, NGX_HTTP_V2_PROTOCOL_ERROR);
@@ -402,6 +406,7 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
         return;
     }
 
+    // http2的配置
     h2mcf = ngx_http_get_module_main_conf(h2c->http_connection->conf_ctx,
                                           ngx_http_v2_module);
 
