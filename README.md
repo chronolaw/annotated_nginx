@@ -12,6 +12,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 
 请参考：
 * [《Nginx完全开发指南：使用C/C++和OpenResty》](http://item.jd.com/12082107.html)
+* [透视HTTP协议](https://time.geekbang.org/column/intro/189)
 * [ngx_cpp_dev](https://github.com/chronolaw/ngx_cpp_dev)
 * [ngx_ansic_dev](https://github.com/chronolaw/ngx_ansic_dev)
 * [openresty_dev](https://github.com/chronolaw/openresty_dev)
