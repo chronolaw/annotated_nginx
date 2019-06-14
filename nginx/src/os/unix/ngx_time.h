@@ -65,7 +65,9 @@ void ngx_localtime(time_t s, ngx_tm_t *tm);
 void ngx_libc_localtime(time_t s, struct tm *tm);
 void ngx_libc_gmtime(time_t s, struct tm *tm);
 
+// 这里的宏后面多了一个分号，但此函数很少被外部调用，所以不影响
 #define ngx_gettimeofday(tp)  (void) gettimeofday(tp, NULL);
+
 #define ngx_msleep(ms)        (void) usleep(ms * 1000)
 #define ngx_sleep(s)          (void) sleep(s)
 
