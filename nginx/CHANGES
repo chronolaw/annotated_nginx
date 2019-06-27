@@ -1,4 +1,21 @@
 
+Changes with nginx 1.17.1                                        25 Jun 2019
+
+    *) Feature: the "limit_req_dry_run" directive.
+
+    *) Feature: when using the "hash" directive inside the "upstream" block
+       an empty hash key now triggers round-robin balancing.
+       Thanks to Niklas Keller.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       caching was used along with the "image_filter" directive, and errors
+       with code 415 were redirected with the "error_page" directive; the
+       bug had appeared in 1.11.10.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       embedded perl was used; the bug had appeared in 1.7.3.
+
+
 Changes with nginx 1.17.0                                        21 May 2019
 
     *) Feature: variables support in the "limit_rate" and "limit_rate_after"
