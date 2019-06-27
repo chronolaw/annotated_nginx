@@ -116,6 +116,8 @@ typedef struct {
 
     // 返回的状态码
     ngx_uint_t                   status_code;
+
+    // 1.17.1，空运行模式
     ngx_flag_t                   dry_run;
 } ngx_http_limit_req_conf_t;
 
@@ -375,7 +377,9 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         }
 
         // new in 1.17.1
+        // 不会限速
         if (lrcf->dry_run) {
+            // 让下一个模块继续处理
             return NGX_DECLINED;
         }
 
@@ -408,6 +412,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
     // new in 1.17.1
     if (lrcf->dry_run) {
+        // dry run不会限速
         return NGX_DECLINED;
     }
 
