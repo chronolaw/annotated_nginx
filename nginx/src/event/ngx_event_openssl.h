@@ -85,6 +85,7 @@ struct ngx_ssl_s {
 // typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 // 是ngx_connection_t的成员，处理ssl
 struct ngx_ssl_connection_s {
+    // 即OpenSSL里的“SSL”
     ngx_ssl_conn_t             *connection;
 
     // openssl的ctx数据
@@ -100,7 +101,9 @@ struct ngx_ssl_connection_s {
 
     ngx_connection_handler_pt   handler;
 
+    // 里面的指针指向SSL_CTX
     ngx_ssl_session_t          *session;
+
     ngx_connection_handler_pt   save_session;
 
     ngx_event_handler_pt        saved_read_handler;
@@ -108,7 +111,9 @@ struct ngx_ssl_connection_s {
 
     u_char                      early_buf;
 
+    // 是否已经握手
     unsigned                    handshaked:1;
+
     unsigned                    renegotiation:1;
 
     // #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
