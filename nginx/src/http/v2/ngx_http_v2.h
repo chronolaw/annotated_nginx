@@ -144,6 +144,7 @@ struct ngx_http_v2_connection_s {
     ngx_uint_t                       processing;
     ngx_uint_t                       frames;
     ngx_uint_t                       idle;
+    ngx_uint_t                       priority_limit;
 
     ngx_uint_t                       pushing;
     ngx_uint_t                       concurrent_pushes;
@@ -214,6 +215,8 @@ struct ngx_http_v2_stream_s {
     size_t                           recv_window;
 
     ngx_buf_t                       *preread;
+
+    ngx_uint_t                       frames;
 
     ngx_http_v2_out_frame_t         *free_frames;
     ngx_chain_t                     *free_frame_headers;

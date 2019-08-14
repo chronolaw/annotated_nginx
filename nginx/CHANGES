@@ -1,4 +1,17 @@
 
+Changes with nginx 1.17.3                                        13 Aug 2019
+
+    *) Security: when using HTTP/2 a client might cause excessive memory
+       consumption and CPU usage (CVE-2019-9511, CVE-2019-9513,
+       CVE-2019-9516).
+
+    *) Bugfix: "zero size buf" alerts might appear in logs when using
+       gzipping; the bug had appeared in 1.17.2.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "resolver" directive was used in SMTP proxy.
+
+
 Changes with nginx 1.17.2                                        23 Jul 2019
 
     *) Change: minimum supported zlib version is 1.2.0.4.
