@@ -1,3 +1,5 @@
+// annotated by chrono since 2019
+//
 
 /*
  * Copyright (C) Nginx, Inc.
@@ -11,8 +13,10 @@
 #include <ngx_http_v2_module.h>
 
 
+// 只添加了一个http2变量
 static ngx_int_t ngx_http_v2_add_variables(ngx_conf_t *cf);
 
+// 标志加密/明文的字符串
 static ngx_int_t ngx_http_v2_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
@@ -243,6 +247,7 @@ ngx_module_t  ngx_http_v2_module = {
 };
 
 
+// 标志加密/明文的字符串变量
 static ngx_http_variable_t  ngx_http_v2_vars[] = {
 
     { ngx_string("http2"), NULL,
@@ -252,6 +257,7 @@ static ngx_http_variable_t  ngx_http_v2_vars[] = {
 };
 
 
+// 只添加了一个http2变量
 static ngx_int_t
 ngx_http_v2_add_variables(ngx_conf_t *cf)
 {
@@ -271,6 +277,7 @@ ngx_http_v2_add_variables(ngx_conf_t *cf)
 }
 
 
+// 标志加密/明文的字符串
 static ngx_int_t
 ngx_http_v2_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -279,6 +286,7 @@ ngx_http_v2_variable(ngx_http_request_t *r,
     if (r->stream) {
 #if (NGX_HTTP_SSL)
 
+        // 有ssl就是加密的，变量是h2
         if (r->connection->ssl) {
             v->len = sizeof("h2") - 1;
             v->valid = 1;
@@ -290,6 +298,7 @@ ngx_http_v2_variable(ngx_http_request_t *r,
         }
 
 #endif
+        // 没有ssl就是明文，变量是h2c
         v->len = sizeof("h2c") - 1;
         v->valid = 1;
         v->no_cacheable = 0;
@@ -299,6 +308,7 @@ ngx_http_v2_variable(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 没有流，不是http/2
     *v = ngx_http_variable_null_value;
 
     return NGX_OK;
