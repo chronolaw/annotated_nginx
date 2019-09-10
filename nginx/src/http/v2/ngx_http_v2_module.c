@@ -387,14 +387,22 @@ ngx_http_v2_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_size_value(conf->pool_size, prev->pool_size, 4096);
 
+    // 默认并发最多128个流
     ngx_conf_merge_uint_value(conf->concurrent_streams,
                               prev->concurrent_streams, 128);
+
+    // 默认并发最多10个服务器推送
     ngx_conf_merge_uint_value(conf->concurrent_pushes,
                               prev->concurrent_pushes, 10);
+
+    // 默认一个http2连接最多1000个请求后关闭
     ngx_conf_merge_uint_value(conf->max_requests, prev->max_requests, 1000);
 
+    // 默认头字段最大4k字节
     ngx_conf_merge_size_value(conf->max_field_size, prev->max_field_size,
                               4096);
+
+    // 默认http2请求头最大16k
     ngx_conf_merge_size_value(conf->max_header_size, prev->max_header_size,
                               16384);
 
@@ -403,6 +411,7 @@ ngx_http_v2_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->streams_index_mask,
                               prev->streams_index_mask, 32 - 1);
 
+    // 超时时间
     ngx_conf_merge_msec_value(conf->recv_timeout,
                               prev->recv_timeout, 30000);
     ngx_conf_merge_msec_value(conf->idle_timeout,
