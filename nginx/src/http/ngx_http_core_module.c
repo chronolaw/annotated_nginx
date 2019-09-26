@@ -2241,8 +2241,10 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     ngx_chain_t   out;
 
     // 这时已经不需要body了，所以丢弃
-    if (ngx_http_discard_request_body(r) != NGX_OK) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    rc = ngx_http_discard_request_body(r);
+
+    if (rc != NGX_OK) {
+        return rc;
     }
 
     // 设置响应头里的状态码
