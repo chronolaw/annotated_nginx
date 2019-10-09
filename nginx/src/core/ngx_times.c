@@ -35,6 +35,7 @@ static ngx_uint_t        slot;
 static ngx_atomic_t      ngx_time_lock;
 
 // 当前的毫秒时间戳
+// 1.13.10改为使用单调时间，不再是日历时间
 volatile ngx_msec_t      ngx_current_msec;
 
 // 当前cache的时间，指向某个时间槽
@@ -125,7 +126,7 @@ ngx_time_update(void)
 
     // 得到毫秒时间戳
     // ngx_current_msec = (ngx_msec_t) sec * 1000 + msec;
-    // 1.13.10改为使用单调时间
+    // 1.13.10改为使用单调时间，不再是日历时间
     ngx_current_msec = ngx_monotonic_time(sec, msec);
 
     // 当前使用的时间槽
@@ -233,6 +234,7 @@ ngx_time_update(void)
 
 
 // 1.13.10改为使用单调时间
+// 计时起点是机器的启动时间
 static ngx_msec_t
 ngx_monotonic_time(time_t sec, ngx_uint_t msec)
 {

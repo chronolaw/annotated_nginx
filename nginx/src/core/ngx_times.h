@@ -66,6 +66,8 @@ extern volatile ngx_str_t    ngx_cached_syslog_time;
  * and truncated to ngx_msec_t, used in event timers
  */
 // 表示自epoch以来的毫秒数，即sec * 1000 + msec
+// 1.13.10改为使用单调时间，不再是日历时间
+// 只用于定时器
 extern volatile ngx_msec_t  ngx_current_msec;
 
 
