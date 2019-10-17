@@ -108,6 +108,9 @@ ngx_signal_t  signals[] = {
       "quit",
       ngx_signal_handler },
 
+    // ngx_config.h
+    // #define NGX_CHANGEBIN_SIGNAL     USR2
+    // hot upgrade, kill -s SIGUSR2 masterpid
     { ngx_signal_value(NGX_CHANGEBIN_SIGNAL),
       "SIG" ngx_value(NGX_CHANGEBIN_SIGNAL),
       "",
@@ -469,6 +472,7 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
             action = ", reopening logs";
             break;
 
+        // hot upgrade, kill -s SIGUSR2 masterpid
         case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
             if (ngx_getppid() == ngx_parent || ngx_new_binary > 0) {
 
@@ -484,6 +488,7 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
                 break;
             }
 
+            // 标志位，热更新二进制文件
             ngx_change_binary = 1;
             action = ", changing binary";
             break;
