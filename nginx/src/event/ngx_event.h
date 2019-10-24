@@ -138,24 +138,17 @@ struct ngx_event_s {
      *   write:      available space in buffer when event is ready
      *               or lowat when event is set with NGX_LOWAT_EVENT flag
      *
-     * epoll with EPOLLRDHUP:
-     *   accept:     1 if accept many, 0 otherwise
-     *   read:       1 if there can be data to read, 0 otherwise
-     *
      * iocp: TODO
      *
      * otherwise:
      *   accept:     1 if accept many, 0 otherwise
+     *   read:       bytes to read when event is ready, -1 if not known
      */
 
-#if (NGX_HAVE_KQUEUE) || (NGX_HAVE_IOCP)
-    int              available;
-#else
     // 是否尽可能多地接受请求建立连接，即multi_accept
     // 1.11.x后增加新用途，在接收数据时标记是否可用
-    // 注意这里使用了bit field，只能存储0/1，节约内存
-    unsigned         available:1;
-#endif
+    // 早期（< 1.17.4）这里使用了bit field，只能存储0/1，节约内存
+    int              available;
 
     // 重要！！
     // 事件发生时调用的函数

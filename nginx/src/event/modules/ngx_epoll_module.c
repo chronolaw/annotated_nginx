@@ -1194,13 +1194,13 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             if (revents & EPOLLRDHUP) {
                 rev->pending_eof = 1;
             }
-
-            // nginx 1.11.x新增,用在ngx_recv时检查
-            rev->available = 1;
 #endif
 
             // 读事件可用
             rev->ready = 1;
+
+            // nginx 1.17.5新增,用在ngx_recv时检查
+            rev->available = -1;
 
             // 检查此事件是否要延后处理
             // 如果使用负载均衡且抢到accept锁，那么flags里有NGX_POST_EVENTS标志

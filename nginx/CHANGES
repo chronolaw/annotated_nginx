@@ -1,4 +1,23 @@
 
+Changes with nginx 1.17.5                                        22 Oct 2019
+
+    *) Feature: now nginx uses ioctl(FIONREAD), if available, to avoid
+       reading from a fast connection for a long time.
+
+    *) Bugfix: incomplete escaped characters at the end of the request URI
+       were ignored.
+
+    *) Bugfix: "/." and "/.." at the end of the request URI were not
+       normalized.
+
+    *) Bugfix: in the "merge_slashes" directive.
+
+    *) Bugfix: in the "ignore_invalid_headers" directive.
+       Thanks to Alan Kemp.
+
+    *) Bugfix: nginx could not be built with MinGW-w64 gcc 8.1 or newer.
+
+
 Changes with nginx 1.17.4                                        24 Sep 2019
 
     *) Change: better detection of incorrect client behavior in HTTP/2.

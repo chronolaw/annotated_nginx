@@ -20,6 +20,10 @@
 ngx_queue_t  ngx_posted_accept_events;
 
 // 读写事件和通知事件
+
+// 1.17.5新增,处理ngx_posted_next_events
+ngx_queue_t  ngx_posted_next_events;
+
 ngx_queue_t  ngx_posted_events;
 
 

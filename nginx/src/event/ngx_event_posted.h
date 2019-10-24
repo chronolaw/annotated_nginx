@@ -56,6 +56,10 @@ void ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted);
 extern ngx_queue_t  ngx_posted_accept_events;
 
 // 读写事件和通知事件
+
+// 1.17.5新增,处理ngx_posted_next_events
+extern ngx_queue_t  ngx_posted_next_events;
+
 extern ngx_queue_t  ngx_posted_events;
 
 
