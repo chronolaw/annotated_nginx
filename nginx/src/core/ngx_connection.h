@@ -264,8 +264,7 @@ struct ngx_connection_s {
     // 客户端的sockaddr，文本形式
     ngx_str_t           addr_text;
 
-    ngx_str_t           proxy_protocol_addr;
-    in_port_t           proxy_protocol_port;
+    ngx_proxy_protocol_t  *proxy_protocol;
 
     // 给https协议用的成员
     // 定义在event/ngx_event_openssl.h

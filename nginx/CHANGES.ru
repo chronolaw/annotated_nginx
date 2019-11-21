@@ -1,4 +1,14 @@
 
+Изменения в nginx 1.17.6                                          19.11.2019
+
+    *) Добавление: переменные $proxy_protocol_server_addr и
+       $proxy_protocol_server_port.
+
+    *) Добавление: директива limit_conn_dry_run.
+
+    *) Добавление: переменные $limit_req_status и $limit_conn_status.
+
+
 Изменения в nginx 1.17.5                                          22.10.2019
 
     *) Добавление: теперь nginx использует вызов ioctl(FIONREAD), если он

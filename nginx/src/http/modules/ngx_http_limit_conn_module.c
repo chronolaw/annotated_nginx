@@ -15,23 +15,28 @@
 #include <ngx_http.h>
 
 
+#define NGX_HTTP_LIMIT_CONN_PASSED            1
+#define NGX_HTTP_LIMIT_CONN_REJECTED          2
+#define NGX_HTTP_LIMIT_CONN_REJECTED_DRY_RUN  3
+
+
 // 第一个成员与ngx_rbtree_node_t的color相同
 // 拼接在node后面，实现共用内存
 typedef struct {
     // rbtree的最后一个成员
-    u_char                     color;
+    u_char                        color;
 
     // 下面是自己的数据
 
     // key的长度，对应最后的data[1]
-    u_char                     len;
+    u_char                        len;
 
     // 连接数，不会超过2^16=65535
-    u_short                    conn;
+    u_short                       conn;
 
     // 用来存放字符串，1只是示意
     // 之后会分配足够的内存，len大小
-    u_char                     data[1];
+    u_char                        data[1];
 } ngx_http_limit_conn_node_t;
 
 
@@ -40,10 +45,10 @@ typedef struct {
 // 不能用log阶段，因为log只是请求结束
 typedef struct {
     // 关联的共享内存
-    ngx_shm_zone_t            *shm_zone;
+    ngx_shm_zone_t               *shm_zone;
 
     // 关联的红黑树节点
-    ngx_rbtree_node_t         *node;
+    ngx_rbtree_node_t            *node;
 } ngx_http_limit_conn_cleanup_t;
 
 
@@ -54,11 +59,19 @@ typedef struct {
 // 与limit_req不同，没有用队列
 // 因为不需要lru管理，在断连时减数
 typedef struct {
-    ngx_rbtree_t              *rbtree;
+    ngx_rbtree_t                  rbtree;
 
     // 存储在红黑树里区分请求的key
     // 例如$binary_remote_addr
     ngx_http_complex_value_t   key;
+    ngx_rbtree_node_t             sentinel;
+} ngx_http_limit_conn_shctx_t;
+
+
+typedef struct {
+    ngx_http_limit_conn_shctx_t  *sh;
+    ngx_slab_pool_t              *shpool;
+    ngx_http_complex_value_t      key;
 } ngx_http_limit_conn_ctx_t;
 
 
@@ -67,10 +80,10 @@ typedef struct {
     // 对应的共享内存
     // 取共享内存里的限速信息
     // ctx = limit->shm_zone->data;
-    ngx_shm_zone_t            *shm_zone;
+    ngx_shm_zone_t               *shm_zone;
 
     // 限连数
-    ngx_uint_t                 conn;
+    ngx_uint_t                    conn;
 } ngx_http_limit_conn_limit_t;
 
 
@@ -78,13 +91,14 @@ typedef struct {
 typedef struct {
     // 限流信息的多个数组
     // 元素类型是ngx_http_limit_conn_limit_t
-    ngx_array_t                limits;
+    ngx_array_t                   limits;
 
     // 日志级别
-    ngx_uint_t                 log_level;
+    ngx_uint_t                    log_level;
 
     // 返回的状态码
-    ngx_uint_t                 status_code;
+    ngx_uint_t                    status_code;
+    ngx_flag_t                    dry_run;
 } ngx_http_limit_conn_conf_t;
 
 
@@ -98,6 +112,8 @@ static void ngx_http_limit_conn_cleanup(void *data);
 // 运行本模块的清理函数
 static ngx_inline void ngx_http_limit_conn_cleanup_all(ngx_pool_t *pool);
 
+static ngx_int_t ngx_http_limit_conn_status_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static void *ngx_http_limit_conn_create_conf(ngx_conf_t *cf);
 static char *ngx_http_limit_conn_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -109,6 +125,7 @@ static char *ngx_http_limit_conn_zone(ngx_conf_t *cf, ngx_command_t *cmd,
 
 static char *ngx_http_limit_conn(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static ngx_int_t ngx_http_limit_conn_add_variables(ngx_conf_t *cf);
 
 // 在preaccess阶段，rewrite之后
 static ngx_int_t ngx_http_limit_conn_init(ngx_conf_t *cf);
@@ -158,12 +175,19 @@ static ngx_command_t  ngx_http_limit_conn_commands[] = {
       offsetof(ngx_http_limit_conn_conf_t, status_code),
       &ngx_http_limit_conn_status_bounds },
 
+    { ngx_string("limit_conn_dry_run"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_limit_conn_conf_t, dry_run),
+      NULL },
+
       ngx_null_command
 };
 
 
 static ngx_http_module_t  ngx_http_limit_conn_module_ctx = {
-    NULL,                                  /* preconfiguration */
+    ngx_http_limit_conn_add_variables,     /* preconfiguration */
 
     // 在preaccess阶段，rewrite之后
     ngx_http_limit_conn_init,              /* postconfiguration */
@@ -195,6 +219,22 @@ ngx_module_t  ngx_http_limit_conn_module = {
 };
 
 
+static ngx_http_variable_t  ngx_http_limit_conn_vars[] = {
+
+    { ngx_string("limit_conn_status"), NULL,
+      ngx_http_limit_conn_status_variable, 0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+      ngx_http_null_variable
+};
+
+
+static ngx_str_t  ngx_http_limit_conn_status[] = {
+    ngx_string("PASSED"),
+    ngx_string("REJECTED"),
+    ngx_string("REJECTED_DRY_RUN")
+};
+
+
 // preaccess阶段执行，检查共享内存，限速
 static ngx_int_t
 ngx_http_limit_conn_handler(ngx_http_request_t *r)
@@ -203,7 +243,6 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
     uint32_t                        hash;
     ngx_str_t                       key;
     ngx_uint_t                      i;
-    ngx_slab_pool_t                *shpool;
     ngx_rbtree_node_t              *node;
     ngx_pool_cleanup_t             *cln;
     ngx_http_limit_conn_ctx_t      *ctx;
@@ -214,7 +253,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 
     // 置标志位，本模块不再处理
     // 标记了主请求，限制子请求
-    if (r->main->limit_conn_set) {
+    if (r->main->limit_conn_status) {
         // preaccess阶段此值表示继续处理
         // 不会拒绝请求
         return NGX_DECLINED;
@@ -252,19 +291,17 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 
         // 置标志位，本模块不再处理
         // 标记了主请求，限制子请求
-        r->main->limit_conn_set = 1;
+        r->main->limit_conn_status = NGX_HTTP_LIMIT_CONN_PASSED;
 
         // crc32作为红黑树key
         hash = ngx_crc32_short(key.data, key.len);
 
         // 取内存池指针
-        shpool = (ngx_slab_pool_t *) limits[i].shm_zone->shm.addr;
-
         // 互斥锁
-        ngx_shmtx_lock(&shpool->mutex);
+        ngx_shmtx_lock(&ctx->shpool->mutex);
 
         // 共享内存红黑树里查找
-        node = ngx_http_limit_conn_lookup(ctx->rbtree, &key, hash);
+        node = ngx_http_limit_conn_lookup(&ctx->sh->rbtree, &key, hash);
 
         // 红黑树里没找到，需要创建新节点
         if (node == NULL) {
@@ -278,12 +315,21 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
                 + key.len;
 
             // 在共享内存里分配内存
-            node = ngx_slab_alloc_locked(shpool, n);
+            node = ngx_slab_alloc_locked(ctx->shpool, n);
 
             // 无法创建节点就需要清理
             if (node == NULL) {
-                ngx_shmtx_unlock(&shpool->mutex);
+                ngx_shmtx_unlock(&ctx->shpool->mutex);
                 ngx_http_limit_conn_cleanup_all(r->pool);
+
+                if (lccf->dry_run) {
+                    r->main->limit_conn_status =
+                                          NGX_HTTP_LIMIT_CONN_REJECTED_DRY_RUN;
+                    return NGX_DECLINED;
+                }
+
+                r->main->limit_conn_status = NGX_HTTP_LIMIT_CONN_REJECTED;
+
                 return lccf->status_code;
             }
 
@@ -303,7 +349,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
             ngx_memcpy(lc->data, key.data, key.len);
 
             // 插入红黑树
-            ngx_rbtree_insert(ctx->rbtree, node);
+            ngx_rbtree_insert(&ctx->sh->rbtree, node);
 
         } else {
             // 找到
@@ -315,14 +361,23 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
             if ((ngx_uint_t) lc->conn >= limits[i].conn) {
 
                 // 超过就解锁，不需要再用共享内存了
-                ngx_shmtx_unlock(&shpool->mutex);
+                ngx_shmtx_unlock(&ctx->shpool->mutex);
 
                 ngx_log_error(lccf->log_level, r->connection->log, 0,
-                              "limiting connections by zone \"%V\"",
+                              "limiting connections%s by zone \"%V\"",
+                              lccf->dry_run ? ", dry run," : "",
                               &limits[i].shm_zone->shm.name);
 
                 // 清理，然后拒绝连接
                 ngx_http_limit_conn_cleanup_all(r->pool);
+
+                if (lccf->dry_run) {
+                    r->main->limit_conn_status =
+                                          NGX_HTTP_LIMIT_CONN_REJECTED_DRY_RUN;
+                    return NGX_DECLINED;
+                }
+
+                r->main->limit_conn_status = NGX_HTTP_LIMIT_CONN_REJECTED;
 
                 return lccf->status_code;
             }
@@ -335,7 +390,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
                        "limit conn: %08Xi %d", node->key, lc->conn);
 
         // 解锁共享内存
-        ngx_shmtx_unlock(&shpool->mutex);
+        ngx_shmtx_unlock(&ctx->shpool->mutex);
 
         // 加入连接关闭的清理动作
         cln = ngx_pool_cleanup_add(r->pool,
@@ -451,7 +506,6 @@ ngx_http_limit_conn_cleanup(void *data)
 {
     ngx_http_limit_conn_cleanup_t  *lccln = data;
 
-    ngx_slab_pool_t             *shpool;
     ngx_rbtree_node_t           *node;
     ngx_http_limit_conn_ctx_t   *ctx;
     ngx_http_limit_conn_node_t  *lc;
@@ -459,16 +513,13 @@ ngx_http_limit_conn_cleanup(void *data)
     // 取红黑树
     ctx = lccln->shm_zone->data;
 
-    // 共享内存池
-    shpool = (ngx_slab_pool_t *) lccln->shm_zone->shm.addr;
-
     // 关联的计数节点
     node = lccln->node;
 
     // 指针转化，红黑树节点后面是自己的数据
     lc = (ngx_http_limit_conn_node_t *) &node->color;
 
-    ngx_shmtx_lock(&shpool->mutex);
+    ngx_shmtx_lock(&ctx->shpool->mutex);
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, lccln->shm_zone->shm.log, 0,
                    "limit conn cleanup: %08Xi %d", node->key, lc->conn);
@@ -478,11 +529,11 @@ ngx_http_limit_conn_cleanup(void *data)
 
     // 无连接删除节点，节约内存
     if (lc->conn == 0) {
-        ngx_rbtree_delete(ctx->rbtree, node);
-        ngx_slab_free_locked(shpool, node);
+        ngx_rbtree_delete(&ctx->sh->rbtree, node);
+        ngx_slab_free_locked(ctx->shpool, node);
     }
 
-    ngx_shmtx_unlock(&shpool->mutex);
+    ngx_shmtx_unlock(&ctx->shpool->mutex);
 }
 
 
@@ -514,8 +565,6 @@ ngx_http_limit_conn_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     ngx_http_limit_conn_ctx_t  *octx = data;
 
     size_t                      len;
-    ngx_slab_pool_t            *shpool;
-    ngx_rbtree_node_t          *sentinel;
     ngx_http_limit_conn_ctx_t  *ctx;
 
     // 共享内存限制请求的基本信息
@@ -536,52 +585,66 @@ ngx_http_limit_conn_init_zone(ngx_shm_zone_t *shm_zone, void *data)
             return NGX_ERROR;
         }
 
-        ctx->rbtree = octx->rbtree;
+        ctx->sh = octx->sh;
+        ctx->shpool = octx->shpool;
 
         return NGX_OK;
     }
 
     // slab内存池
-    shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
+    ctx->shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
 
     // 已存在则复用旧数据
     if (shm_zone->shm.exists) {
-        ctx->rbtree = shpool->data;
+        ctx->sh = ctx->shpool->data;
 
         return NGX_OK;
     }
 
     // 创建红黑树结构体
-    ctx->rbtree = ngx_slab_alloc(shpool, sizeof(ngx_rbtree_t));
-    if (ctx->rbtree == NULL) {
+    ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_limit_conn_shctx_t));
+    if (ctx->sh == NULL) {
         return NGX_ERROR;
     }
 
     // 关联到共享内存池
-    shpool->data = ctx->rbtree;
-
-    // 红黑树的哨兵节点
-    sentinel = ngx_slab_alloc(shpool, sizeof(ngx_rbtree_node_t));
-    if (sentinel == NULL) {
-        return NGX_ERROR;
-    }
+    ctx->shpool->data = ctx->sh;
 
     // 初始化红黑树
-    ngx_rbtree_init(ctx->rbtree, sentinel,
+    ngx_rbtree_init(&ctx->sh->rbtree, &ctx->sh->sentinel,
                     ngx_http_limit_conn_rbtree_insert_value);
 
     // 拼共享内存的名字
     len = sizeof(" in limit_conn_zone \"\"") + shm_zone->shm.name.len;
 
     // 作为共享内存池的日志记录用
-    shpool->log_ctx = ngx_slab_alloc(shpool, len);
-    if (shpool->log_ctx == NULL) {
+    ctx->shpool->log_ctx = ngx_slab_alloc(ctx->shpool, len);
+    if (ctx->shpool->log_ctx == NULL) {
         return NGX_ERROR;
     }
 
     // 作为共享内存池的日志记录用
-    ngx_sprintf(shpool->log_ctx, " in limit_conn_zone \"%V\"%Z",
+    ngx_sprintf(ctx->shpool->log_ctx, " in limit_conn_zone \"%V\"%Z",
                 &shm_zone->shm.name);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_limit_conn_status_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    if (r->main->limit_conn_status == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = ngx_http_limit_conn_status[r->main->limit_conn_status - 1].len;
+    v->data = ngx_http_limit_conn_status[r->main->limit_conn_status - 1].data;
 
     return NGX_OK;
 }
@@ -605,6 +668,7 @@ ngx_http_limit_conn_create_conf(ngx_conf_t *cf)
 
     conf->log_level = NGX_CONF_UNSET_UINT;
     conf->status_code = NGX_CONF_UNSET_UINT;
+    conf->dry_run = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -623,6 +687,8 @@ ngx_http_limit_conn_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->log_level, prev->log_level, NGX_LOG_ERR);
     ngx_conf_merge_uint_value(conf->status_code, prev->status_code,
                               NGX_HTTP_SERVICE_UNAVAILABLE);
+
+    ngx_conf_merge_value(conf->dry_run, prev->dry_run, 0);
 
     return NGX_CONF_OK;
 }
@@ -822,6 +888,25 @@ ngx_http_limit_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 // 在preaccess阶段，rewrite之后
+static ngx_int_t
+ngx_http_limit_conn_add_variables(ngx_conf_t *cf)
+{
+    ngx_http_variable_t  *var, *v;
+
+    for (v = ngx_http_limit_conn_vars; v->name.len; v++) {
+        var = ngx_http_add_variable(cf, &v->name, v->flags);
+        if (var == NULL) {
+            return NGX_ERROR;
+        }
+
+        var->get_handler = v->get_handler;
+        var->data = v->data;
+    }
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_http_limit_conn_init(ngx_conf_t *cf)
 {

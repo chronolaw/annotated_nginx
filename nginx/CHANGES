@@ -1,4 +1,14 @@
 
+Changes with nginx 1.17.6                                        19 Nov 2019
+
+    *) Feature: the $proxy_protocol_server_addr and
+       $proxy_protocol_server_port variables.
+
+    *) Feature: the "limit_conn_dry_run" directive.
+
+    *) Feature: the $limit_req_status and $limit_conn_status variables.
+
+
 Changes with nginx 1.17.5                                        22 Oct 2019
 
     *) Feature: now nginx uses ioctl(FIONREAD), if available, to avoid

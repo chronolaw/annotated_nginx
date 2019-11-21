@@ -35,6 +35,7 @@ typedef struct ngx_thread_task_s     ngx_thread_task_t;
 
 // ssl相关数据结构
 typedef struct ngx_ssl_s             ngx_ssl_t;
+typedef struct ngx_proxy_protocol_s  ngx_proxy_protocol_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 
 // 1.15.0新增的管理udp会话数据结构
