@@ -1,4 +1,15 @@
 
+Changes with nginx 1.17.8                                        21 Jan 2020
+
+    *) Feature: variables support in the "grpc_pass" directive.
+
+    *) Bugfix: a timeout might occur while handling pipelined requests in an
+       SSL connection; the bug had appeared in 1.17.5.
+
+    *) Bugfix: in the "debug_points" directive when using HTTP/2.
+       Thanks to Daniil Bondarev.
+
+
 Changes with nginx 1.17.7                                        24 Dec 2019
 
     *) Bugfix: a segmentation fault might occur on start or during
