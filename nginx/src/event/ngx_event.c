@@ -429,6 +429,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     // 1.17.5新增,处理ngx_posted_next_events
     if (!ngx_queue_empty(&ngx_posted_next_events)) {
+        ngx_event_move_posted_next(cycle);
         timer = 0;
     }
 
@@ -489,7 +490,6 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     // 如果不使用负载均衡（accept_mutex off）或者reuseport
     // 那么此处就是空操作，因为队列为空
     ngx_event_process_posted(cycle, &ngx_posted_events);
-    ngx_event_process_posted_next(cycle, &ngx_posted_next_events);
 }
 
 

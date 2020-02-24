@@ -51,7 +51,7 @@
 // 遍历队列，取出队列里的事件，调用对应的handler
 // cycle参数只用于记录日志
 void ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted);
-void ngx_event_process_posted_next(ngx_cycle_t *cycle, ngx_queue_t *posted);
+void ngx_event_move_posted_next(ngx_cycle_t *cycle);
 
 // 保存accept事件，即客户端发起的连接请求
 extern ngx_queue_t  ngx_posted_accept_events;
