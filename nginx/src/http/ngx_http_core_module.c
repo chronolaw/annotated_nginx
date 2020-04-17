@@ -36,6 +36,9 @@ typedef struct {
 #define NGX_HTTP_REQUEST_BODY_FILE_CLEAN  2
 
 
+static ngx_int_t ngx_http_core_auth_delay(ngx_http_request_t *r);
+static void ngx_http_core_auth_delay_handler(ngx_http_request_t *r);
+
 static ngx_int_t ngx_http_core_find_location(ngx_http_request_t *r);
 static ngx_int_t ngx_http_core_find_static_location(ngx_http_request_t *r,
     ngx_http_location_tree_node_t *node);
@@ -621,6 +624,8 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, keepalive_disable),
       &ngx_http_core_keepalive_disable },
 
+    // 1.10 no satisfy_any
+
     { ngx_string("satisfy"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_enum_slot,
@@ -628,7 +633,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, satisfy),
       &ngx_http_core_satisfy },
 
-    // 1.10 no satisfy_any
+    // 1.17.10
+    { ngx_string("auth_delay"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_core_loc_conf_t, auth_delay),
+      NULL },
 
     // 不允许重复，设置location的internal标志
     // 在ngx_http_core_find_config_phase里检查
@@ -1407,10 +1418,17 @@ ngx_http_core_access_phase(ngx_http_request_t *r, ngx_http_phase_handler_t *ph)
 
     /* rc == NGX_ERROR || rc == NGX_HTTP_...  */
 
+<<<<<<< HEAD
     // 其他的错误，见上nginx注释
 
     // 结束请求
     // 但如果count>1，则不会真正结束
+=======
+    if (rc == NGX_HTTP_UNAUTHORIZED) {
+        return ngx_http_core_auth_delay(r);
+    }
+
+>>>>>>> mainline
     ngx_http_finalize_request(r, rc);
 
     return NGX_OK;
@@ -1431,12 +1449,17 @@ ngx_http_core_post_access_phase(ngx_http_request_t *r,
     access_code = r->access_code;
 
     if (access_code) {
+        r->access_code = 0;
+
         if (access_code == NGX_HTTP_FORBIDDEN) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "access forbidden by rule");
         }
 
-        r->access_code = 0;
+        if (access_code == NGX_HTTP_UNAUTHORIZED) {
+            return ngx_http_core_auth_delay(r);
+        }
+
         ngx_http_finalize_request(r, access_code);
         return NGX_OK;
     }
@@ -1446,6 +1469,7 @@ ngx_http_core_post_access_phase(ngx_http_request_t *r,
 }
 
 
+<<<<<<< HEAD
 // 不研究
 //ngx_int_t
 //ngx_http_core_try_files_phase(ngx_http_request_t *r,
@@ -1678,6 +1702,67 @@ ngx_http_core_post_access_phase(ngx_http_request_t *r,
 // 调用每个模块自己的处理函数
 // 模块handler返回decline，表示不处理
 // 没有一个content模块可以处理,返回404
+=======
+static ngx_int_t
+ngx_http_core_auth_delay(ngx_http_request_t *r)
+{
+    ngx_http_core_loc_conf_t  *clcf;
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->auth_delay == 0) {
+        ngx_http_finalize_request(r, NGX_HTTP_UNAUTHORIZED);
+        return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                  "delaying unauthorized request");
+
+    if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    r->read_event_handler = ngx_http_test_reading;
+    r->write_event_handler = ngx_http_core_auth_delay_handler;
+
+    r->connection->write->delayed = 1;
+    ngx_add_timer(r->connection->write, clcf->auth_delay);
+
+    /*
+     * trigger an additional event loop iteration
+     * to ensure constant-time processing
+     */
+
+    ngx_post_event(r->connection->write, &ngx_posted_next_events);
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_http_core_auth_delay_handler(ngx_http_request_t *r)
+{
+    ngx_event_t  *wev;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "auth delay handler");
+
+    wev = r->connection->write;
+
+    if (wev->delayed) {
+
+        if (ngx_handle_write_event(wev, 0) != NGX_OK) {
+            ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return;
+    }
+
+    ngx_http_finalize_request(r, NGX_HTTP_UNAUTHORIZED);
+}
+
+
+>>>>>>> mainline
 ngx_int_t
 ngx_http_core_content_phase(ngx_http_request_t *r,
     ngx_http_phase_handler_t *ph)
@@ -4182,6 +4267,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
     clcf->satisfy = NGX_CONF_UNSET_UINT;
+    clcf->auth_delay = NGX_CONF_UNSET_MSEC;
     clcf->if_modified_since = NGX_CONF_UNSET_UINT;
     clcf->max_ranges = NGX_CONF_UNSET_UINT;
     clcf->client_body_in_file_only = NGX_CONF_UNSET_UINT;
@@ -4397,6 +4483,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                |NGX_HTTP_KEEPALIVE_DISABLE_MSIE6));
     ngx_conf_merge_uint_value(conf->satisfy, prev->satisfy,
                               NGX_HTTP_SATISFY_ALL);
+    ngx_conf_merge_msec_value(conf->auth_delay, prev->auth_delay, 0);
     ngx_conf_merge_uint_value(conf->if_modified_since, prev->if_modified_since,
                               NGX_HTTP_IMS_EXACT);
     ngx_conf_merge_uint_value(conf->max_ranges, prev->max_ranges,
