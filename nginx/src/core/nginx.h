@@ -13,8 +13,8 @@
 // 1'015'005
 
 
-#define nginx_version      1017010
-#define NGINX_VERSION      "1.17.10"
+#define nginx_version      1018000
+#define NGINX_VERSION      "1.18.0"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 // nginx 1.7之后添加--build=Name选项
