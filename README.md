@@ -27,7 +27,7 @@ Nginx 1.18.0
 --------|-------|-----
 master  | Nginx开发版1.18.0|有
 mainline| Nginx开发版1.18.0|无
-stable  | Nginx稳定版1.16.0|无
+stable  | Nginx稳定版1.18.0|无
 
 # 已注解
 
