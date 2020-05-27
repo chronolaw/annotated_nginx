@@ -1,7 +1,15 @@
 
-Changes with nginx 1.18.0                                        21 Apr 2020
+Changes with nginx 1.19.0                                        26 May 2020
 
-    *) 1.18.x stable branch.
+    *) Feature: client certificate validation with OCSP.
+
+    *) Bugfix: "upstream sent frame for closed stream" errors might occur
+       when working with gRPC backends.
+
+    *) Bugfix: OCSP stapling might not work if the "resolver" directive was
+       not specified.
+
+    *) Bugfix: connections with incorrect HTTP/2 preface were not logged.
 
 
 Changes with nginx 1.17.10                                       14 Apr 2020

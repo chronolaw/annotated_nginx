@@ -2717,6 +2717,8 @@ ngx_http_upstream_test_next(ngx_http_request_t *r, ngx_http_upstream_t *u)
         }
 
 #endif
+
+        break;
     }
 
 #if (NGX_HTTP_CACHE)
