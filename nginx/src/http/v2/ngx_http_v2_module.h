@@ -20,7 +20,9 @@ typedef struct {
 } ngx_http_v2_main_conf_t;
 
 
+// HTTP2 server块配置
 typedef struct {
+    // http2连接使用的内存池大小，默认4k
     size_t                          pool_size;
 
     // 默认并发最多128个流
@@ -47,6 +49,7 @@ typedef struct {
 } ngx_http_v2_srv_conf_t;
 
 
+// HTTP2 location块配置
 typedef struct {
     size_t                          chunk_size;
 
