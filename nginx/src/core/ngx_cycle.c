@@ -653,6 +653,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 {
                     // 直接替换之前打开的socket描述符
                     nls[n].fd = ls[i].fd;
+                    nls[n].inherited = ls[i].inherited;
                     nls[n].previous = &ls[i];
 
                     // 置remain标记，已经找到，不需要再处理

@@ -1023,7 +1023,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 
 
     // 客户端里已经发来了一些数据
-    if (c->buffer && c->buffer->pos < c->buffer->last) {
+    if (c->buffer && c->buffer->pos <= c->buffer->last) {
         ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
                        "stream proxy add preread buffer: %uz",
                        c->buffer->last - c->buffer->pos);
@@ -1039,6 +1039,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
         *cl->buf = *c->buffer;
 
         cl->buf->tag = (ngx_buf_tag_t) &ngx_stream_proxy_module;
+        cl->buf->temporary = (cl->buf->pos == cl->buf->last) ? 0 : 1;
         cl->buf->flush = 1;
 
         // 1.15.0之前udp特殊处理，直接是最后一块数据，所以Nginx暂不支持udp会话

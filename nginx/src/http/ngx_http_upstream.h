@@ -472,6 +472,7 @@ struct ngx_http_upstream_s {
 
     unsigned                         keepalive:1;
     unsigned                         upgrade:1;
+    unsigned                         error:1;
 
     // 是否已经发送请求
     unsigned                         request_sent:1;
@@ -500,6 +501,8 @@ typedef struct {
 
 ngx_int_t ngx_http_upstream_create(ngx_http_request_t *r);
 void ngx_http_upstream_init(ngx_http_request_t *r);
+ngx_int_t ngx_http_upstream_non_buffered_filter_init(void *data);
+ngx_int_t ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes);
 ngx_http_upstream_srv_conf_t *ngx_http_upstream_add(ngx_conf_t *cf,
     ngx_url_t *u, ngx_uint_t flags);
 char *ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,

@@ -1202,7 +1202,8 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
         // 对于domain socket需要删除文件
         if (ls[i].sockaddr->sa_family == AF_UNIX
             && ngx_process <= NGX_PROCESS_MASTER
-            && ngx_new_binary == 0)
+            && ngx_new_binary == 0
+            && (!ls[i].inherited || ngx_getppid() != ngx_parent))
         {
             // 去掉前面的unix:前缀
             u_char *name = ls[i].addr_text.data + sizeof("unix:") - 1;

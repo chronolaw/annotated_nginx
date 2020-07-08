@@ -130,12 +130,11 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     u_char            *p;
     size_t             size;
     ngx_int_t          i;
-    ngx_uint_t         n, sigio;
+    ngx_uint_t         sigio;
     sigset_t           set;
     struct itimerval   itv;
     ngx_uint_t         live;
     ngx_msec_t         delay;
-    ngx_listening_t   *ls;
     ngx_core_conf_t   *ccf;
 
     // 添加master进程关注的信号
@@ -298,16 +297,19 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
 
+            // before 1.19.1
+            //ls = cycle->listening.elts;
+            //for (n = 0; n < cycle->listening.nelts; n++) {
+            //    if (ngx_close_socket(ls[n].fd) == -1) {
+            //        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+            //                      ngx_close_socket_n " %V failed",
+            //                      &ls[n].addr_text);
+            //    }
+            //}
+            //cycle->listening.nelts = 0;
+
             // 关闭所有监听端口
-            ls = cycle->listening.elts;
-            for (n = 0; n < cycle->listening.nelts; n++) {
-                if (ngx_close_socket(ls[n].fd) == -1) {
-                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
-                                  ngx_close_socket_n " %V failed",
-                                  &ls[n].addr_text);
-                }
-            }
-            cycle->listening.nelts = 0;
+            ngx_close_listening_sockets(cycle);
 
             continue;
         }

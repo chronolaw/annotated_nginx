@@ -686,6 +686,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 
             // 设置为刚获得的socket描述符
             ls->fd = (ngx_socket_t) s;
+            ls->inherited = 1;
         }
     }
 

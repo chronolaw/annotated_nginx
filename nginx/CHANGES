@@ -1,4 +1,40 @@
 
+Changes with nginx 1.19.1                                        07 Jul 2020
+
+    *) Change: the "lingering_close", "lingering_time", and
+       "lingering_timeout" directives now work when using HTTP/2.
+
+    *) Change: now extra data sent by a backend are always discarded.
+
+    *) Change: now after receiving a too short response from a FastCGI
+       server nginx tries to send the available part of the response to the
+       client, and then closes the client connection.
+
+    *) Change: now after receiving a response with incorrect length from a
+       gRPC backend nginx stops response processing with an error.
+
+    *) Feature: the "min_free" parameter of the "proxy_cache_path",
+       "fastcgi_cache_path", "scgi_cache_path", and "uwsgi_cache_path"
+       directives.
+       Thanks to Adam Bambuch.
+
+    *) Bugfix: nginx did not delete unix domain listen sockets during
+       graceful shutdown on the SIGQUIT signal.
+
+    *) Bugfix: zero length UDP datagrams were not proxied.
+
+    *) Bugfix: proxying to uwsgi backends using SSL might not work.
+       Thanks to Guanzhong Chen.
+
+    *) Bugfix: in error handling when using the "ssl_ocsp" directive.
+
+    *) Bugfix: on XFS and NFS file systems disk cache size might be
+       calculated incorrectly.
+
+    *) Bugfix: "negative size buf in writer" alerts might appear in logs if
+       a memcached server returned a malformed response.
+
+
 Changes with nginx 1.19.0                                        26 May 2020
 
     *) Feature: client certificate validation with OCSP.
