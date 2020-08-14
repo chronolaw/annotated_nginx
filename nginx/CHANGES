@@ -1,4 +1,33 @@
 
+Changes with nginx 1.19.2                                        11 Aug 2020
+
+    *) Change: now nginx starts closing keepalive connections before all
+       free worker connections are exhausted, and logs a warning about this
+       to the error log.
+
+    *) Change: optimization of client request body reading when using
+       chunked transfer encoding.
+
+    *) Bugfix: memory leak if the "ssl_ocsp" directive was used.
+
+    *) Bugfix: "zero size buf in output" alerts might appear in logs if a
+       FastCGI server returned an incorrect response; the bug had appeared
+       in 1.19.1.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       different large_client_header_buffers sizes were used in different
+       virtual servers.
+
+    *) Bugfix: SSL shutdown might not work.
+
+    *) Bugfix: "SSL_shutdown() failed (SSL: ... bad write retry)" messages
+       might appear in logs.
+
+    *) Bugfix: in the ngx_http_slice_module.
+
+    *) Bugfix: in the ngx_http_xslt_filter_module.
+
+
 Changes with nginx 1.19.1                                        07 Jul 2020
 
     *) Change: the "lingering_close", "lingering_time", and

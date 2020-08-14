@@ -136,6 +136,7 @@ struct ngx_cycle_s {
     // 复用连接对象队列
     ngx_queue_t               reusable_connections_queue;
     ngx_uint_t                reusable_connections_n;
+    time_t                    connections_reuse_time;
 
     // 监听的端口数组, in ngx_connection.h
     // 主要成员: fd,backlog,rcvbuf,sndbuf

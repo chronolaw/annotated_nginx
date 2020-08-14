@@ -27,6 +27,9 @@ static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
 // 如果已经读完了所有剩余数据，那么就挂到bufs指针，结束函数
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
 
+static ngx_int_t ngx_http_copy_pipelined_header(ngx_http_request_t *r,
+    ngx_buf_t *buf);
+
 // 请求体写入临时文件，不研究
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
 
@@ -445,28 +448,12 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             // 是否已经满了
             if (rb->buf->last == rb->buf->end) {
 
-                if (rb->buf->pos != rb->buf->last) {
+                /* update chains */
 
-                    /* pass buffer to request body filter chain */
+                rc = ngx_http_request_body_filter(r, NULL);
 
-                    out.buf = rb->buf;
-                    out.next = NULL;
-
-                    rc = ngx_http_request_body_filter(r, &out);
-
-                    if (rc != NGX_OK) {
-                        return rc;
-                    }
-
-                } else {
-
-                    /* update chains */
-
-                    rc = ngx_http_request_body_filter(r, NULL);
-
-                    if (rc != NGX_OK) {
-                        return rc;
-                    }
+                if (rc != NGX_OK) {
+                    return rc;
                 }
 
                 if (rb->busy != NULL) {
@@ -535,29 +522,27 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             r->request_length += n;
 
             // 已经读完了所有剩余数据
-            if (n == rest) {
-                /* pass buffer to request body filter chain */
+            /* pass buffer to request body filter chain */
 
-                out.buf = rb->buf;
-                out.next = NULL;
+            out.buf = rb->buf;
+            out.next = NULL;
 
-                // 分为chunked和确定长度两种
-                // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
-                //
-                // 处理确定长度的请求体数据，参数是已经读取的数据链表
-                // 先看free里是否有空闲节点，有则直接使用
-                // 如果没有，就从内存池的空闲链表里获取
-                // 这里只是指针操作，没有内存拷贝
-                // 调用请求体过滤链表，对数据进行过滤处理
-                // 实际上是ngx_http_request_body_save_filter
-                // 拷贝in链表里的buf到rb->bufs里，不是直接连接
-                // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
-                rc = ngx_http_request_body_filter(r, &out);
+            // 分为chunked和确定长度两种
+            // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+            //
+            // 处理确定长度的请求体数据，参数是已经读取的数据链表
+            // 先看free里是否有空闲节点，有则直接使用
+            // 如果没有，就从内存池的空闲链表里获取
+            // 这里只是指针操作，没有内存拷贝
+            // 调用请求体过滤链表，对数据进行过滤处理
+            // 实际上是ngx_http_request_body_save_filter
+            // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+            // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
+            rc = ngx_http_request_body_filter(r, &out);
 
-                // 出错则结束函数
-                if (rc != NGX_OK) {
-                    return rc;
-                }
+            // 出错则结束函数
+            if (rc != NGX_OK) {
+                return rc;
             }
 
             // ngx_http_request_body_filter里计算了rest剩余字节数
@@ -588,31 +573,17 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
         // 还有数据要读，且已经无数据可读
         if (!c->read->ready) {
 
-            if (r->request_body_no_buffering
-                && rb->buf->pos != rb->buf->last)
-            {
-                /* pass buffer to request body filter chain */
-
-                out.buf = rb->buf;
-                out.next = NULL;
-
-                // 分为chunked和确定长度两种
-                // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
-                //
-                // 处理确定长度的请求体数据，参数是已经读取的数据链表
-                // 先看free里是否有空闲节点，有则直接使用
-                // 如果没有，就从内存池的空闲链表里获取
-                // 这里只是指针操作，没有内存拷贝
-                // 调用请求体过滤链表，对数据进行过滤处理
-                // 实际上是ngx_http_request_body_save_filter
-                // 拷贝in链表里的buf到rb->bufs里，不是直接连接
-                // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
-                rc = ngx_http_request_body_filter(r, &out);
-
-                if (rc != NGX_OK) {
-                    return rc;
-                }
-            }
+            // 分为chunked和确定长度两种
+            // 简单起见只研究确定长度，即ngx_http_request_body_length_filter
+            //
+            // 处理确定长度的请求体数据，参数是已经读取的数据链表
+            // 先看free里是否有空闲节点，有则直接使用
+            // 如果没有，就从内存池的空闲链表里获取
+            // 这里只是指针操作，没有内存拷贝
+            // 调用请求体过滤链表，对数据进行过滤处理
+            // 实际上是ngx_http_request_body_save_filter
+            // 拷贝in链表里的buf到rb->bufs里，不是直接连接
+            // 最后把用完的ngx_chaint_t挂到free里供复用，提高效率
 
             // 读取body的超时时间
             clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -629,6 +600,10 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     }   // 外层for
 
     // 只有rest==0，即读取完毕才会走到这里
+
+    if (ngx_http_copy_pipelined_header(r, rb->buf) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
@@ -647,6 +622,88 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
 
 // 请求体写入临时文件，不研究
+static ngx_int_t
+ngx_http_copy_pipelined_header(ngx_http_request_t *r, ngx_buf_t *buf)
+{
+    size_t                     n;
+    ngx_buf_t                 *b;
+    ngx_chain_t               *cl;
+    ngx_http_connection_t     *hc;
+    ngx_http_core_srv_conf_t  *cscf;
+
+    b = r->header_in;
+    n = buf->last - buf->pos;
+
+    if (buf == b || n == 0) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http body pipelined header: %uz", n);
+
+    /*
+     * if there is a pipelined request in the client body buffer,
+     * copy it to the r->header_in buffer if there is enough room,
+     * or allocate a large client header buffer
+     */
+
+    if (n > (size_t) (b->end - b->last)) {
+
+        hc = r->http_connection;
+
+        if (hc->free) {
+            cl = hc->free;
+            hc->free = cl->next;
+
+            b = cl->buf;
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "http large header free: %p %uz",
+                           b->pos, b->end - b->last);
+
+        } else {
+            cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
+            b = ngx_create_temp_buf(r->connection->pool,
+                                    cscf->large_client_header_buffers.size);
+            if (b == NULL) {
+                return NGX_ERROR;
+            }
+
+            cl = ngx_alloc_chain_link(r->connection->pool);
+            if (cl == NULL) {
+                return NGX_ERROR;
+            }
+
+            cl->buf = b;
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "http large header alloc: %p %uz",
+                           b->pos, b->end - b->last);
+        }
+
+        cl->next = hc->busy;
+        hc->busy = cl;
+        hc->nbusy++;
+
+        r->header_in = b;
+
+        if (n > (size_t) (b->end - b->last)) {
+            ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                          "too large pipelined header after reading body");
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_memcpy(b->last, buf->pos, n);
+
+    b->last += n;
+    r->request_length -= n;
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_http_write_request_body(ngx_http_request_t *r)
 {
@@ -992,8 +1049,7 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
         // 判断content_length_n，为0就是已经读取完请求体
         // 就不需要再读了，读事件设置为block，返回成功
         if (r->headers_in.content_length_n == 0) {
-            r->read_event_handler = ngx_http_block_reading;
-            return NGX_OK;
+            break;
         }
 
         // content_length_n大于0，表示还有数据需要读取
@@ -1050,6 +1106,14 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 
         // 如果是ok，那么在for开始的地方检查content_length_n
     }
+
+    if (ngx_http_copy_pipelined_header(r, &b) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    r->read_event_handler = ngx_http_block_reading;
+
+    return NGX_OK;
 }
 
 
@@ -1061,9 +1125,10 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
 {
-    size_t                    size;
-    ngx_int_t                 rc;
-    ngx_http_request_body_t  *rb;
+    size_t                     size;
+    ngx_int_t                  rc;
+    ngx_http_request_body_t   *rb;
+    ngx_http_core_srv_conf_t  *cscf;
 
     // chunked数据长度不确定，需要特殊处理
     if (r->headers_in.chunked) {
@@ -1136,7 +1201,10 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
 
                 /* set amount of data we want to see next time */
 
-                r->headers_in.content_length_n = rb->chunked->length;
+                cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
+                r->headers_in.content_length_n = ngx_max(rb->chunked->length,
+                               (off_t) cscf->large_client_header_buffers.size);
                 break;
             }
 
@@ -1375,6 +1443,7 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_chain_t               *cl, *out, *tl, **ll;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
+    ngx_http_core_srv_conf_t  *cscf;
 
     rb = r->request_body;
 
@@ -1388,14 +1457,18 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
+        cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
         r->headers_in.content_length_n = 0;
-        rb->rest = 3;
+        rb->rest = cscf->large_client_header_buffers.size;
     }
 
     out = NULL;
     ll = &out;
 
     for (cl = in; cl; cl = cl->next) {
+
+        b = NULL;
 
         for ( ;; ) {
 
@@ -1432,6 +1505,29 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
                     r->lingering_close = 1;
 
                     return NGX_HTTP_REQUEST_ENTITY_TOO_LARGE;
+                }
+
+                if (b
+                    && rb->chunked->size <= 128
+                    && cl->buf->last - cl->buf->pos >= rb->chunked->size)
+                {
+                    r->headers_in.content_length_n += rb->chunked->size;
+
+                    if (rb->chunked->size < 8) {
+
+                        while (rb->chunked->size) {
+                            *b->last++ = *cl->buf->pos++;
+                            rb->chunked->size--;
+                        }
+
+                    } else {
+                        ngx_memmove(b->last, cl->buf->pos, rb->chunked->size);
+                        b->last += rb->chunked->size;
+                        cl->buf->pos += rb->chunked->size;
+                        rb->chunked->size = 0;
+                    }
+
+                    continue;
                 }
 
                 tl = ngx_chain_get_free_buf(r->pool, &rb->free);
@@ -1499,7 +1595,10 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
                 /* set rb->rest, amount of data we want to see next time */
 
-                rb->rest = rb->chunked->length;
+                cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
+                rb->rest = ngx_max(rb->chunked->length,
+                               (off_t) cscf->large_client_header_buffers.size);
 
                 break;
             }

@@ -144,22 +144,22 @@ typedef struct {
 
 
 // 检查多个标志位，确定缓冲区是否在内存里
-#define ngx_buf_in_memory(b)        (b->temporary || b->memory || b->mmap)
-#define ngx_buf_in_memory_only(b)   (ngx_buf_in_memory(b) && !b->in_file)
+#define ngx_buf_in_memory(b)       ((b)->temporary || (b)->memory || (b)->mmap)
+#define ngx_buf_in_memory_only(b)  (ngx_buf_in_memory(b) && !(b)->in_file)
 
 // 起控制作用的特殊缓冲区
 #define ngx_buf_special(b)                                                   \
-    ((b->flush || b->last_buf || b->sync)                                    \
-     && !ngx_buf_in_memory(b) && !b->in_file)
+    (((b)->flush || (b)->last_buf || (b)->sync)                              \
+     && !ngx_buf_in_memory(b) && !(b)->in_file)
 
 #define ngx_buf_sync_only(b)                                                 \
-    (b->sync                                                                 \
-     && !ngx_buf_in_memory(b) && !b->in_file && !b->flush && !b->last_buf)
+    ((b)->sync && !ngx_buf_in_memory(b)                                      \
+     && !(b)->in_file && !(b)->flush && !(b)->last_buf)
 
 // 计算缓冲区的大小，会根据是否在内存里使用恰当的指针
 #define ngx_buf_size(b)                                                      \
-    (ngx_buf_in_memory(b) ? (off_t) (b->last - b->pos):                      \
-                            (b->file_last - b->file_pos))
+    (ngx_buf_in_memory(b) ? (off_t) ((b)->last - (b)->pos):                  \
+                            ((b)->file_last - (b)->file_pos))
 
 // 从内存池里分配一块size大小的缓冲区
 // 并使用buf管理，注意temporary是1，可以修改
@@ -181,8 +181,8 @@ ngx_chain_t *ngx_alloc_chain_link(ngx_pool_t *pool);
 
 // 释放链表节点，挂在空闲链表里
 #define ngx_free_chain(pool, cl)                                             \
-    cl->next = pool->chain;                                                  \
-    pool->chain = cl
+    (cl)->next = (pool)->chain;                                              \
+    (pool)->chain = (cl)
 
 
 

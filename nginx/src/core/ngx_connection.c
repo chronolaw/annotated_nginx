@@ -1246,20 +1246,17 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
     // free_connections是空闲链表头指针
+
+    // 检查最多32个在可复用连接队列里的元素
+    // 设置为连接关闭c->close = 1;
+    // 调用事件的处理函数，里面会检查c->close
+    // 这样就会调用ngx_http_close_connection
+    // 释放连接，加入空闲链表，可以再次使用
+    ngx_drain_connections((ngx_cycle_t *) ngx_cycle);
+
+    // 此时应该有了一些空闲连接
+    // 再次获取
     c = ngx_cycle->free_connections;
-
-    if (c == NULL) {
-        // 检查最多32个在可复用连接队列里的元素
-        // 设置为连接关闭c->close = 1;
-        // 调用事件的处理函数，里面会检查c->close
-        // 这样就会调用ngx_http_close_connection
-        // 释放连接，加入空闲链表，可以再次使用
-        ngx_drain_connections((ngx_cycle_t *) ngx_cycle);
-
-        // 此时应该有了一些空闲连接
-        // 再次获取
-        c = ngx_cycle->free_connections;
-    }
 
     // 如果还没有获取到连接，那么就报错
     if (c == NULL) {
@@ -1493,8 +1490,26 @@ ngx_drain_connections(ngx_cycle_t *cycle)
     ngx_queue_t       *q;
     ngx_connection_t  *c;
 
+    // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
+    // free_connections是空闲链表头指针
+
     // 早期的nginx只检查32次，避免过多消耗时间
     // 1.12改变了这个固定值
+    if (cycle->free_connection_n > cycle->connection_n / 16
+        || cycle->reusable_connections_n == 0)
+    {
+        return;
+    }
+
+    if (cycle->connections_reuse_time != ngx_time()) {
+        cycle->connections_reuse_time = ngx_time();
+
+        ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                      "%ui worker_connections are not enough, "
+                      "reusing connections",
+                      cycle->connection_n);
+    }
+
     n = ngx_max(ngx_min(32, cycle->reusable_connections_n / 8), 1);
 
     for (i = 0; i < n; i++) {
