@@ -1,4 +1,34 @@
 
+Changes with nginx 1.19.3                                        29 Sep 2020
+
+    *) Feature: the ngx_stream_set_module.
+
+    *) Feature: the "proxy_cookie_flags" directive.
+
+    *) Feature: the "userid_flags" directive.
+
+    *) Bugfix: the "stale-if-error" cache control extension was erroneously
+       applied if backend returned a response with status code 500, 502,
+       503, 504, 403, 404, or 429.
+
+    *) Bugfix: "[crit] cache file ... has too long header" messages might
+       appear in logs if caching was used and the backend returned responses
+       with the "Vary" header line.
+
+    *) Workaround: "[crit] SSL_write() failed" messages might appear in logs
+       when using OpenSSL 1.1.1.
+
+    *) Bugfix: "SSL_shutdown() failed (SSL: ... bad write retry)" messages
+       might appear in logs; the bug had appeared in 1.19.2.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       using HTTP/2 if errors with code 400 were redirected to a proxied
+       location using the "error_page" directive.
+
+    *) Bugfix: socket leak when using HTTP/2 and subrequests in the njs
+       module.
+
+
 Changes with nginx 1.19.2                                        11 Aug 2020
 
     *) Change: now nginx starts closing keepalive connections before all
