@@ -2,6 +2,8 @@
 //
 // * ngx_hash_elt_t
 // * ngx_hash_init_t
+// * ngx_hash_key
+// * ngx_hash_key_lc
 
 /*
  * Copyright (C) Igor Sysoev
