@@ -119,6 +119,9 @@ struct ngx_ssl_connection_s {
     // 是否已经握手
     unsigned                    handshaked:1;
 
+    // new in 1.19.4
+    unsigned                    handshake_rejected:1;
+
     unsigned                    renegotiation:1;
 
     // #define NGX_SSL_BUFFER   1 默认启用ssl缓冲
@@ -238,6 +241,9 @@ ngx_int_t ngx_ssl_dhparam(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file);
 ngx_int_t ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name);
 ngx_int_t ngx_ssl_early_data(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_uint_t enable);
+ngx_int_t ngx_ssl_conf_commands(ngx_conf_t *cf, ngx_ssl_t *ssl,
+    ngx_array_t *commands);
+
 ngx_int_t ngx_ssl_client_session_cache(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_uint_t enable);
 ngx_int_t ngx_ssl_session_cache(ngx_ssl_t *ssl, ngx_str_t *sess_ctx,

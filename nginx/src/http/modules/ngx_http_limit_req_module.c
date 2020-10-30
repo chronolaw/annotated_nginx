@@ -142,6 +142,8 @@ static ngx_int_t ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit,
 static ngx_msec_t ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits,
     ngx_uint_t n, ngx_uint_t *ep, ngx_http_limit_req_limit_t **limit);
 
+static void ngx_http_limit_req_unlock(ngx_http_limit_req_limit_t *limits,
+    ngx_uint_t n);
 static void ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx,
     ngx_uint_t n);
 
@@ -321,6 +323,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         // 计算key
         // 例如$binary_remote_addr
         if (ngx_http_complex_value(r, &ctx->key, &key) != NGX_OK) {
+            ngx_http_limit_req_unlock(limits, n);
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -386,22 +389,25 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         }
 
         // 找是哪个共享内存设置了限速
-        while (n--) {
-            // 取共享内存里的限速信息
-            ctx = limits[n].shm_zone->data;
+        //while (n--) {
+        //    // 取共享内存里的限速信息
+        //    ctx = limits[n].shm_zone->data;
 
-            if (ctx->node == NULL) {
-                continue;
-            }
+        //    if (ctx->node == NULL) {
+        //        continue;
+        //    }
 
-            ngx_shmtx_lock(&ctx->shpool->mutex);
+        //    ngx_shmtx_lock(&ctx->shpool->mutex);
 
-            ctx->node->count--;
+        //    ctx->node->count--;
 
-            ngx_shmtx_unlock(&ctx->shpool->mutex);
+        //    ngx_shmtx_unlock(&ctx->shpool->mutex);
 
-            ctx->node = NULL;
-        }
+        //    ctx->node = NULL;
+        //}
+
+        // new in 1.19.4
+        ngx_http_limit_req_unlock(limits, n);
 
         // new in 1.17.1
         // 不会限速
@@ -811,6 +817,29 @@ ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits, ngx_uint_t n,
 
 
 // 清理一下内存
+static void
+ngx_http_limit_req_unlock(ngx_http_limit_req_limit_t *limits, ngx_uint_t n)
+{
+    ngx_http_limit_req_ctx_t  *ctx;
+
+    while (n--) {
+        ctx = limits[n].shm_zone->data;
+
+        if (ctx->node == NULL) {
+            continue;
+        }
+
+        ngx_shmtx_lock(&ctx->shpool->mutex);
+
+        ctx->node->count--;
+
+        ngx_shmtx_unlock(&ctx->shpool->mutex);
+
+        ctx->node = NULL;
+    }
+}
+
+
 static void
 ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx, ngx_uint_t n)
 {

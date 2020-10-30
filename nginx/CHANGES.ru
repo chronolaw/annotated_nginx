@@ -1,4 +1,14 @@
 
+Изменения в nginx 1.19.4                                          27.10.2020
+
+    *) Добавление: директивы ssl_conf_command, proxy_ssl_conf_command,
+       grpc_ssl_conf_command и uwsgi_ssl_conf_command.
+
+    *) Добавление: директива ssl_reject_handshake.
+
+    *) Добавление: директива proxy_smtp_auth в почтовом прокси-сервере.
+
+
 Изменения в nginx 1.19.3                                          29.09.2020
 
     *) Добавление: модуль ngx_stream_set_module.

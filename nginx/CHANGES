@@ -1,4 +1,14 @@
 
+Changes with nginx 1.19.4                                        27 Oct 2020
+
+    *) Feature: the "ssl_conf_command", "proxy_ssl_conf_command",
+       "grpc_ssl_conf_command", and "uwsgi_ssl_conf_command" directives.
+
+    *) Feature: the "ssl_reject_handshake" directive.
+
+    *) Feature: the "proxy_smtp_auth" directive in mail proxy.
+
+
 Changes with nginx 1.19.3                                        29 Sep 2020
 
     *) Feature: the ngx_stream_set_module.
