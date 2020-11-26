@@ -418,7 +418,7 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
 // 如果没有文件名就输出到stderr
 // 打开有前缀的日志文件
 ngx_log_t *
-ngx_log_init(u_char *prefix)
+ngx_log_init(u_char *prefix, u_char *error_log)
 {
     u_char  *p, *name;
     size_t   nlen, plen;
@@ -429,13 +429,18 @@ ngx_log_init(u_char *prefix)
 
     // 由configure自动生成
     // #define NGX_ERROR_LOG_PATH  "logs/error.log"
-    name = (u_char *) NGX_ERROR_LOG_PATH;
+    //name = (u_char *) NGX_ERROR_LOG_PATH;
 
     /*
      * we use ngx_strlen() here since BCC warns about
      * condition is always false and unreachable code
      */
 
+    if (error_log == NULL) {
+        error_log = (u_char *) NGX_ERROR_LOG_PATH;
+    }
+
+    name = error_log;
     nlen = ngx_strlen(name);
 
     // 如果没有文件名就输出到stderr
@@ -480,7 +485,7 @@ ngx_log_init(u_char *prefix)
                 *p++ = '/';
             }
 
-            ngx_cpystrn(p, (u_char *) NGX_ERROR_LOG_PATH, nlen + 1);
+            ngx_cpystrn(p, error_log, nlen + 1);
 
             p = name;
         }
@@ -518,10 +523,10 @@ ngx_log_init(u_char *prefix)
 ngx_int_t
 ngx_log_open_default(ngx_cycle_t *cycle)
 {
-    ngx_log_t         *log;
-
     // #define NGX_ERROR_LOG_PATH  "logs/error.log"
-    static ngx_str_t   error_log = ngx_string(NGX_ERROR_LOG_PATH);
+    //static ngx_str_t   error_log = ngx_string(NGX_ERROR_LOG_PATH);
+
+    ngx_log_t  *log;
 
     // 在日志链表里找到一个使用文件的日志对象
     // 有就说明已经用指令设置了日志
@@ -550,7 +555,7 @@ ngx_log_open_default(ngx_cycle_t *cycle)
 
     // 打开文件，注意没有前缀
     // 默认使用conf_prefix/prefix
-    log->file = ngx_conf_open_file(cycle, &error_log);
+    log->file = ngx_conf_open_file(cycle, &cycle->error_log);
     if (log->file == NULL) {
         return NGX_ERROR;
     }

@@ -139,6 +139,16 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         return NULL;
     }
 
+    // 1.19.5
+    cycle->error_log.len = old_cycle->error_log.len;
+    cycle->error_log.data = ngx_pnalloc(pool, old_cycle->error_log.len + 1);
+    if (cycle->error_log.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+    ngx_cpystrn(cycle->error_log.data, old_cycle->error_log.data,
+                old_cycle->error_log.len + 1);
+
     // 从old_cycle拷贝conf_file
     cycle->conf_file.len = old_cycle->conf_file.len;
     cycle->conf_file.data = ngx_pnalloc(pool, old_cycle->conf_file.len + 1);

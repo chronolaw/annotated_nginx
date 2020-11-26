@@ -263,6 +263,7 @@ static ngx_uint_t   ngx_show_configure;     // 显示编译配置信息
 // 前三个是u_char是因为要赋值给ngx_str_t
 // ngx_signal用char*是因为要做字符串比较，不需要存储
 static u_char      *ngx_prefix;             // -p参数，工作路径
+static u_char      *ngx_error_log;          // 1.19.5, errorlog filename
 static u_char      *ngx_conf_file;          // -c参数，配置文件
 static u_char      *ngx_conf_params;        // -g参数
 static char        *ngx_signal;             // -s参数，unix信号, stop/quit/reload/reopen/
@@ -341,7 +342,7 @@ main(int argc, char *const *argv)
     // 初始化log，仅在配置阶段使用
     // ngx_prefix是-p后的参数，即nginx的工作目录
     // 默认是NGX_CONF_PREFIX，即/usr/local/nginx
-    log = ngx_log_init(ngx_prefix);
+    log = ngx_log_init(ngx_prefix, ngx_error_log);
     if (log == NULL) {
         return 1;
     }
@@ -575,9 +576,9 @@ ngx_show_version_info(void)
 
     if (ngx_show_help) {
         ngx_write_stderr(
-            "Usage: nginx [-?hvVtTq] [-s signal] [-c filename] "
-                         "[-p prefix] [-g directives]" NGX_LINEFEED
-                         NGX_LINEFEED
+            "Usage: nginx [-?hvVtTq] [-s signal] [-p prefix]" NGX_LINEFEED
+            "             [-e filename] [-c filename] [-g directives]"
+                          NGX_LINEFEED NGX_LINEFEED
             "Options:" NGX_LINEFEED
             "  -?,-h         : this help" NGX_LINEFEED
             "  -v            : show version and exit" NGX_LINEFEED
@@ -595,6 +596,12 @@ ngx_show_version_info(void)
                                NGX_LINEFEED
 #else
             "  -p prefix     : set prefix path (default: NONE)" NGX_LINEFEED
+#endif
+            "  -e filename   : set error log file (default: "
+#ifdef NGX_ERROR_LOG_STDERR
+                               "stderr)" NGX_LINEFEED
+#else
+                               NGX_ERROR_LOG_PATH ")" NGX_LINEFEED
 #endif
             "  -c filename   : set configuration file (default: " NGX_CONF_PATH
                                ")" NGX_LINEFEED
@@ -1012,6 +1019,24 @@ ngx_get_options(int argc, char *const *argv)
                 ngx_log_stderr(0, "option \"-p\" requires directory name");
                 return NGX_ERROR;
 
+            case 'e':
+                if (*p) {
+                    ngx_error_log = p;
+
+                } else if (argv[++i]) {
+                    ngx_error_log = (u_char *) argv[i];
+
+                } else {
+                    ngx_log_stderr(0, "option \"-e\" requires file name");
+                    return NGX_ERROR;
+                }
+
+                if (ngx_strcmp(ngx_error_log, "stderr") == 0) {
+                    ngx_error_log = (u_char *) "";
+                }
+
+                goto next;
+
             case 'c':
                 if (*p) {
                     ngx_conf_file = p;      //设置ngx_conf_file,配置文件
@@ -1206,6 +1231,14 @@ ngx_process_options(ngx_cycle_t *cycle)
             cycle->conf_prefix.data = cycle->conf_file.data;
             break;
         }
+    }
+
+    if (ngx_error_log) {
+        cycle->error_log.len = ngx_strlen(ngx_error_log);
+        cycle->error_log.data = ngx_error_log;
+
+    } else {
+        ngx_str_set(&cycle->error_log, NGX_ERROR_LOG_PATH);
     }
 
     if (ngx_conf_params) {

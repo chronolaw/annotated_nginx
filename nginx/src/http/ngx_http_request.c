@@ -167,7 +167,7 @@ static void ngx_http_keepalive_handler(ngx_event_t *ev);
 // 计算延后关闭的时间，添加超时
 // 设置读事件处理函数为ngx_http_lingering_close_handler
 // 如果此时有数据可读那么直接调用ngx_http_lingering_close_handler
-static void ngx_http_set_lingering_close(ngx_http_request_t *r);
+static void ngx_http_set_lingering_close(ngx_connection_t *c);
 
 // 超时直接关闭连接
 // 否则读取数据，但并不处理，使用固定的buffer
@@ -3488,7 +3488,7 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
                 || r->header_in->pos < r->header_in->last
                 || r->connection->read->ready)))
     {
-        ngx_http_set_lingering_close(r);
+        ngx_http_set_lingering_close(r->connection);
         return;
     }
 
@@ -3883,12 +3883,13 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     // 请求正在丢弃body
     // 使用lingering_time延迟关闭，如果一段时间内没有数据发过来就关闭连接
     // r->read_event_handler = ngx_http_discarded_request_body_handler;
-    if (r->discard_body) {
-        r->write_event_handler = ngx_http_request_empty_handler;
-        r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
-        ngx_add_timer(rev, clcf->lingering_timeout);
-        return;
-    }
+    // 1.19.5
+    //if (r->discard_body) {
+    //    r->write_event_handler = ngx_http_request_empty_handler;
+    //    r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
+    //    ngx_add_timer(rev, clcf->lingering_timeout);
+    //    return;
+    //}
 
     c->log->action = "closing request";
 
@@ -4237,24 +4238,56 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
 // 设置读事件处理函数为ngx_http_lingering_close_handler
 // 如果此时有数据可读那么直接调用ngx_http_lingering_close_handler
 static void
-ngx_http_set_lingering_close(ngx_http_request_t *r)
+ngx_http_set_lingering_close(ngx_connection_t *c)
 {
     ngx_event_t               *rev, *wev;
-    ngx_connection_t          *c;
+    ngx_http_request_t        *r;
     ngx_http_core_loc_conf_t  *clcf;
 
+    // 1.19.5
     // 获取连接对象
-    c = r->connection;
+    //c = r->connection;
+
+    //clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    //// 设置读事件处理函数为ngx_http_lingering_close_handler
+    //rev = c->read;
+    //rev->handler = ngx_http_lingering_close_handler;
+
+    //// 计算延后关闭的时间，添加超时
+    //r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
+    //ngx_add_timer(rev, clcf->lingering_timeout);
+
+    r = c->data;
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
-    // 设置读事件处理函数为ngx_http_lingering_close_handler
+    if (r->lingering_time == 0) {
+        r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
+    }
+
+#if (NGX_HTTP_SSL)
+    if (c->ssl) {
+        ngx_int_t  rc;
+
+        rc = ngx_ssl_shutdown(c);
+
+        if (rc == NGX_ERROR) {
+            ngx_http_close_request(r, 0);
+            return;
+        }
+
+        if (rc == NGX_AGAIN) {
+            c->ssl->handler = ngx_http_set_lingering_close;
+            return;
+        }
+
+        c->recv = ngx_recv;
+    }
+#endif
+
     rev = c->read;
     rev->handler = ngx_http_lingering_close_handler;
-
-    // 计算延后关闭的时间，添加超时
-    r->lingering_time = ngx_time() + (time_t) (clcf->lingering_time / 1000);
-    ngx_add_timer(rev, clcf->lingering_timeout);
 
     // 注册读事件
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
@@ -4280,6 +4313,8 @@ ngx_http_set_lingering_close(ngx_http_request_t *r)
         ngx_http_close_request(r, 0);
         return;
     }
+
+    ngx_add_timer(rev, clcf->lingering_timeout);
 
     // 如果此时有数据可读那么直接调用ngx_http_lingering_close_handler
     if (rev->ready) {

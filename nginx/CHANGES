@@ -1,4 +1,19 @@
 
+Changes with nginx 1.19.5                                        24 Nov 2020
+
+    *) Feature: the -e switch.
+
+    *) Feature: the same source files can now be specified in different
+       modules while building addon modules.
+
+    *) Bugfix: SSL shutdown did not work when lingering close was used.
+
+    *) Bugfix: "upstream sent frame for closed stream" errors might occur
+       when working with gRPC backends.
+
+    *) Bugfix: in request body filters internal API.
+
+
 Changes with nginx 1.19.4                                        27 Oct 2020
 
     *) Feature: the "ssl_conf_command", "proxy_ssl_conf_command",

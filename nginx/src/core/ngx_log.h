@@ -308,7 +308,7 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 /*********************************/
 
 // 初始化日志
-ngx_log_t *ngx_log_init(u_char *prefix);
+ngx_log_t *ngx_log_init(u_char *prefix, u_char *error_log);
 
 // 直接以alert级别记录日志
 void ngx_cdecl ngx_log_abort(ngx_err_t err, const char *fmt, ...);
