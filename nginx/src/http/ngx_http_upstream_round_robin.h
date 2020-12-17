@@ -105,6 +105,7 @@ struct ngx_http_upstream_rr_peers_s {
 
     // 总权重
     ngx_uint_t                      total_weight;
+    ngx_uint_t                      tries;
 
     // 只有一台服务器时优化处理
     unsigned                        single:1;
