@@ -920,6 +920,8 @@ ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
 }
 
 
+// 设置可信的CA根证书(PEM format)，调用OpenSSL API
+// called by ngx_http_lua_set_ssl()/lua_ssl_trusted_certificate
 ngx_int_t
 ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
     ngx_int_t depth)
@@ -933,10 +935,12 @@ ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_OK;
     }
 
+    // 以conf作为默认起始目录
     if (ngx_conf_full_name(cf->cycle, cert, 1) != NGX_OK) {
         return NGX_ERROR;
     }
 
+    // 设置可信的CA根证书，调用OpenSSL API
     if (SSL_CTX_load_verify_locations(ssl->ctx, (char *) cert->data, NULL)
         == 0)
     {
