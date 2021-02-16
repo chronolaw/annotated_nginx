@@ -352,16 +352,17 @@ ngx_http_header_t  ngx_http_headers_in[] = {
 void
 ngx_http_init_connection(ngx_connection_t *c)
 {
-    ngx_uint_t              i;
-    ngx_event_t            *rev;
-    struct sockaddr_in     *sin;
-    ngx_http_port_t        *port;
-    ngx_http_in_addr_t     *addr;
-    ngx_http_log_ctx_t     *ctx;
-    ngx_http_connection_t  *hc;
+    ngx_uint_t                 i;
+    ngx_event_t               *rev;
+    struct sockaddr_in        *sin;
+    ngx_http_port_t           *port;
+    ngx_http_in_addr_t        *addr;
+    ngx_http_log_ctx_t        *ctx;
+    ngx_http_connection_t     *hc;
+    ngx_http_core_srv_conf_t  *cscf;
 #if (NGX_HAVE_INET6)
-    struct sockaddr_in6    *sin6;
-    ngx_http_in6_addr_t    *addr6;
+    struct sockaddr_in6       *sin6;
+    ngx_http_in6_addr_t       *addr6;
 #endif
 
     // 建立连接时server{}里相关的信息
@@ -539,9 +540,11 @@ ngx_http_init_connection(ngx_connection_t *c)
         return;
     }
 
+    cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
+
     // 虽然建立了连接，但暂时没有数据可读，ready=0
     // 加一个超时事件，等待读事件发生
-    ngx_add_timer(rev, c->listening->post_accept_timeout);
+    ngx_add_timer(rev, cscf->client_header_timeout);
 
     // 连接加入cycle的复用队列ngx_cycle->reusable_connections_queue
     ngx_reusable_connection(c, 1);
@@ -654,7 +657,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
         // 没设置超时就再来一次
         if (!rev->timer_set) {
-            ngx_add_timer(rev, c->listening->post_accept_timeout);
+            ngx_add_timer(rev, cscf->client_header_timeout);
             ngx_reusable_connection(c, 1);
         }
 
@@ -959,6 +962,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
     ngx_http_connection_t     *hc;
     ngx_http_ssl_srv_conf_t   *sscf;
     ngx_http_core_loc_conf_t  *clcf;
+    ngx_http_core_srv_conf_t  *cscf;
 
     // 连接可读，即客户端发来了数据
 
@@ -1004,7 +1008,9 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             rev->ready = 0;
 
             if (!rev->timer_set) {
-                ngx_add_timer(rev, c->listening->post_accept_timeout);
+                cscf = ngx_http_get_module_srv_conf(hc->conf_ctx,
+                                                    ngx_http_core_module);
+                ngx_add_timer(rev, cscf->client_header_timeout);
                 ngx_reusable_connection(c, 1);
             }
 
@@ -1092,7 +1098,9 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             if (rc == NGX_AGAIN) {
 
                 if (!rev->timer_set) {
-                    ngx_add_timer(rev, c->listening->post_accept_timeout);
+                    cscf = ngx_http_get_module_srv_conf(hc->conf_ctx,
+                                                        ngx_http_core_module);
+                    ngx_add_timer(rev, cscf->client_header_timeout);
                 }
 
                 c->ssl->handler = ngx_http_ssl_handshake_handler;
@@ -4316,6 +4324,9 @@ ngx_http_set_lingering_close(ngx_connection_t *c)
         return;
     }
 
+    c->close = 0;
+    ngx_reusable_connection(c, 1);
+
     ngx_add_timer(rev, clcf->lingering_timeout);
 
     // 如果此时有数据可读那么直接调用ngx_http_lingering_close_handler
@@ -4349,7 +4360,7 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
                    "http lingering close handler");
 
     // 超时直接关闭连接
-    if (rev->timedout) {
+    if (rev->timedout || c->close) {
         ngx_http_close_request(r, 0);
         return;
     }

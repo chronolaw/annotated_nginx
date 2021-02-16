@@ -1,4 +1,31 @@
 
+Changes with nginx 1.19.7                                        16 Feb 2021
+
+    *) Change: connections handling in HTTP/2 has been changed to better
+       match HTTP/1.x; the "http2_recv_timeout", "http2_idle_timeout", and
+       "http2_max_requests" directives have been removed, the
+       "keepalive_timeout" and "keepalive_requests" directives should be
+       used instead.
+
+    *) Change: the "http2_max_field_size" and "http2_max_header_size"
+       directives have been removed, the "large_client_header_buffers"
+       directive should be used instead.
+
+    *) Feature: now, if free worker connections are exhausted, nginx starts
+       closing not only keepalive connections, but also connections in
+       lingering close.
+
+    *) Bugfix: "zero size buf in output" alerts might appear in logs if an
+       upstream server returned an incorrect response during unbuffered
+       proxying; the bug had appeared in 1.19.1.
+
+    *) Bugfix: HEAD requests were handled incorrectly if the "return"
+       directive was used with the "image_filter" or "xslt_stylesheet"
+       directives.
+
+    *) Bugfix: in the "add_trailer" directive.
+
+
 Changes with nginx 1.19.6                                        15 Dec 2020
 
     *) Bugfix: "no live upstreams" errors if a "server" inside "upstream"
