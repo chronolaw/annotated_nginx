@@ -29,7 +29,7 @@ static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
 static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
     ngx_uint_t respawn);
 
-static void ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch);
+static void ngx_pass_open_channel(ngx_cycle_t *cycle);
 
 // master进程调用，遍历ngx_processes数组，用kill发送信号
 static void ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo);
@@ -499,15 +499,9 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 static void
 ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 {
-    ngx_int_t      i;
-    ngx_channel_t  ch;
+    ngx_int_t  i;
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start worker processes");
-
-    ngx_memzero(&ch, sizeof(ngx_channel_t));
-
-    // unix channel
-    ch.command = NGX_CMD_OPEN_CHANNEL;
 
     for (i = 0; i < n; i++) {
 
@@ -518,13 +512,7 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
                           (void *) (intptr_t) i, "worker process", type);
 
-        // 设置channel信息
-        ch.pid = ngx_processes[ngx_process_slot].pid;
-        ch.slot = ngx_process_slot;
-        ch.fd = ngx_processes[ngx_process_slot].channel[0];
-
-        // 建立channel，用于进程间通信
-        ngx_pass_open_channel(cycle, &ch);
+        ngx_pass_open_channel(cycle);
     }
 }
 
@@ -532,9 +520,8 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 static void
 ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
 {
-    ngx_uint_t       i, manager, loader;
-    ngx_path_t     **path;
-    ngx_channel_t    ch;
+    ngx_uint_t    i, manager, loader;
+    ngx_path_t  **path;
 
     manager = 0;
     loader = 0;
@@ -559,14 +546,7 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
                       &ngx_cache_manager_ctx, "cache manager process",
                       respawn ? NGX_PROCESS_JUST_RESPAWN : NGX_PROCESS_RESPAWN);
 
-    ngx_memzero(&ch, sizeof(ngx_channel_t));
-
-    ch.command = NGX_CMD_OPEN_CHANNEL;
-    ch.pid = ngx_processes[ngx_process_slot].pid;
-    ch.slot = ngx_process_slot;
-    ch.fd = ngx_processes[ngx_process_slot].channel[0];
-
-    ngx_pass_open_channel(cycle, &ch);
+    ngx_pass_open_channel(cycle);
 
     if (loader == 0) {
         return;
@@ -576,20 +556,21 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
                       &ngx_cache_loader_ctx, "cache loader process",
                       respawn ? NGX_PROCESS_JUST_SPAWN : NGX_PROCESS_NORESPAWN);
 
-    ch.command = NGX_CMD_OPEN_CHANNEL;
-    ch.pid = ngx_processes[ngx_process_slot].pid;
-    ch.slot = ngx_process_slot;
-    ch.fd = ngx_processes[ngx_process_slot].channel[0];
-
-    ngx_pass_open_channel(cycle, &ch);
+    ngx_pass_open_channel(cycle);
 }
 
 
 // 建立channel，用于进程间通信
 static void
-ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
+ngx_pass_open_channel(ngx_cycle_t *cycle)
 {
-    ngx_int_t  i;
+    ngx_int_t      i;
+    ngx_channel_t  ch;
+
+    ch.command = NGX_CMD_OPEN_CHANNEL;
+    ch.pid = ngx_processes[ngx_process_slot].pid;
+    ch.slot = ngx_process_slot;
+    ch.fd = ngx_processes[ngx_process_slot].channel[0];
 
     // 遍历进程数组，逐个发送子进程消息
     for (i = 0; i < ngx_last_process; i++) {
@@ -604,7 +585,7 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
 
         ngx_log_debug6(NGX_LOG_DEBUG_CORE, cycle->log, 0,
                       "pass channel s:%i pid:%P fd:%d to s:%i pid:%P fd:%d",
-                      ch->slot, ch->pid, ch->fd,
+                      ch.slot, ch.pid, ch.fd,
                       i, ngx_processes[i].pid,
                       ngx_processes[i].channel[0]);
 
@@ -613,7 +594,7 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
         // 发送信息
         // 在其他进程的ngx_channel_handler里处理
         ngx_write_channel(ngx_processes[i].channel[0],
-                          ch, sizeof(ngx_channel_t), cycle->log);
+                          &ch, sizeof(ngx_channel_t), cycle->log);
     }
 }
 
@@ -821,14 +802,8 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 }
 
 
-                // 创建子进程成功，设置channle信息，通知其他worker
-                ch.command = NGX_CMD_OPEN_CHANNEL;
-                ch.pid = ngx_processes[ngx_process_slot].pid;
-                ch.slot = ngx_process_slot;
-                ch.fd = ngx_processes[ngx_process_slot].channel[0];
-
                 // 建立channel，用于进程间通信
-                ngx_pass_open_channel(cycle, &ch);
+                ngx_pass_open_channel(cycle);
 
                 live = 1;
 

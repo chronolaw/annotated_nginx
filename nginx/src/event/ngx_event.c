@@ -474,12 +474,15 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         ngx_shmtx_unlock(&ngx_accept_mutex);
     }
 
+    // 1.19.9
     // 如果消耗了一点时间，那么看看是否定时器里有过期的
-    if (delta) {
-        // 遍历定时器红黑树，找出所有过期的事件，调用handler处理超时
-        // 其中可能有的socket读写超时，那么就结束请求，断开连接
-        ngx_event_expire_timers();
-    }
+    //if (delta) {
+    //    ngx_event_expire_timers();
+    //}
+
+    // 遍历定时器红黑树，找出所有过期的事件，调用handler处理超时
+    // 其中可能有的socket读写超时，那么就结束请求，断开连接
+    ngx_event_expire_timers();
 
     // 接下来处理延后队列里的事件，即调用事件的handler(ev)，收发数据
     // in ngx_event_posted.c

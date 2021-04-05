@@ -1,4 +1,24 @@
 
+Changes with nginx 1.19.9                                        30 Mar 2021
+
+    *) Bugfix: nginx could not be built with the mail proxy module, but
+       without the ngx_mail_ssl_module; the bug had appeared in 1.19.8.
+
+    *) Bugfix: "upstream sent response body larger than indicated content
+       length" errors might occur when working with gRPC backends; the bug
+       had appeared in 1.19.1.
+
+    *) Bugfix: nginx might not close a connection till keepalive timeout
+       expiration if the connection was closed by the client while
+       discarding the request body.
+
+    *) Bugfix: nginx might not detect that a connection was already closed
+       by the client when waiting for auth_delay or limit_req delay, or when
+       working with backends.
+
+    *) Bugfix: in the eventport method.
+
+
 Changes with nginx 1.19.8                                        09 Mar 2021
 
     *) Feature: flags in the "proxy_cookie_flags" directive can now contain

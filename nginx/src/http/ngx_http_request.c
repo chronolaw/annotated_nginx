@@ -3296,19 +3296,20 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         ngx_del_timer(c->write);
     }
 
-    if (c->read->eof) {
-        // 尝试关闭请求，引用计数减1，表示本操作完成
-        // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
-        // 不能关闭，直接返回
-        // 引用计数为0，没有任何操作了，可以安全关闭
-        // 释放请求相关的资源，调用cleanup链表，相当于析构
-        // 此时请求已经结束，调用log模块记录日志
-        // 销毁请求的内存池
-        // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
-        // 最后销毁连接的内存池
-        ngx_http_close_request(r, 0);
-        return;
-    }
+    // 1.19.9
+    //if (c->read->eof) {
+    //    // 尝试关闭请求，引用计数减1，表示本操作完成
+    //    // 如果还有引用计数，意味着此请求还有关联的epoll事件未完成
+    //    // 不能关闭，直接返回
+    //    // 引用计数为0，没有任何操作了，可以安全关闭
+    //    // 释放请求相关的资源，调用cleanup链表，相当于析构
+    //    // 此时请求已经结束，调用log模块记录日志
+    //    // 销毁请求的内存池
+    //    // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
+    //    // 最后销毁连接的内存池
+    //    ngx_http_close_request(r, 0);
+    //    return;
+    //}
 
     // 检查请求相关的异步事件，尝试关闭请求
     //
@@ -3475,6 +3476,11 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     // r->main->count == 1，可以结束请求
 
     r = r->main;
+
+    if (r->connection->read->eof) {
+        ngx_http_close_request(r, 0);
+        return;
+    }
 
     // 如果正在读取请求体，那么设置标志位，要求延后读取数据关闭
     if (r->reading_body) {
