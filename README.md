@@ -21,13 +21,13 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module)
 
 # 当前状态
-Nginx 1.19.9
+Nginx 1.19.10
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.19.9|有
-mainline| Nginx开发版1.19.9|无
+master  | Nginx开发版1.19.10|有
+mainline| Nginx开发版1.19.10|无
 stable  | Nginx稳定版1.18.0|无
 
 # 已注解
