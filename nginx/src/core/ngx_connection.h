@@ -296,6 +296,9 @@ struct ngx_connection_s {
     // c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
     ngx_atomic_uint_t   number;
 
+    // 1.19.10 连接开始的时间
+    ngx_msec_t          start_time;
+
     // 处理的请求次数，在ngx_http_create_request里增加
     // 用来控制长连接里可处理的请求次数，指令keepalive_requests
     // 在stream框架里暂未使用

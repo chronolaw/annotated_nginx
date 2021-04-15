@@ -327,6 +327,8 @@ ngx_event_accept(ngx_event_t *ev)
         // 连接计数器增加
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
+        c->start_time = ngx_current_msec;
+
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_handled, 1);
 #endif

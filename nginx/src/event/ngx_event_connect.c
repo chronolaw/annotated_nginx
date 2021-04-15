@@ -225,6 +225,9 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     // 连接计数器
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
+    // 1.19.10 连接开始的时间
+    c->start_time = ngx_current_msec;
+
     // 向epoll添加连接，即同时添加读写事件
     // 当与上游服务器有任何数据收发时都会触发epoll
     // 在upstream机制里就是回调ngx_http_upstream_handle
