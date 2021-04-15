@@ -1,4 +1,17 @@
 
+Changes with nginx 1.19.10                                       13 Apr 2021
+
+    *) Change: the default value of the "keepalive_requests" directive was
+       changed to 1000.
+
+    *) Feature: the "keepalive_time" directive.
+
+    *) Feature: the $connection_time variable.
+
+    *) Workaround: "gzip filter failed to use preallocated memory" alerts
+       appeared in logs when using zlib-ng.
+
+
 Changes with nginx 1.19.9                                        30 Mar 2021
 
     *) Bugfix: nginx could not be built with the mail proxy module, but
