@@ -77,9 +77,6 @@ static void
 static void
     ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     ngx_uint_t do_write);
-static ngx_int_t ngx_http_upstream_non_buffered_filter_init(void *data);
-static ngx_int_t ngx_http_upstream_non_buffered_filter(void *data,
-    ssize_t bytes);
 #if (NGX_THREADS)
 static ngx_int_t ngx_http_upstream_thread_handler(ngx_thread_task_t *task,
     ngx_file_t *file);
@@ -610,6 +607,17 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
     u->store = u->conf->store;
 
     if (!u->store && !r->post_action && !u->conf->ignore_client_abort) {
+
+        if (r->connection->read->ready) {
+            ngx_post_event(r->connection->read, &ngx_posted_events);
+
+        } else {
+            if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
+                ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+        }
+
         r->read_event_handler = ngx_http_upstream_rd_check_broken_connection;
         r->write_event_handler = ngx_http_upstream_wr_check_broken_connection;
     }
@@ -1919,6 +1927,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     u->keepalive = 0;
     u->upgrade = 0;
+    u->error = 0;
 
     ngx_memzero(&u->headers_in, sizeof(ngx_http_upstream_headers_in_t));
     u->headers_in.content_length_n = -1;
@@ -2475,7 +2484,7 @@ ngx_http_upstream_test_next(ngx_http_request_t *r, ngx_http_upstream_t *u)
 #if (NGX_HTTP_CACHE)
 
         if (u->cache_status == NGX_HTTP_CACHE_EXPIRED
-            && ((u->conf->cache_use_stale & un->mask) || r->cache->stale_error))
+            && (u->conf->cache_use_stale & un->mask))
         {
             ngx_int_t  rc;
 
@@ -2502,6 +2511,8 @@ ngx_http_upstream_test_next(ngx_http_request_t *r, ngx_http_upstream_t *u)
         }
 
 #endif
+
+        break;
     }
 
 #if (NGX_HTTP_CACHE)
@@ -3011,9 +3022,7 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
                 return;
             }
 
-            if (u->peer.connection->read->ready || u->length == 0) {
-                ngx_http_upstream_process_non_buffered_upstream(r, u);
-            }
+            ngx_http_upstream_process_non_buffered_upstream(r, u);
         }
 
         return;
@@ -3625,7 +3634,7 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
                     return;
                 }
 
-                if (upstream->read->error) {
+                if (upstream->read->error || u->error) {
                     ngx_http_upstream_finalize_request(r, u,
                                                        NGX_HTTP_BAD_GATEWAY);
                     return;
@@ -3703,14 +3712,14 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_http_upstream_non_buffered_filter_init(void *data)
 {
     return NGX_OK;
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes)
 {
     ngx_http_request_t  *r = data;
@@ -3720,6 +3729,13 @@ ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes)
     ngx_http_upstream_t  *u;
 
     u = r->upstream;
+
+    if (u->length == 0) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "upstream sent more data than specified in "
+                      "\"Content-Length\" header");
+        return NGX_OK;
+    }
 
     for (cl = u->out_bufs, ll = &u->out_bufs; cl; cl = cl->next) {
         ll = &cl->next;
@@ -3743,6 +3759,18 @@ ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes)
     cl->buf->tag = u->output.tag;
 
     if (u->length == -1) {
+        return NGX_OK;
+    }
+
+    if (bytes > u->length) {
+
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "upstream sent more data than specified in "
+                      "\"Content-Length\" header");
+
+        cl->buf->last = cl->buf->pos + u->length;
+        u->length = 0;
+
         return NGX_OK;
     }
 
