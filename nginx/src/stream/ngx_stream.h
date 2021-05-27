@@ -111,6 +111,11 @@ typedef struct {
     int                            rcvbuf;
     int                            sndbuf;
 
+    // 1.21.0
+#if (NGX_HAVE_TCP_FASTOPEN)
+    int                            fastopen;
+#endif
+
     // socket的类型，SOCK_STREAM 表示TCP
     int                            type;
 } ngx_stream_listen_t;

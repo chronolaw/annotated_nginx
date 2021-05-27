@@ -1,7 +1,30 @@
 
-Changes with nginx 1.20.0                                        20 Apr 2021
+Changes with nginx 1.21.0                                        25 May 2021
 
-    *) 1.20.x stable branch.
+    *) Security: 1-byte memory overwrite might occur during DNS server
+       response processing if the "resolver" directive was used, allowing an
+       attacker who is able to forge UDP packets from the DNS server to
+       cause worker process crash or, potentially, arbitrary code execution
+       (CVE-2021-23017).
+
+    *) Feature: variables support in the "proxy_ssl_certificate",
+       "proxy_ssl_certificate_key" "grpc_ssl_certificate",
+       "grpc_ssl_certificate_key", "uwsgi_ssl_certificate", and
+       "uwsgi_ssl_certificate_key" directives.
+
+    *) Feature: the "max_errors" directive in the mail proxy module.
+
+    *) Feature: the mail proxy module supports POP3 and IMAP pipelining.
+
+    *) Feature: the "fastopen" parameter of the "listen" directive in the
+       stream module.
+       Thanks to Anbang Wen.
+
+    *) Bugfix: special characters were not escaped during automatic redirect
+       with appended trailing slash.
+
+    *) Bugfix: connections with clients in the mail proxy module might be
+       closed unexpectedly when using SMTP pipelining.
 
 
 Changes with nginx 1.19.10                                       13 Apr 2021

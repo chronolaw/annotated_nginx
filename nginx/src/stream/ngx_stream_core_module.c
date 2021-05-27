@@ -813,6 +813,10 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 也就是监听端口关联了定义listen的server{}
     ls->ctx = cf->ctx;
 
+#if (NGX_HAVE_TCP_FASTOPEN)
+    ls->fastopen = -1;
+#endif
+
 #if (NGX_HAVE_INET6)
     ls->ipv6only = 1;
 #endif
@@ -836,6 +840,22 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             ls->bind = 1;
             continue;
         }
+
+        // 1.21.0
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (ngx_strncmp(value[i].data, "fastopen=", 9) == 0) {
+            ls->fastopen = ngx_atoi(value[i].data + 9, value[i].len - 9);
+            ls->bind = 1;
+
+            if (ls->fastopen == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid fastopen \"%V\"", &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            continue;
+        }
+#endif
 
         // tcp协议支持backlog选项
         if (ngx_strncmp(value[i].data, "backlog=", 8) == 0) {
@@ -1066,6 +1086,12 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ls->proxy_protocol) {
             return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
         }
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (ls->fastopen != -1) {
+            return "\"fastopen\" parameter is incompatible with \"udp\"";
+        }
+#endif
     }
 
     als = cmcf->listen.elts;
