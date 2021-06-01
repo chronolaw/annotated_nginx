@@ -1,3 +1,7 @@
+// annotated by chrono since 2021
+//
+// * ngx_http_proxy_pass
+// * ngx_http_proxy_headers
 
 /*
  * Copyright (C) Igor Sysoev
@@ -23,6 +27,7 @@
 #define  NGX_HTTP_PROXY_COOKIE_SAMESITE_OFF     0x0400
 
 
+// 主配置,缓存
 typedef struct {
     ngx_array_t                    caches;  /* ngx_http_file_cache_t * */
 } ngx_http_proxy_main_conf_t;
@@ -78,7 +83,10 @@ typedef struct {
 } ngx_http_proxy_headers_t;
 
 
+// ngx_http_proxy_loc_conf_t
+// 反向代理的配置
 typedef struct {
+    // upstream连接参数
     ngx_http_upstream_conf_t       upstream;
 
     ngx_array_t                   *body_flushes;
@@ -112,11 +120,17 @@ typedef struct {
 
     ngx_flag_t                     redirect;
 
+    // 由proxy_http_version指令改写
+    // 长连接应该设置为1.1
     ngx_uint_t                     http_version;
 
+    // proxy_headers_hash_max_size,默认512
     ngx_uint_t                     headers_hash_max_size;
+
+    // proxy_headers_hash_bucket_size,默认64
     ngx_uint_t                     headers_hash_bucket_size;
 
+    // 上游启用ssl
 #if (NGX_HTTP_SSL)
     ngx_uint_t                     ssl;
     ngx_uint_t                     ssl_protocols;
@@ -129,6 +143,7 @@ typedef struct {
 } ngx_http_proxy_loc_conf_t;
 
 
+// 反向代理的ctx
 typedef struct {
     ngx_http_status_t              status;
     ngx_http_chunked_t             chunked;
@@ -194,7 +209,9 @@ static ngx_int_t ngx_http_proxy_edit_cookie_flags(ngx_http_request_t *r,
 static ngx_int_t ngx_http_proxy_rewrite(ngx_http_request_t *r,
     ngx_str_t *value, size_t prefix, size_t len, ngx_str_t *replacement);
 
+// 添加变量
 static ngx_int_t ngx_http_proxy_add_variables(ngx_conf_t *cf);
+
 static void *ngx_http_proxy_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_proxy_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf,
@@ -282,6 +299,7 @@ static ngx_conf_post_t  ngx_http_proxy_ssl_conf_command_post =
 #endif
 
 
+// 由proxy_http_version指令使用
 static ngx_conf_enum_t  ngx_http_proxy_http_version[] = {
     { ngx_string("1.0"), NGX_HTTP_VERSION_10 },
     { ngx_string("1.1"), NGX_HTTP_VERSION_11 },
@@ -292,6 +310,7 @@ static ngx_conf_enum_t  ngx_http_proxy_http_version[] = {
 ngx_module_t  ngx_http_proxy_module;
 
 
+// 各种反向代理指令
 static ngx_command_t  ngx_http_proxy_commands[] = {
 
     { ngx_string("proxy_pass"),
@@ -513,6 +532,7 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       0,
       NULL },
 
+    // 主配置,缓存
     { ngx_string("proxy_cache_path"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_2MORE,
       ngx_http_file_cache_set_slot,
@@ -813,10 +833,13 @@ ngx_module_t  ngx_http_proxy_module = {
 };
 
 
+// nginx只支持http/1.0/1.1,暂不支持http/2
 static char  ngx_http_proxy_version[] = " HTTP/1.0" CRLF;
 static char  ngx_http_proxy_version_11[] = " HTTP/1.1" CRLF;
 
 
+// 默认向上游发送的字段
+// 注意Host=>$proxy_host,Connection=>close
 static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
@@ -830,6 +853,8 @@ static ngx_keyval_t  ngx_http_proxy_headers[] = {
 };
 
 
+// 默认不向下游发送的字段
+// 注意有Date/Server
 static ngx_str_t  ngx_http_proxy_hide_headers[] = {
     ngx_string("Date"),
     ngx_string("Server"),
@@ -3258,7 +3283,7 @@ ngx_http_proxy_rewrite(ngx_http_request_t *r, ngx_str_t *value, size_t prefix,
     return NGX_OK;
 }
 
-
+// 添加变量
 static ngx_int_t
 ngx_http_proxy_add_variables(ngx_conf_t *cf)
 {
@@ -3278,6 +3303,7 @@ ngx_http_proxy_add_variables(ngx_conf_t *cf)
 }
 
 
+// 主配置,缓存
 static void *
 ngx_http_proxy_create_main_conf(ngx_conf_t *cf)
 {
@@ -3428,7 +3454,7 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     return conf;
 }
 
-
+// 设置缺省值
 static char *
 ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 {
