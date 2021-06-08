@@ -1,3 +1,6 @@
+// annotated by chrono since 2021
+//
+// * ngx_http_realip_handler
 
 /*
  * Copyright (C) Igor Sysoev
@@ -44,7 +47,10 @@ static void *ngx_http_realip_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_realip_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
 static ngx_int_t ngx_http_realip_add_variables(ngx_conf_t *cf);
+
+// 把handler加载到post_read阶段，即读取完header之后
 static ngx_int_t ngx_http_realip_init(ngx_conf_t *cf);
+
 static ngx_http_realip_ctx_t *ngx_http_realip_get_module_ctx(
     ngx_http_request_t *r);
 
@@ -85,6 +91,8 @@ static ngx_command_t  ngx_http_realip_commands[] = {
 
 static ngx_http_module_t  ngx_http_realip_module_ctx = {
     ngx_http_realip_add_variables,         /* preconfiguration */
+
+    // 把handler加载到post_read阶段，即读取完header之后
     ngx_http_realip_init,                  /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -126,6 +134,7 @@ static ngx_http_variable_t  ngx_http_realip_vars[] = {
 };
 
 
+// 此时已经拿到了完整的请求头
 static ngx_int_t
 ngx_http_realip_handler(ngx_http_request_t *r)
 {
@@ -153,8 +162,10 @@ ngx_http_realip_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
+    // 检查指令real_ip_header的配置
     switch (rlcf->type) {
 
+    // 看x_real_ip字段
     case NGX_HTTP_REALIP_XREALIP:
 
         if (r->headers_in.x_real_ip == NULL) {
@@ -166,6 +177,7 @@ ngx_http_realip_handler(ngx_http_request_t *r)
 
         break;
 
+    // 看x_forwarded_for字段
     case NGX_HTTP_REALIP_XFWD:
 
         xfwd = &r->headers_in.x_forwarded_for;
@@ -178,6 +190,7 @@ ngx_http_realip_handler(ngx_http_request_t *r)
 
         break;
 
+    // 看proxy protocol的处理情况
     case NGX_HTTP_REALIP_PROXY:
 
         if (r->connection->proxy_protocol == NULL) {
@@ -189,8 +202,10 @@ ngx_http_realip_handler(ngx_http_request_t *r)
 
         break;
 
+    // 看指定的特殊字段
     default: /* NGX_HTTP_REALIP_HEADER */
 
+        // 遍历头字段
         part = &r->headers_in.headers.part;
         header = part->elts;
 
@@ -210,6 +225,7 @@ ngx_http_realip_handler(ngx_http_request_t *r)
                 i = 0;
             }
 
+            // 比较hash和字符串
             if (hash == header[i].hash
                 && len == header[i].key.len
                 && ngx_strncmp(p, header[i].lowcase_key, len) == 0)
@@ -516,6 +532,7 @@ ngx_http_realip_add_variables(ngx_conf_t *cf)
 }
 
 
+// 把handler加载到post_read阶段，即读取完header之后
 static ngx_int_t
 ngx_http_realip_init(ngx_conf_t *cf)
 {
