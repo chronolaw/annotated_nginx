@@ -403,7 +403,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv);
         }
 
-        // 停止监听端口
+        // 停止监听端口, signal: winch
         if (ngx_noaccept) {
             ngx_noaccept = 0;
             ngx_noaccepting = 1;

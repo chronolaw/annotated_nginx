@@ -453,6 +453,7 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
             action = ", exiting";
             break;
 
+        // 不再接受新请求，用于热升级、平滑升级
         case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
             if (ngx_daemonized) {
                 ngx_noaccept = 1;
@@ -517,6 +518,8 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
     case NGX_PROCESS_HELPER:
         switch (signo) {
 
+        // 不再接受新请求，用于热升级、平滑升级
+        // 进入 -s quit
         case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
             if (!ngx_daemonized) {
                 break;
