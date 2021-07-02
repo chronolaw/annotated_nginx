@@ -929,6 +929,7 @@ old_shm_zone_done:
 
     ngx_destroy_pool(conf.temp_pool);
 
+    // 初始化完成，删除old_cycle的内存池，删除old_cycle对象
     if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
 
         ngx_destroy_pool(old_cycle->pool);
