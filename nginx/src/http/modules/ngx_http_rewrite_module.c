@@ -1,3 +1,6 @@
+// annotated by chrono since 2021
+//
+// * ngx_http_rewrite_return
 
 /*
  * Copyright (C) Igor Sysoev
@@ -25,8 +28,11 @@ static char *ngx_http_rewrite_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
 static ngx_int_t ngx_http_rewrite_init(ngx_conf_t *cf);
 static char *ngx_http_rewrite(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+// 处理return指令，客户端重定向
 static char *ngx_http_rewrite_return(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
 static char *ngx_http_rewrite_break(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_rewrite_if(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -438,6 +444,7 @@ ngx_http_rewrite(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+// 处理return指令，客户端重定向
 static char *
 ngx_http_rewrite_return(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -454,18 +461,23 @@ ngx_http_rewrite_return(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 指令的参数数组
     value = cf->args->elts;
 
     ngx_memzero(ret, sizeof(ngx_http_script_return_code_t));
 
     ret->code = ngx_http_script_return_code;
 
+    // 看第一个参数，即状态码
     p = value[1].data;
 
+    // 转换为数字
     ret->status = ngx_atoi(p, value[1].len);
 
+    // 转换出错，参数不是数字而是url字符串
     if (ret->status == (uintptr_t) NGX_ERROR) {
 
+        // 有http等前缀，转换为301重定向
         if (cf->args->nelts == 2
             && (ngx_strncmp(p, "http://", sizeof("http://") - 1) == 0
                 || ngx_strncmp(p, "https://", sizeof("https://") - 1) == 0
@@ -482,6 +494,7 @@ ngx_http_rewrite_return(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     } else {
 
+        // 状态码不能超过999
         if (ret->status > 999) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid return code \"%V\"", &value[1]);
