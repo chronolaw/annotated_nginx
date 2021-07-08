@@ -109,7 +109,7 @@ ngx_event_expire_timers(void)
 
         // 此事件已经超时
         // 通过offsetof获得事件对象
-        ev = (ngx_event_t *) ((char *) node - offsetof(ngx_event_t, timer));
+        ev = ngx_rbtree_data(node, ngx_event_t, timer);
 
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                        "event timer del: %d: %M",
@@ -168,7 +168,7 @@ ngx_event_no_timers_left(void)
          node = ngx_rbtree_next(&ngx_event_timer_rbtree, node))
     {
         // 通过offsetof获得事件对象
-        ev = (ngx_event_t *) ((char *) node - offsetof(ngx_event_t, timer));
+        ev = ngx_rbtree_data(node, ngx_event_t, timer);
 
         // 事件不能被取消
         // 找到了一个定时器事件，即还有定时器

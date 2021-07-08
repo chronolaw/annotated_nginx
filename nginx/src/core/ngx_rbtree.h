@@ -86,6 +86,9 @@ struct ngx_rbtree_s {
     (tree)->sentinel = s;                                                     \
     (tree)->insert = i
 
+#define ngx_rbtree_data(node, type, link)                                     \
+    (type *) ((u_char *) (node) - offsetof(type, link))
+
 
 // 向红黑树插入一个节点
 // 插入后旋转红黑树，保持平衡
