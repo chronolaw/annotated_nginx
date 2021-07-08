@@ -1,4 +1,36 @@
 
+Changes with nginx 1.21.1                                        06 Jul 2021
+
+    *) Change: now nginx always returns an error for the CONNECT method.
+
+    *) Change: now nginx always returns an error if both "Content-Length"
+       and "Transfer-Encoding" header lines are present in the request.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in the request line.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in a header name.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in the "Host" request header line.
+
+    *) Change: optimization of configuration testing when using many
+       listening sockets.
+
+    *) Bugfix: nginx did not escape """, "<", ">", "\", "^", "`", "{", "|",
+       and "}" characters when proxying with changed URI.
+
+    *) Bugfix: SSL variables might be empty when used in logs; the bug had
+       appeared in 1.19.5.
+
+    *) Bugfix: keepalive connections with gRPC backends might not be closed
+       after receiving a GOAWAY frame.
+
+    *) Bugfix: reduced memory consumption for long-lived requests when
+       proxying with more than 64 buffers.
+
+
 Changes with nginx 1.21.0                                        25 May 2021
 
     *) Security: 1-byte memory overwrite might occur during DNS server
