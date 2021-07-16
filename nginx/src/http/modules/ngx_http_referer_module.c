@@ -1,3 +1,6 @@
+// annotated by chrono since 2021
+//
+// ngx_http_referer_variable
 
 /*
  * Copyright (C) Igor Sysoev
@@ -32,7 +35,9 @@ typedef struct {
 } ngx_http_referer_conf_t;
 
 
+// 在pre config阶段添加变量
 static ngx_int_t ngx_http_referer_add_variables(ngx_conf_t *cf);
+
 static void * ngx_http_referer_create_conf(ngx_conf_t *cf);
 static char * ngx_http_referer_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -78,6 +83,7 @@ static ngx_command_t  ngx_http_referer_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_referer_module_ctx = {
+    // 在pre config阶段添加变量
     ngx_http_referer_add_variables,        /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
@@ -111,6 +117,7 @@ ngx_module_t  ngx_http_referer_module = {
 static ngx_str_t  ngx_http_invalid_referer_name = ngx_string("invalid_referer");
 
 
+// 核心函数，计算referer是否有效
 static ngx_int_t
 ngx_http_referer_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     uintptr_t data)
@@ -140,25 +147,32 @@ ngx_http_referer_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
         goto valid;
     }
 
+    // 没有头字段
     if (r->headers_in.referer == NULL) {
+        // 没有头字段，配置了none，直接有效
         if (rlcf->no_referer) {
             goto valid;
         }
 
+        // 无none则无效
         goto invalid;
     }
 
+    // 取字段值
     len = r->headers_in.referer->value.len;
     ref = r->headers_in.referer->value.data;
 
+    // 看字段长度
     if (len >= sizeof("http://i.ru") - 1) {
         last = ref + len;
 
+        // 是http
         if (ngx_strncasecmp(ref, (u_char *) "http://", 7) == 0) {
             ref += 7;
             len -= 7;
             goto valid_scheme;
 
+        // 是https
         } else if (ngx_strncasecmp(ref, (u_char *) "https://", 8) == 0) {
             ref += 8;
             len -= 8;
@@ -166,10 +180,12 @@ ngx_http_referer_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
         }
     }
 
+    // 没有http/https，配置了blockerd，有效
     if (rlcf->blocked_referer) {
         goto valid;
     }
 
+    // 否则无效
     goto invalid;
 
 valid_scheme:
@@ -177,11 +193,13 @@ valid_scheme:
     i = 0;
     key = 0;
 
+    // 找域名
     for (p = ref; p < last; p++) {
         if (*p == '/' || *p == ':') {
             break;
         }
 
+        // 太长无效
         if (i == 256) {
             goto invalid;
         }
@@ -189,6 +207,8 @@ valid_scheme:
         buf[i] = ngx_tolower(*p);
         key = ngx_hash(key, buf[i++]);
     }
+
+    // 接下来匹配域名、正则
 
     uri = ngx_hash_find_combined(&rlcf->hash, key, buf, p - ref);
 
@@ -267,6 +287,7 @@ valid:
 }
 
 
+// 在pre config阶段添加变量
 static ngx_int_t
 ngx_http_referer_add_variables(ngx_conf_t *cf)
 {
@@ -278,6 +299,7 @@ ngx_http_referer_add_variables(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
+    // 指定读取变量的函数
     var->get_handler = ngx_http_referer_variable;
 
     return NGX_OK;
