@@ -1,3 +1,6 @@
+// annotated by chrono since 2021
+//
+// * ngx_resolver_create
 
 /*
  * Copyright (C) Igor Sysoev
@@ -129,6 +132,8 @@ static ngx_resolver_node_t *ngx_resolver_lookup_addr6(ngx_resolver_t *r,
 #endif
 
 
+// 创建域名解析器，用在http里
+// 参数是指令后的所有字符串
 ngx_resolver_t *
 ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 {
@@ -199,6 +204,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     r->log = &cf->cycle->new_log;
     r->log_level = NGX_LOG_ERR;
 
+    // n是指令的参数数量
     if (n) {
         if (ngx_array_init(&r->connections, cf->pool, n,
                            sizeof(ngx_resolver_connection_t))
@@ -208,7 +214,10 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
         }
     }
 
+    // 处理指令参数
     for (i = 0; i < n; i++) {
+
+        // 设置域名有效时间ttl
         if (ngx_strncmp(names[i].data, "valid=", 6) == 0) {
             s.len = names[i].len - 6;
             s.data = names[i].data + 6;
@@ -224,6 +233,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
             continue;
         }
 
+        // 是否解析出ipv6地址
 #if (NGX_HAVE_INET6)
         if (ngx_strncmp(names[i].data, "ipv6=", 5) == 0) {
 
@@ -245,6 +255,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 
         ngx_memzero(&u, sizeof(ngx_url_t));
 
+        // 构建url，53是dns默认端口号
         u.url = names[i];
         u.default_port = 53;
 
@@ -271,8 +282,9 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
             rec[j].server = u.addrs[j].name;
             rec[j].resolver = r;
         }
-    }
+    } //for循环检查参数结束
 
+    // 如果没有定义dns服务则报错
     if (n && r->connections.nelts == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "no name servers defined");
         return NULL;
