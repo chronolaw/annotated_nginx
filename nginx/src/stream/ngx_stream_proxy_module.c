@@ -2521,6 +2521,10 @@ ngx_stream_proxy_set_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *pscf)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = pscf->ssl;
 
+    if (ngx_ssl_ciphers(cf, pscf->ssl, &pscf->ssl_ciphers, 0) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
     if (pscf->ssl_certificate) {
 
         if (pscf->ssl_certificate_key == NULL) {
@@ -2550,10 +2554,6 @@ ngx_stream_proxy_set_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *pscf)
                 return NGX_ERROR;
             }
         }
-    }
-
-    if (ngx_ssl_ciphers(cf, pscf->ssl, &pscf->ssl_ciphers, 0) != NGX_OK) {
-        return NGX_ERROR;
     }
 
     if (pscf->ssl_verify) {

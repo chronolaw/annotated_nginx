@@ -390,6 +390,9 @@ typedef struct {
     // 当读取完毕后的回调函数
     // 即ngx_http_read_client_request_body的第二个参数
     ngx_http_client_body_handler_pt   post_handler;
+    unsigned                          filter_need_buffering:1;
+    unsigned                          last_sent:1;
+    unsigned                          last_saved:1;
 } ngx_http_request_body_t;
 
 

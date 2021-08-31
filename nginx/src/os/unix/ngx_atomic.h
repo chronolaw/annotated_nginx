@@ -49,56 +49,6 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 #define ngx_cpu_pause()
 
 
-#elif (NGX_DARWIN_ATOMIC)
-
-/*
- * use Darwin 8 atomic(3) and barrier(3) operations
- * optimized at run-time for UP and SMP
- */
-
-#include <libkern/OSAtomic.h>
-
-/* "bool" conflicts with perl's CORE/handy.h */
-#if 0
-#undef bool
-#endif
-
-
-#define NGX_HAVE_ATOMIC_OPS  1
-
-#if (NGX_PTR_SIZE == 8)
-
-typedef int64_t                     ngx_atomic_int_t;
-typedef uint64_t                    ngx_atomic_uint_t;
-#define NGX_ATOMIC_T_LEN            (sizeof("-9223372036854775808") - 1)
-
-#define ngx_atomic_cmp_set(lock, old, new)                                    \
-    OSAtomicCompareAndSwap64Barrier(old, new, (int64_t *) lock)
-
-#define ngx_atomic_fetch_add(value, add)                                      \
-    (OSAtomicAdd64(add, (int64_t *) value) - add)
-
-#else
-
-typedef int32_t                     ngx_atomic_int_t;
-typedef uint32_t                    ngx_atomic_uint_t;
-#define NGX_ATOMIC_T_LEN            (sizeof("-2147483648") - 1)
-
-#define ngx_atomic_cmp_set(lock, old, new)                                    \
-    OSAtomicCompareAndSwap32Barrier(old, new, (int32_t *) lock)
-
-#define ngx_atomic_fetch_add(value, add)                                      \
-    (OSAtomicAdd32(add, (int32_t *) value) - add)
-
-#endif
-
-#define ngx_memory_barrier()        OSMemoryBarrier()
-
-#define ngx_cpu_pause()
-
-typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
-
-
 #elif (NGX_HAVE_GCC_ATOMIC)
 
 /* GCC 4.1 builtin atomic operations */
@@ -142,6 +92,60 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 #endif
 
 
+#elif (NGX_DARWIN_ATOMIC)
+
+/*
+ * use Darwin 8 atomic(3) and barrier(3) operations
+ * optimized at run-time for UP and SMP
+ */
+
+#include <libkern/OSAtomic.h>
+
+/* "bool" conflicts with perl's CORE/handy.h */
+#if 0
+#undef bool
+#endif
+
+
+#define NGX_HAVE_ATOMIC_OPS  1
+
+#if (NGX_PTR_SIZE == 8)
+
+typedef int64_t                     ngx_atomic_int_t;
+typedef uint64_t                    ngx_atomic_uint_t;
+#define NGX_ATOMIC_T_LEN            (sizeof("-9223372036854775808") - 1)
+
+#define ngx_atomic_cmp_set(lock, old, new)                                    \
+    OSAtomicCompareAndSwap64Barrier(old, new, (int64_t *) lock)
+
+#define ngx_atomic_fetch_add(value, add)                                      \
+    (OSAtomicAdd64(add, (int64_t *) value) - add)
+
+#else
+
+typedef int32_t                     ngx_atomic_int_t;
+typedef uint32_t                    ngx_atomic_uint_t;
+#define NGX_ATOMIC_T_LEN            (sizeof("-2147483648") - 1)
+
+// cas赋值
+#define ngx_atomic_cmp_set(lock, old, new)                                    \
+    OSAtomicCompareAndSwap32Barrier(old, new, (int32_t *) lock)
+
+// cas加法
+#define ngx_atomic_fetch_add(value, add)                                      \
+    (OSAtomicAdd32(add, (int32_t *) value) - add)
+
+#endif
+
+// 内存屏障， 并发操作的同步点
+#define ngx_memory_barrier()        OSMemoryBarrier()
+
+// 降低cpu功耗，不让出cpu
+#define ngx_cpu_pause()
+
+typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
+
+
 #elif ( __i386__ || __i386 )
 
 typedef int32_t                     ngx_atomic_int_t;
@@ -152,6 +156,7 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 
 #if ( __SUNPRO_C )
 
+// 肯定支持原子操作
 #define NGX_HAVE_ATOMIC_OPS  1
 
 ngx_atomic_uint_t
@@ -176,6 +181,7 @@ ngx_cpu_pause(void);
 
 #else /* ( __GNUC__ || __INTEL_COMPILER ) */
 
+// 肯定支持原子操作
 #define NGX_HAVE_ATOMIC_OPS  1
 
 #include "ngx_gcc_atomic_x86.h"
@@ -185,9 +191,13 @@ ngx_cpu_pause(void);
 
 #elif ( __amd64__ || __amd64 )
 
+// 原子类型实际上都是长整数
 typedef int64_t                     ngx_atomic_int_t;
 typedef uint64_t                    ngx_atomic_uint_t;
 typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
+
+// 原子整数文本表示的最大长度，T=>text
+// -1是去掉字符串里结尾的'\0'
 #define NGX_ATOMIC_T_LEN            (sizeof("-9223372036854775808") - 1)
 
 
@@ -240,6 +250,8 @@ typedef uint32_t                    ngx_atomic_uint_t;
 
 #endif
 
+// 原子类型实际上是无符号长整数
+// 使用volatile修饰，禁止编译器优化缓存，即时取值
 typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 
 

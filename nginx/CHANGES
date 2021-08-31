@@ -1,4 +1,35 @@
 
+Changes with nginx 1.21.2                                        31 Aug 2021
+
+    *) Change: now nginx rejects HTTP/1.0 requests with the
+       "Transfer-Encoding" header line.
+
+    *) Change: export ciphers are no longer supported.
+
+    *) Feature: OpenSSL 3.0 compatibility.
+
+    *) Feature: the "Auth-SSL-Protocol" and "Auth-SSL-Cipher" header lines
+       are now passed to the mail proxy authentication server.
+       Thanks to Rob Mueller.
+
+    *) Feature: request body filters API now permits buffering of the data
+       being processed.
+
+    *) Bugfix: backend SSL connections in the stream module might hang after
+       an SSL handshake.
+
+    *) Bugfix: the security level, which is available in OpenSSL 1.1.0 or
+       newer, did not affect loading of the server certificates when set
+       with "@SECLEVEL=N" in the "ssl_ciphers" directive.
+
+    *) Bugfix: SSL connections with gRPC backends might hang if select,
+       poll, or /dev/poll methods were used.
+
+    *) Bugfix: when using HTTP/2 client request body was always written to
+       disk if the "Content-Length" header line was not present in the
+       request.
+
+
 Changes with nginx 1.21.1                                        06 Jul 2021
 
     *) Change: now nginx always returns an error for the CONNECT method.
