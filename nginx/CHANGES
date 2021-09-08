@@ -1,4 +1,13 @@
 
+Changes with nginx 1.21.3                                        07 Sep 2021
+
+    *) Change: optimization of client request body reading when using
+       HTTP/2.
+
+    *) Bugfix: in request body filters internal API when using HTTP/2 and
+       buffering of the data being processed.
+
+
 Changes with nginx 1.21.2                                        31 Aug 2021
 
     *) Change: now nginx rejects HTTP/1.0 requests with the
