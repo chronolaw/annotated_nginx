@@ -1600,8 +1600,9 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 static void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
-    ngx_int_t          rc;
-    ngx_connection_t  *c;
+    ngx_int_t                  rc;
+    ngx_connection_t          *c;
+    ngx_http_core_loc_conf_t  *clcf;
 
     r->connection->log->action = "connecting to upstream";
 
@@ -1703,10 +1704,12 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* init or reinit the ngx_output_chain() and ngx_chain_writer() contexts */
 
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
     u->writer.out = NULL;
     u->writer.last = &u->writer.out;
     u->writer.connection = c;
-    u->writer.limit = 0;
+    u->writer.limit = clcf->sendfile_max_chunk;
 
     // 如果已经发送了请求
     // 需要重新初始化，调用reinit_request
@@ -1791,9 +1794,6 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
-
-    c->sendfile = 0;
-    u->output.sendfile = 0;
 
     if (u->conf->ssl_server_name || u->conf->ssl_verify) {
         if (ngx_http_upstream_ssl_name(r, u, c) != NGX_OK) {
@@ -1898,6 +1898,11 @@ ngx_http_upstream_ssl_handshake(ngx_http_request_t *r, ngx_http_upstream_t *u,
                               &u->ssl_name);
                 goto failed;
             }
+        }
+
+        if (!c->ssl->sendfile) {
+            c->sendfile = 0;
+            u->output.sendfile = 0;
         }
 
         c->write->handler = ngx_http_upstream_handler;

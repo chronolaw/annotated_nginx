@@ -305,6 +305,10 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
     // 遍历names数组
     // 检查待加入散列表的字符串key长度
     for (n = 0; n < nelts; n++) {
+        if (names[n].key.data == NULL) {
+            continue;
+        }
+
         // 桶的大小必须能够容纳任意一个字符串
         if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
         {

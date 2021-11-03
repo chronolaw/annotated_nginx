@@ -234,11 +234,6 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
         // 取当前节点
         cl = *busy;
 
-        // 缓冲区里有数据，停止遍历，结束函数
-        if (ngx_buf_size(cl->buf) != 0) {
-            break;
-        }
-
         // 缓冲区为空，说明可以复用，应该挂到free链表里
 
         // 检查tag，如果不是本功能相关的buf就归还给内存池
@@ -247,6 +242,11 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
             *busy = cl->next;
             ngx_free_chain(p, cl);
             continue;
+        }
+
+        // 缓冲区里有数据，停止遍历，结束函数
+        if (ngx_buf_size(cl->buf) != 0) {
+            break;
         }
 
         // 把缓冲区复位，都指向start，即完全可用

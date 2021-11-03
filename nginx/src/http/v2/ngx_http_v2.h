@@ -18,12 +18,12 @@
 #include <ngx_http.h>
 
 
+// 旧的npn标志，同alpn
+//#define NGX_HTTP_V2_NPN_ADVERTISE        NGX_HTTP_V2_ALPN_ADVERTISE
+
 // 在tls的alpn扩展里识别http2
 // 第一个0x02是长度
-#define NGX_HTTP_V2_ALPN_ADVERTISE       "\x02h2"
-
-// 旧的npn标志，同alpn
-#define NGX_HTTP_V2_NPN_ADVERTISE        NGX_HTTP_V2_ALPN_ADVERTISE
+#define NGX_HTTP_V2_ALPN_PROTO           "\x02h2"
 
 #define NGX_HTTP_V2_STATE_BUFFER_SIZE    16
 
