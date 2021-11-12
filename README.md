@@ -9,6 +9,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * 1.14增加了mirror模块，支持gRPC。
 * 1.15.10增加了range listen,指令“ssl_certificate”可从变量里加载证书。
 * 1.17.0不再支持OpenSSL 0.98,limit_rate/proxy_upload_rate支持变量。
+* 1.21.4支持内核TLS（kTLS），要求使用OpenSSL3.0，Linux内核高于4.17。
 
 请参考：
 * [《Nginx完全开发指南：使用C/C++/JavaScript/Lua》](https://item.jd.com/12536113.html)
