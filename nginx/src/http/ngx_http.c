@@ -539,12 +539,14 @@ ngx_http_init_headers_in_hash(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     ngx_hash_init_t     hash;
     ngx_http_header_t  *header;
 
+    // 这里初始化大小为32，如果要改源码增加新的头字段，应当适当加大，如改成64
     if (ngx_array_init(&headers_in, cf->temp_pool, 32, sizeof(ngx_hash_key_t))
         != NGX_OK)
     {
         return NGX_ERROR;
     }
 
+    // 逐个计算hash加入数组里
     for (header = ngx_http_headers_in; header->name.len; header++) {
         hk = ngx_array_push(&headers_in);
         if (hk == NULL) {
@@ -556,6 +558,7 @@ ngx_http_init_headers_in_hash(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
         hk->value = header;
     }
 
+    // 填充hash数据
     hash.hash = &cmcf->headers_in_hash;
     hash.key = ngx_hash_key_lc;
     hash.max_size = 512;
@@ -564,6 +567,7 @@ ngx_http_init_headers_in_hash(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf)
     hash.pool = cf->pool;
     hash.temp_pool = NULL;
 
+    // 初始化hash表，存储到cmcf->headers_in_hash
     if (ngx_hash_init(&hash, headers_in.elts, headers_in.nelts) != NGX_OK) {
         return NGX_ERROR;
     }
