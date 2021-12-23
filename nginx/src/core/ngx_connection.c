@@ -1263,6 +1263,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     c = ngx_cycle->free_connections;
 
     // 如果还没有获取到连接，那么就报错
+    // 日志里会出现“worker_connections are not enough”
     if (c == NULL) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
                       "%ui worker_connections are not enough",

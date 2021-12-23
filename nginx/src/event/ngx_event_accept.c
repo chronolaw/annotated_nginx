@@ -179,6 +179,7 @@ ngx_event_accept(ngx_event_t *ev)
                               - ngx_cycle->free_connection_n;
 
         // 从全局变量ngx_cycle里获取空闲链接，即free_connections链表
+        // 如果没有空闲连接，调用ngx_drain_connections释放一些可复用的连接
         c = ngx_get_connection(s, ev->log);
 
         // 如果没有空闲连接，那么关闭socket，无法处理请求
