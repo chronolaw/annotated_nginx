@@ -240,6 +240,7 @@ static ngx_int_t ngx_http_upstream_ssl_certificate(ngx_http_request_t *r,
 
 
 // 解析常用的上游响应头字段
+// 使用函数ngx_http_upstream_process_header_line设置到headers_in里
 static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
     { ngx_string("Status"),
