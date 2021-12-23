@@ -239,6 +239,7 @@ static ngx_int_t ngx_http_upstream_ssl_certificate(ngx_http_request_t *r,
 #endif
 
 
+// 解析常用的上游响应头字段
 static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
     { ngx_string("Status"),
@@ -3032,6 +3033,7 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
                 i = 0;
             }
 
+            // 根据hash快速查找预定义的头字段
             hh = ngx_hash_find(&umcf->headers_in_hash, h[i].hash,
                                h[i].lowcase_key, h[i].key.len);
 
@@ -6818,6 +6820,7 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    // 初始化响应头字段查找结构
     for (header = ngx_http_upstream_headers_in; header->name.len; header++) {
         hk = ngx_array_push(&headers_in);
         if (hk == NULL) {

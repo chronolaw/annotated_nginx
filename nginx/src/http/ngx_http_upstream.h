@@ -319,6 +319,7 @@ typedef struct {
 } ngx_http_upstream_header_t;
 
 
+// 上游的响应头，同样也有快速查找常用头字段
 typedef struct {
     ngx_list_t                       headers;
     ngx_list_t                       trailers;
