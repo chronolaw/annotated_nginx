@@ -4902,8 +4902,10 @@ ngx_ssl_get_server_name(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     size_t       len;
     const char  *name;
 
+    // 调用OpenSSL函数获取sni
     name = SSL_get_servername(c->ssl->connection, TLSEXT_NAMETYPE_host_name);
 
+    // 还需要从内存池里分配一块内存，拷贝后再给出去，有成本
     if (name) {
         len = ngx_strlen(name);
 

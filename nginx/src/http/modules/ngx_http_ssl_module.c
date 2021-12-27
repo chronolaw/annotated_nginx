@@ -1,3 +1,5 @@
+// annotated by chrono since 2016
+//
 
 /*
  * Copyright (C) Igor Sysoev
@@ -54,6 +56,7 @@ static char *ngx_http_ssl_conf_command_check(ngx_conf_t *cf, void *post,
 static ngx_int_t ngx_http_ssl_init(ngx_conf_t *cf);
 
 
+// 配置支持的ss/tls协议，现在应当至少是1.2、1.3
 static ngx_conf_bitmask_t  ngx_http_ssl_protocols[] = {
     { ngx_string("SSLv2"), NGX_SSL_SSLv2 },
     { ngx_string("SSLv3"), NGX_SSL_SSLv3 },
@@ -93,6 +96,7 @@ static ngx_conf_post_t  ngx_http_ssl_conf_command_post =
 
 static ngx_command_t  ngx_http_ssl_commands[] = {
 
+    // ssl指令已经被废弃，应当使用listen ssl
     { ngx_string("ssl"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_http_ssl_enable,
@@ -331,6 +335,7 @@ ngx_module_t  ngx_http_ssl_module = {
 };
 
 
+// 关于ssl/tls的各种变量，注意大多需要转换字符串分配内存，有成本
 static ngx_http_variable_t  ngx_http_ssl_vars[] = {
 
     { ngx_string("ssl_protocol"), NULL, ngx_http_ssl_static_variable,
@@ -355,6 +360,8 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
       (uintptr_t) ngx_ssl_get_early_data,
       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
+    // sni名字，在lua中可以改用C函数直接获取
+    // ngx_ssl_get_server_name在event模块里
     { ngx_string("ssl_server_name"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_server_name, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
