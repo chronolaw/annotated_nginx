@@ -1052,6 +1052,7 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
         u->rewrite_cookie = ngx_http_proxy_rewrite_cookie;
     }
 
+    // 是否缓存上游发送回来的数据，指令proxy_buffering on/off
     u->buffering = plcf->upstream.buffering;
 
     u->pipe = ngx_pcalloc(r->pool, sizeof(ngx_event_pipe_t));
