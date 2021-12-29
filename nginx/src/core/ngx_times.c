@@ -238,6 +238,7 @@ ngx_time_update(void)
 static ngx_msec_t
 ngx_monotonic_time(time_t sec, ngx_uint_t msec)
 {
+    // 如果支持单调时间，就调用系统函数，不使用传入的参数
 #if (NGX_HAVE_CLOCK_MONOTONIC)
     struct timespec  ts;
 
@@ -252,6 +253,7 @@ ngx_monotonic_time(time_t sec, ngx_uint_t msec)
 
 #endif
 
+    // 条件编译发现不支持单调时间，就是简单的秒*1000+毫秒
     return (ngx_msec_t) sec * 1000 + msec;
 }
 
