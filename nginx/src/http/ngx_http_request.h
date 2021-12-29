@@ -730,6 +730,7 @@ struct ngx_http_request_s {
 
     // 0-缓存请求体数据
     // 1-不缓存请求体数据
+    // 与proxy模块的proxy_request_buffering相关
     unsigned                          request_body_no_buffering:1;
 
     // 要求子请求的数据都在内存里，方便处理
