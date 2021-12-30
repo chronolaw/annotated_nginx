@@ -10,6 +10,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * 1.15.10增加了range listen,指令“ssl_certificate”可从变量里加载证书。
 * 1.17.0不再支持OpenSSL 0.98,limit_rate/proxy_upload_rate支持变量。
 * 1.21.4支持内核TLS（kTLS），要求使用OpenSSL3.0，Linux内核高于4.17。
+* 1.21.4支持更新的PCRE2，但向上的封装接口不变。
 
 请参考：
 * [《Nginx完全开发指南：使用C/C++/JavaScript/Lua》](https://item.jd.com/12536113.html)
@@ -22,13 +23,13 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module)
 
 # 当前状态
-Nginx 1.21.4
+Nginx 1.21.5
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.21.4|有
-mainline| Nginx开发版1.21.4|无
+master  | Nginx开发版1.21.5|有
+mainline| Nginx开发版1.21.5|无
 stable  | Nginx稳定版1.20.0|无
 
 # 已注解
