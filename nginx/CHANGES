@@ -1,4 +1,18 @@
 
+Changes with nginx 1.21.5                                        28 Dec 2021
+
+    *) Change: now nginx is built with the PCRE2 library by default.
+
+    *) Change: now nginx always uses sendfile(SF_NODISKIO) on FreeBSD.
+
+    *) Feature: support for sendfile(SF_NOCACHE) on FreeBSD.
+
+    *) Feature: the $ssl_curve variable.
+
+    *) Bugfix: connections might hang when using HTTP/2 without SSL with the
+       "sendfile" and "aio" directives.
+
+
 Changes with nginx 1.21.4                                        02 Nov 2021
 
     *) Change: support for NPN instead of ALPN to establish HTTP/2
