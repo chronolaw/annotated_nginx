@@ -249,6 +249,11 @@ ngx_http_header_filter(ngx_http_request_t *r)
         }
     }
 
+    // 1.21.6
+    if (r->keepalive && (ngx_terminate || ngx_exiting)) {
+        r->keepalive = 0;
+    }
+
     // 下面开始计算状态行+响应头的长度
 
     // 首先是状态行

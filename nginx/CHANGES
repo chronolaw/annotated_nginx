@@ -1,4 +1,15 @@
 
+Changes with nginx 1.21.6                                        25 Jan 2022
+
+    *) Bugfix: when using EPOLLEXCLUSIVE on Linux client connections were
+       unevenly distributed among worker processes.
+
+    *) Bugfix: nginx returned the "Connection: keep-alive" header line in
+       responses during graceful shutdown of old worker processes.
+
+    *) Bugfix: in the "ssl_session_ticket_key" when using TLSv1.3.
+
+
 Changes with nginx 1.21.5                                        28 Dec 2021
 
     *) Change: now nginx is built with the PCRE2 library by default.

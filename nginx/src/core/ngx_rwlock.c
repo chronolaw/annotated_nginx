@@ -126,6 +126,8 @@ ngx_rwlock_rlock(ngx_atomic_t *lock)
 void
 ngx_rwlock_unlock(ngx_atomic_t *lock)
 {
+    // before 1.21.6
+#if 0
     ngx_atomic_uint_t  readers;
 
     // 现有的读者数量
@@ -149,6 +151,12 @@ ngx_rwlock_unlock(ngx_atomic_t *lock)
 
         // 不成功重新取读者数
         readers = *lock;
+#endif
+    // 1.21.6简化了代码
+    if (*lock == NGX_RWLOCK_WLOCK) {
+        (void) ngx_atomic_cmp_set(lock, NGX_RWLOCK_WLOCK, 0);
+    } else {
+        (void) ngx_atomic_fetch_add(lock, -1);
     }
 }
 

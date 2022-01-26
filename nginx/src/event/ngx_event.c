@@ -140,6 +140,7 @@ ngx_msec_t            ngx_accept_mutex_delay;
 // 也就是说空闲连接数小于总数的1/8,那么就暂时停止接受连接
 // in ngx_event_accept.c:ngx_event_accept
 ngx_int_t             ngx_accept_disabled;
+ngx_uint_t            ngx_use_exclusive_accept;
 
 
 // 统计用的共享内存变量指针
@@ -960,6 +961,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #endif
 
+    // 1.21.6新增处理
+    ngx_use_exclusive_accept = 0;
+
     // 初始化两个延后处理的事件队列
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_next_events);
@@ -1267,6 +1271,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         if ((ngx_event_flags & NGX_USE_EPOLL_EVENT)
             && ccf->worker_processes > 1)
         {
+            // 1.21.6新增处理
+            ngx_use_exclusive_accept = 1;
+
             // nginx 1.9.x不再使用rtsig
 
             // 单进程、未明确指定负载均衡，不使用负载均衡
