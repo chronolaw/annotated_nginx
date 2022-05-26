@@ -1,7 +1,169 @@
 
-Changes with nginx 1.20.0                                        20 Apr 2021
+Changes with nginx 1.22.0                                        24 May 2022
 
-    *) 1.20.x stable branch.
+    *) 1.22.x stable branch.
+
+
+Changes with nginx 1.21.6                                        25 Jan 2022
+
+    *) Bugfix: when using EPOLLEXCLUSIVE on Linux client connections were
+       unevenly distributed among worker processes.
+
+    *) Bugfix: nginx returned the "Connection: keep-alive" header line in
+       responses during graceful shutdown of old worker processes.
+
+    *) Bugfix: in the "ssl_session_ticket_key" when using TLSv1.3.
+
+
+Changes with nginx 1.21.5                                        28 Dec 2021
+
+    *) Change: now nginx is built with the PCRE2 library by default.
+
+    *) Change: now nginx always uses sendfile(SF_NODISKIO) on FreeBSD.
+
+    *) Feature: support for sendfile(SF_NOCACHE) on FreeBSD.
+
+    *) Feature: the $ssl_curve variable.
+
+    *) Bugfix: connections might hang when using HTTP/2 without SSL with the
+       "sendfile" and "aio" directives.
+
+
+Changes with nginx 1.21.4                                        02 Nov 2021
+
+    *) Change: support for NPN instead of ALPN to establish HTTP/2
+       connections has been removed.
+
+    *) Change: now nginx rejects SSL connections if ALPN is used by the
+       client, but no supported protocols can be negotiated.
+
+    *) Change: the default value of the "sendfile_max_chunk" directive was
+       changed to 2 megabytes.
+
+    *) Feature: the "proxy_half_close" directive in the stream module.
+
+    *) Feature: the "ssl_alpn" directive in the stream module.
+
+    *) Feature: the $ssl_alpn_protocol variable.
+
+    *) Feature: support for SSL_sendfile() when using OpenSSL 3.0.
+
+    *) Feature: the "mp4_start_key_frame" directive in the
+       ngx_http_mp4_module.
+       Thanks to Tracey Jaquith.
+
+    *) Bugfix: in the $content_length variable when using chunked transfer
+       encoding.
+
+    *) Bugfix: after receiving a response with incorrect length from a
+       proxied backend nginx might nevertheless cache the connection.
+       Thanks to Awdhesh Mathpal.
+
+    *) Bugfix: invalid headers from backends were logged at the "info" level
+       instead of "error"; the bug had appeared in 1.21.1.
+
+    *) Bugfix: requests might hang when using HTTP/2 and the "aio_write"
+       directive.
+
+
+Changes with nginx 1.21.3                                        07 Sep 2021
+
+    *) Change: optimization of client request body reading when using
+       HTTP/2.
+
+    *) Bugfix: in request body filters internal API when using HTTP/2 and
+       buffering of the data being processed.
+
+
+Changes with nginx 1.21.2                                        31 Aug 2021
+
+    *) Change: now nginx rejects HTTP/1.0 requests with the
+       "Transfer-Encoding" header line.
+
+    *) Change: export ciphers are no longer supported.
+
+    *) Feature: OpenSSL 3.0 compatibility.
+
+    *) Feature: the "Auth-SSL-Protocol" and "Auth-SSL-Cipher" header lines
+       are now passed to the mail proxy authentication server.
+       Thanks to Rob Mueller.
+
+    *) Feature: request body filters API now permits buffering of the data
+       being processed.
+
+    *) Bugfix: backend SSL connections in the stream module might hang after
+       an SSL handshake.
+
+    *) Bugfix: the security level, which is available in OpenSSL 1.1.0 or
+       newer, did not affect loading of the server certificates when set
+       with "@SECLEVEL=N" in the "ssl_ciphers" directive.
+
+    *) Bugfix: SSL connections with gRPC backends might hang if select,
+       poll, or /dev/poll methods were used.
+
+    *) Bugfix: when using HTTP/2 client request body was always written to
+       disk if the "Content-Length" header line was not present in the
+       request.
+
+
+Changes with nginx 1.21.1                                        06 Jul 2021
+
+    *) Change: now nginx always returns an error for the CONNECT method.
+
+    *) Change: now nginx always returns an error if both "Content-Length"
+       and "Transfer-Encoding" header lines are present in the request.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in the request line.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in a header name.
+
+    *) Change: now nginx always returns an error if spaces or control
+       characters are used in the "Host" request header line.
+
+    *) Change: optimization of configuration testing when using many
+       listening sockets.
+
+    *) Bugfix: nginx did not escape """, "<", ">", "\", "^", "`", "{", "|",
+       and "}" characters when proxying with changed URI.
+
+    *) Bugfix: SSL variables might be empty when used in logs; the bug had
+       appeared in 1.19.5.
+
+    *) Bugfix: keepalive connections with gRPC backends might not be closed
+       after receiving a GOAWAY frame.
+
+    *) Bugfix: reduced memory consumption for long-lived requests when
+       proxying with more than 64 buffers.
+
+
+Changes with nginx 1.21.0                                        25 May 2021
+
+    *) Security: 1-byte memory overwrite might occur during DNS server
+       response processing if the "resolver" directive was used, allowing an
+       attacker who is able to forge UDP packets from the DNS server to
+       cause worker process crash or, potentially, arbitrary code execution
+       (CVE-2021-23017).
+
+    *) Feature: variables support in the "proxy_ssl_certificate",
+       "proxy_ssl_certificate_key" "grpc_ssl_certificate",
+       "grpc_ssl_certificate_key", "uwsgi_ssl_certificate", and
+       "uwsgi_ssl_certificate_key" directives.
+
+    *) Feature: the "max_errors" directive in the mail proxy module.
+
+    *) Feature: the mail proxy module supports POP3 and IMAP pipelining.
+
+    *) Feature: the "fastopen" parameter of the "listen" directive in the
+       stream module.
+       Thanks to Anbang Wen.
+
+    *) Bugfix: special characters were not escaped during automatic redirect
+       with appended trailing slash.
+
+    *) Bugfix: connections with clients in the mail proxy module might be
+       closed unexpectedly when using SMTP pipelining.
 
 
 Changes with nginx 1.19.10                                       13 Apr 2021

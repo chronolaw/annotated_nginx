@@ -147,10 +147,6 @@ struct ngx_event_aio_s {
 
     ngx_fd_t                   fd;
 
-#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
-    ssize_t                  (*preload_handler)(ngx_buf_t *file);
-#endif
-
 #if (NGX_HAVE_EVENTFD)
     int64_t                    res;
 #endif
@@ -466,6 +462,7 @@ extern ngx_uint_t             ngx_accept_events;
 extern ngx_uint_t             ngx_accept_mutex_held;
 extern ngx_msec_t             ngx_accept_mutex_delay;
 extern ngx_int_t              ngx_accept_disabled;
+extern ngx_uint_t             ngx_use_exclusive_accept;
 
 
 #if (NGX_STAT_STUB)

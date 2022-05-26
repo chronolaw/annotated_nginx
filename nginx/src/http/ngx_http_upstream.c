@@ -187,6 +187,8 @@ static void ngx_http_upstream_ssl_handshake(ngx_http_request_t *,
 static void ngx_http_upstream_ssl_save_session(ngx_connection_t *c);
 static ngx_int_t ngx_http_upstream_ssl_name(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_connection_t *c);
+static ngx_int_t ngx_http_upstream_ssl_certificate(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_connection_t *c);
 #endif
 
 
@@ -1509,8 +1511,9 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 static void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
-    ngx_int_t          rc;
-    ngx_connection_t  *c;
+    ngx_int_t                  rc;
+    ngx_connection_t          *c;
+    ngx_http_core_loc_conf_t  *clcf;
 
     r->connection->log->action = "connecting to upstream";
 
@@ -1597,10 +1600,12 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* init or reinit the ngx_output_chain() and ngx_chain_writer() contexts */
 
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
     u->writer.out = NULL;
     u->writer.last = &u->writer.out;
     u->writer.connection = c;
-    u->writer.limit = 0;
+    u->writer.limit = clcf->sendfile_max_chunk;
 
     if (u->request_sent) {
         if (ngx_http_upstream_reinit(r, u) != NGX_OK) {
@@ -1681,11 +1686,18 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
         return;
     }
 
-    c->sendfile = 0;
-    u->output.sendfile = 0;
-
     if (u->conf->ssl_server_name || u->conf->ssl_verify) {
         if (ngx_http_upstream_ssl_name(r, u, c) != NGX_OK) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+    }
+
+    if (u->conf->ssl_certificate && (u->conf->ssl_certificate->lengths
+                                     || u->conf->ssl_certificate_key->lengths))
+    {
+        if (ngx_http_upstream_ssl_certificate(r, u, c) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
@@ -1777,6 +1789,11 @@ ngx_http_upstream_ssl_handshake(ngx_http_request_t *r, ngx_http_upstream_t *u,
                               &u->ssl_name);
                 goto failed;
             }
+        }
+
+        if (!c->ssl->sendfile) {
+            c->sendfile = 0;
+            u->output.sendfile = 0;
         }
 
         c->write->handler = ngx_http_upstream_handler;
@@ -1908,6 +1925,45 @@ ngx_http_upstream_ssl_name(ngx_http_request_t *r, ngx_http_upstream_t *u,
 done:
 
     u->ssl_name = name;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_ssl_certificate(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_connection_t *c)
+{
+    ngx_str_t  cert, key;
+
+    if (ngx_http_complex_value(r, u->conf->ssl_certificate, &cert)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "http upstream ssl cert: \"%s\"", cert.data);
+
+    if (*cert.data == '\0') {
+        return NGX_OK;
+    }
+
+    if (ngx_http_complex_value(r, u->conf->ssl_certificate_key, &key)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "http upstream ssl key: \"%s\"", key.data);
+
+    if (ngx_ssl_connection_certificate(c, r->pool, &cert, &key,
+                                       u->conf->ssl_passwords)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
 
     return NGX_OK;
 }
@@ -2060,6 +2116,10 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
             }
 
             c->tcp_nopush = NGX_TCP_NOPUSH_UNSET;
+        }
+
+        if (c->read->ready) {
+            ngx_post_event(c->read, &ngx_posted_events);
         }
 
         return;
@@ -3787,12 +3847,34 @@ ngx_http_upstream_thread_handler(ngx_thread_task_t *task, ngx_file_t *file)
 {
     ngx_str_t                  name;
     ngx_event_pipe_t          *p;
+    ngx_connection_t          *c;
     ngx_thread_pool_t         *tp;
     ngx_http_request_t        *r;
     ngx_http_core_loc_conf_t  *clcf;
 
     r = file->thread_ctx;
     p = r->upstream->pipe;
+
+    if (r->aio) {
+        /*
+         * tolerate sendfile() calls if another operation is already
+         * running; this can happen due to subrequests, multiple calls
+         * of the next body filter from a filter, or in HTTP/2 due to
+         * a write event on the main connection
+         */
+
+        c = r->connection;
+
+#if (NGX_HTTP_V2)
+        if (r->stream) {
+            c = r->stream->connection->connection;
+        }
+#endif
+
+        if (task == c->sendfile_task) {
+            return NGX_OK;
+        }
+    }
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     tp = clcf->thread_pool;
@@ -3844,6 +3926,20 @@ ngx_http_upstream_thread_event_handler(ngx_event_t *ev)
 
     r->main->blocked--;
     r->aio = 0;
+
+#if (NGX_HTTP_V2)
+
+    if (r->stream) {
+        /*
+         * for HTTP/2, update write event to make sure processing will
+         * reach the main connection to handle sendfile() in threads
+         */
+
+        c->write->ready = 1;
+        c->write->active = 0;
+    }
+
+#endif
 
     if (r->done) {
         /*
