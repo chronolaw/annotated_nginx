@@ -1,4 +1,9 @@
 
+Changes with nginx 1.22.0                                        24 May 2022
+
+    *) 1.22.x stable branch.
+
+
 Changes with nginx 1.21.6                                        25 Jan 2022
 
     *) Bugfix: when using EPOLLEXCLUSIVE on Linux client connections were
