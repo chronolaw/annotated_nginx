@@ -29,8 +29,8 @@ Nginx 1.21.6
 分支    |说明   |注释
 --------|-------|-----
 master  | Nginx开发版1.21.6|有
-mainline| Nginx开发版1.21.6|无
-stable  | Nginx稳定版1.20.0|无
+mainline| Nginx开发版1.22.0|无
+stable  | Nginx稳定版1.22.0|无
 
 # 已注解
 
