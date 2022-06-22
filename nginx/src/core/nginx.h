@@ -12,7 +12,6 @@
 // version number format
 // 1'015'005
 
-
 #define nginx_version      1021006
 #define NGINX_VERSION      "1.21.6"
 #define NGINX_VER          "nginx/" NGINX_VERSION

@@ -20,6 +20,11 @@
 // 遍历监听端口列表，删除epoll监听连接事件，不接受请求
 static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all);
 
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+static void ngx_reorder_accept_events(ngx_listening_t *ls);
+#endif
+static void ngx_close_accepted_connection(ngx_connection_t *c);
+
 // 1.21.6新增处理
 #if (NGX_HAVE_EPOLLEXCLUSIVE)
 static void ngx_reorder_accept_events(ngx_listening_t *ls);
@@ -775,6 +780,10 @@ ngx_event_recvmsg(ngx_event_t *ev)
     // epoll尽可能接受多个请求，直至accept出错EAGAIN，即无新连接请求
     // 否则epoll只接受一个请求后即退出循环
     } while (ev->available);
+
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+    ngx_reorder_accept_events(ls);
+#endif
 }
 
 #endif
