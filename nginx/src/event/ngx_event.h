@@ -724,16 +724,16 @@ extern ngx_module_t           ngx_event_core_module;
 // 例如ngx_http_init_connection,ngx_stream_init_connection
 void ngx_event_accept(ngx_event_t *ev);
 
-#if !(NGX_WIN32)
-// 1.10新增函数，接受udp连接的handler
-void ngx_event_recvmsg(ngx_event_t *ev);
-void ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
-    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
-#endif
-
-// 1.15.7改为非static
-// 清理函数，会删除红黑树节点
-void ngx_delete_udp_connection(void *data);
+//#if !(NGX_WIN32)
+//// 1.10新增函数，接受udp连接的handler
+//void ngx_event_recvmsg(ngx_event_t *ev);
+//void ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
+//    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+//#endif
+//
+//// 1.15.7改为非static
+//// 清理函数，会删除红黑树节点
+//void ngx_delete_udp_connection(void *data);
 
 // 尝试获取负载均衡锁，监听端口
 // 如未获取则不监听端口
@@ -786,6 +786,7 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 
 #include <ngx_event_timer.h>
 #include <ngx_event_posted.h>
+#include <ngx_event_udp.h>
 
 #if (NGX_WIN32)
 #include <ngx_iocp_module.h>
