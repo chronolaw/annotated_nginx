@@ -265,7 +265,7 @@ typedef struct {
     ngx_table_elt_t                  *keep_alive;
 
 #if (NGX_HTTP_X_FORWARDED_FOR)
-    ngx_array_t                       x_forwarded_for;
+    ngx_table_elt_t                  *x_forwarded_for;
 #endif
 
 #if (NGX_HTTP_REALIP)
@@ -284,10 +284,10 @@ typedef struct {
     ngx_table_elt_t                  *date;
 #endif
 
+    ngx_table_elt_t                  *cookie;
+
     ngx_str_t                         user;
     ngx_str_t                         passwd;
-
-    ngx_array_t                       cookies;
 
     ngx_str_t                         server;
 
@@ -300,6 +300,9 @@ typedef struct {
 
     unsigned                          connection_type:2;
     unsigned                          chunked:1;
+
+    unsigned                          multi:1;
+    unsigned                          multi_linked:1;
 
     // user agent标志位
     unsigned                          msie:1;
@@ -338,6 +341,9 @@ typedef struct {
     ngx_table_elt_t                  *expires;
     ngx_table_elt_t                  *etag;
 
+    ngx_table_elt_t                  *cache_control;
+    ngx_table_elt_t                  *link;
+
     ngx_str_t                        *override_charset;
 
     size_t                            content_type_len;
@@ -345,9 +351,6 @@ typedef struct {
     ngx_str_t                         charset;
     u_char                           *content_type_lowcase;
     ngx_uint_t                        content_type_hash;
-
-    ngx_array_t                       cache_control;
-    ngx_array_t                       link;
 
     // 通常需要指定content_length_n，表示body的长度
     off_t                             content_length_n;

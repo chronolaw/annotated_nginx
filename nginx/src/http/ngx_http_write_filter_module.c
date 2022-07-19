@@ -279,7 +279,8 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     // 数据长度为0
     if (size == 0
         && !(c->buffered & NGX_LOWLEVEL_BUFFERED)
-        && !(last && c->need_last_buf))
+        && !(last && c->need_last_buf)
+        && !(flush && c->need_flush_buf))
     {
         // 释放r->out里的节点
         if (last || flush || sync) {
