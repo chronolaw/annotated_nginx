@@ -141,13 +141,16 @@ typedef struct {
 } ngx_hash_keys_arrays_t;
 
 
+typedef struct ngx_table_elt_s  ngx_table_elt_t;
+
 // 键值对结构, 主要用来表示HTTP头部信息
-typedef struct {
+struct ngx_table_elt_s {
     ngx_uint_t        hash;         //散列（哈希）标记
     ngx_str_t         key;          //键
     ngx_str_t         value;        //值
     u_char           *lowcase_key;  //key的小写字符串指针
-} ngx_table_elt_t;
+    ngx_table_elt_t  *next;         // 1.23.0新增
+};
 
 
 // 表面上好像是使用开放寻址法
