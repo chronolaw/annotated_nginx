@@ -1,7 +1,34 @@
 
-Changes with nginx 1.22.0                                        24 May 2022
+Changes with nginx 1.23.0                                        21 Jun 2022
 
-    *) 1.22.x stable branch.
+    *) Change in internal API: now header lines are represented as linked
+       lists.
+
+    *) Change: now nginx combines arbitrary header lines with identical
+       names when sending to FastCGI, SCGI, and uwsgi backends, in the
+       $r->header_in() method of the ngx_http_perl_module, and during lookup
+       of the "$http_...", "$sent_http_...", "$sent_trailer_...",
+       "$upstream_http_...", and "$upstream_trailer_..." variables.
+
+    *) Bugfix: if there were multiple "Vary" header lines in the backend
+       response, nginx only used the last of them when caching.
+
+    *) Bugfix: if there were multiple "WWW-Authenticate" header lines in the
+       backend response and errors with code 401 were intercepted or the
+       "auth_request" directive was used, nginx only sent the first of the
+       header lines to the client.
+
+    *) Change: the logging level of the "application data after close
+       notify" SSL errors has been lowered from "crit" to "info".
+
+    *) Bugfix: connections might hang if nginx was built on Linux 2.6.17 or
+       newer, but was used on systems without EPOLLRDHUP support, notably
+       with epoll emulation layers; the bug had appeared in 1.17.5.
+       Thanks to Marcus Ball.
+
+    *) Bugfix: nginx did not cache the response if the "Expires" response
+       header line disabled caching, but following "Cache-Control" header
+       line enabled caching.
 
 
 Changes with nginx 1.21.6                                        25 Jan 2022
