@@ -1,4 +1,24 @@
 
+Changes with nginx 1.23.1                                        19 Jul 2022
+
+    *) Feature: memory usage optimization in configurations with SSL
+       proxying.
+
+    *) Feature: looking up of IPv4 addresses while resolving now can be
+       disabled with the "ipv4=off" parameter of the "resolver" directive.
+
+    *) Change: the logging level of the "bad key share", "bad extension",
+       "bad cipher", and "bad ecpoint" SSL errors has been lowered from
+       "crit" to "info".
+
+    *) Bugfix: while returning byte ranges nginx did not remove the
+       "Content-Range" header line if it was present in the original backend
+       response.
+
+    *) Bugfix: a proxied response might be truncated during reconfiguration
+       on Linux; the bug had appeared in 1.17.5.
+
+
 Changes with nginx 1.23.0                                        21 Jun 2022
 
     *) Change in internal API: now header lines are represented as linked
