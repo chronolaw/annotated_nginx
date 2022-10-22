@@ -1,4 +1,39 @@
 
+Changes with nginx 1.23.2                                        19 Oct 2022
+
+    *) Security: processing of a specially crafted mp4 file by the
+       ngx_http_mp4_module might cause a worker process crash, worker
+       process memory disclosure, or might have potential other impact
+       (CVE-2022-41741, CVE-2022-41742).
+
+    *) Feature: the "$proxy_protocol_tlv_..." variables.
+
+    *) Feature: TLS session tickets encryption keys are now automatically
+       rotated when using shared memory in the "ssl_session_cache"
+       directive.
+
+    *) Change: the logging level of the "bad record type" SSL errors has
+       been lowered from "crit" to "info".
+       Thanks to Murilo Andrade.
+
+    *) Change: now when using shared memory in the "ssl_session_cache"
+       directive the "could not allocate new session" errors are logged at
+       the "warn" level instead of "alert" and not more often than once per
+       second.
+
+    *) Bugfix: nginx/Windows could not be built with OpenSSL 3.0.x.
+
+    *) Bugfix: in logging of the PROXY protocol errors.
+       Thanks to Sergey Brester.
+
+    *) Workaround: shared memory from the "ssl_session_cache" directive was
+       spent on sessions using TLS session tickets when using TLSv1.3 with
+       OpenSSL.
+
+    *) Workaround: timeout specified with the "ssl_session_timeout"
+       directive did not work when using TLSv1.3 with OpenSSL or BoringSSL.
+
+
 Changes with nginx 1.23.1                                        19 Jul 2022
 
     *) Feature: memory usage optimization in configurations with SSL
