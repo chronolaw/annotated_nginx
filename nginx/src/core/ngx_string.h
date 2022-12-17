@@ -172,12 +172,12 @@ ngx_copy(u_char *dst, u_char *src, size_t len)
 
 // 内存移动，应该使用ngx_movemem
 // 与c函数不一样，它返回移动后的地址，可以简化连续移动内存
-#define ngx_memmove(dst, src, n)   (void) memmove(dst, src, n)
-#define ngx_movemem(dst, src, n)   (((u_char *) memmove(dst, src, n)) + (n))
+#define ngx_memmove(dst, src, n)  (void) memmove(dst, src, n)
+#define ngx_movemem(dst, src, n)  (((u_char *) memmove(dst, src, n)) + (n))
 
 
 /* msvc and icc7 compile memcmp() to the inline loop */
-#define ngx_memcmp(s1, s2, n)  memcmp((const char *) s1, (const char *) s2, n)
+#define ngx_memcmp(s1, s2, n)     memcmp(s1, s2, n)
 
 
 // 拷贝字符串

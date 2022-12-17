@@ -1084,7 +1084,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
             return;
         }
 
-        p = ngx_pnalloc(c->pool, NGX_PROXY_PROTOCOL_MAX_HEADER);
+        p = ngx_pnalloc(c->pool, NGX_PROXY_PROTOCOL_V1_MAX_HEADER);
         if (p == NULL) {
             ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
             return;
@@ -1092,7 +1092,8 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
 
         cl->buf->pos = p;
 
-        p = ngx_proxy_protocol_write(c, p, p + NGX_PROXY_PROTOCOL_MAX_HEADER);
+        p = ngx_proxy_protocol_write(c, p,
+                                     p + NGX_PROXY_PROTOCOL_V1_MAX_HEADER);
         if (p == NULL) {
             ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
             return;
@@ -1142,14 +1143,15 @@ ngx_stream_proxy_send_proxy_protocol(ngx_stream_session_t *s)
     ngx_connection_t             *c, *pc;
     ngx_stream_upstream_t        *u;
     ngx_stream_proxy_srv_conf_t  *pscf;
-    u_char                        buf[NGX_PROXY_PROTOCOL_MAX_HEADER];
+    u_char                        buf[NGX_PROXY_PROTOCOL_V1_MAX_HEADER];
 
     c = s->connection;
 
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream proxy send PROXY protocol header");
 
-    p = ngx_proxy_protocol_write(c, buf, buf + NGX_PROXY_PROTOCOL_MAX_HEADER);
+    p = ngx_proxy_protocol_write(c, buf,
+                                 buf + NGX_PROXY_PROTOCOL_V1_MAX_HEADER);
     if (p == NULL) {
         ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return NGX_ERROR;
@@ -1933,9 +1935,7 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
         size = b->end - b->last;
 
         // 如果缓冲区有剩余，且src还可以读数据
-        if (size && src->read->ready && !src->read->delayed
-            && !src->read->error)
-        {
+        if (size && src->read->ready && !src->read->delayed) {
 
             // 限速处理
             if (limit_rate) {

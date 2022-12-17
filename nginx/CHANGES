@@ -1,4 +1,21 @@
 
+Changes with nginx 1.23.3                                        13 Dec 2022
+
+    *) Bugfix: an error might occur when reading PROXY protocol version 2
+       header with large number of TLVs.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if SSI
+       was used to process subrequests created by other modules.
+       Thanks to Ciel Zhao.
+
+    *) Workaround: when a hostname used in the "listen" directive resolves
+       to multiple addresses, nginx now ignores duplicates within these
+       addresses.
+
+    *) Bugfix: nginx might hog CPU during unbuffered proxying if SSL
+       connections to backends were used.
+
+
 Changes with nginx 1.23.2                                        19 Oct 2022
 
     *) Security: processing of a specially crafted mp4 file by the
