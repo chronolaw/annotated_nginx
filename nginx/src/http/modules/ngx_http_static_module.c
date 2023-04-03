@@ -262,12 +262,13 @@ ngx_http_static_handler(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    // before 1.23.4
     // r != r->main 子请求
     // of.size == 0 文件长度是0
     // 那么就只发送头，没有实际的响应数据
-    if (r != r->main && of.size == 0) {
-        return ngx_http_send_header(r);
-    }
+    //if (r != r->main && of.size == 0) {
+    //    return ngx_http_send_header(r);
+    //}
 
     // 允许range请求
     r->allow_ranges = 1;
@@ -300,13 +301,14 @@ ngx_http_static_handler(ngx_http_request_t *r)
     b->file_pos = 0;
     b->file_last = of.size;
 
-    b->in_file = b->file_last ? 1: 0;
+    b->in_file = b->file_last ? 1 : 0;
 
     // 如果是主请求，那么last_buf，即最后一块数据
-    b->last_buf = (r == r->main) ? 1: 0;
+    b->last_buf = (r == r->main) ? 1 : 0;
 
     // 因为只有一块数据，链里的唯一一个也就是最后一个
     b->last_in_chain = 1;
+    b->sync = (b->last_buf || b->in_file) ? 0 : 1;
 
     b->file->fd = of.fd;
     b->file->name = path;

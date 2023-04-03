@@ -1,4 +1,51 @@
 
+Изменения в nginx 1.23.4                                          28.03.2023
+
+    *) Изменение: теперь протокол TLSv1.3 разрешён по умолчанию.
+
+    *) Изменение: теперь nginx выдаёт предупреждение при переопределении
+       параметров listen-сокета, задающих используемые протоколы.
+
+    *) Изменение: теперь, если клиент использует pipelining, nginx закрывает
+       соединения с ожиданием дополнительных данных (lingering close).
+
+    *) Добавление: поддержка byte ranges для ответов модуля
+       ngx_http_gzip_static_module.
+
+    *) Исправление: диапазоны портов в директиве listen не работали; ошибка
+       появилась в 1.23.3.
+       Спасибо Валентину Бартеневу.
+
+    *) Исправление: для обработки запроса мог быть выбран неверный location,
+       если в конфигурации использовался префиксный location длиннее 255
+       символов.
+
+    *) Исправление: не-ASCII символы в именах файлов на Windows не
+       поддерживались модулями ngx_http_autoindex_module и
+       ngx_http_dav_module, а также директивой include.
+
+    *) Изменение: уровень логгирования ошибок SSL "data length too long",
+       "length too short", "bad legacy version", "no shared signature
+       algorithms", "bad digest length", "missing sigalgs extension",
+       "encrypted length too long", "bad length", "bad key update", "mixed
+       handshake and non handshake data", "ccs received early", "data
+       between ccs and finished", "packet length too long", "too many warn
+       alerts", "record too small", и "got a fin before a ccs" понижен с
+       уровня crit до info.
+
+    *) Исправление: при использовании HTTP/2 и директивы error_page для
+       перенаправления ошибок с кодом 400 могла происходить утечка сокетов.
+
+    *) Исправление: сообщения об ошибках записи в syslog не содержали
+       информации о том, что ошибки происходили в процессе записи в syslog.
+       Спасибо Safar Safarly.
+
+    *) Изменение: при использовании zlib-ng в логах появлялись сообщения
+       "gzip filter failed to use preallocated memory".
+
+    *) Исправление: в почтовом прокси-сервере.
+
+
 Изменения в nginx 1.23.3                                          13.12.2022
 
     *) Исправление: при чтении заголовка протокола PROXY версии 2,

@@ -323,6 +323,7 @@ struct ngx_connection_s {
 
     // 是否tcp连接已经被销毁
     unsigned            destroyed:1;
+    unsigned            pipeline:1;
 
     // 连接处于空闲状态
     unsigned            idle:1;

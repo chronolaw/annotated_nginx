@@ -2396,9 +2396,9 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     //if (r->method == NGX_HTTP_HEAD || (r != r->main && val.len == 0)) {
 
     // 1.19.7
-    if (r != r->main && val.len == 0) {
-        return ngx_http_send_header(r);
-    }
+    //if (r != r->main && val.len == 0) {
+    //    return ngx_http_send_header(r);
+    //}
 
     //b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
     // 分配buffer供发送用
@@ -2412,6 +2412,7 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     b->memory = val.len ? 1 : 0;
     b->last_buf = (r == r->main) ? 1 : 0;
     b->last_in_chain = 1;
+    b->sync = (b->last_buf || b->memory) ? 0 : 1;
 
     // buffer放进chain里
     out.buf = b;
@@ -5115,7 +5116,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         for (i = 0; i < n; i++) {
             if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen,
-                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 0)
+                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 1)
                 == NGX_OK)
             {
                 goto next;

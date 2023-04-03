@@ -137,7 +137,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
             msg.msg_controllen = sizeof(msg_control);
 
             ngx_memzero(&msg_control, sizeof(msg_control));
-       }
+        }
 #endif
 
         // 接收udp数据
