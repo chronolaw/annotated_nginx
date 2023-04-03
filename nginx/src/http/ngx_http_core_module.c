@@ -1803,10 +1803,6 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
         }
     }
 
-    if (r != r->main && val.len == 0) {
-        return ngx_http_send_header(r);
-    }
-
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -1817,6 +1813,7 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     b->memory = val.len ? 1 : 0;
     b->last_buf = (r == r->main) ? 1 : 0;
     b->last_in_chain = 1;
+    b->sync = (b->last_buf || b->memory) ? 0 : 1;
 
     out.buf = b;
     out.next = NULL;
@@ -4292,7 +4289,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         for (i = 0; i < n; i++) {
             if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen,
-                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 0)
+                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 1)
                 == NGX_OK)
             {
                 goto next;

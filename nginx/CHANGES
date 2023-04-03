@@ -1,4 +1,50 @@
 
+Changes with nginx 1.23.4                                        28 Mar 2023
+
+    *) Change: now TLSv1.3 protocol is enabled by default.
+
+    *) Change: now nginx issues a warning if protocol parameters of a
+       listening socket are redefined.
+
+    *) Change: now nginx closes connections with lingering if pipelining was
+       used by the client.
+
+    *) Feature: byte ranges support in the ngx_http_gzip_static_module.
+
+    *) Bugfix: port ranges in the "listen" directive did not work; the bug
+       had appeared in 1.23.3.
+       Thanks to Valentin Bartenev.
+
+    *) Bugfix: incorrect location might be chosen to process a request if a
+       prefix location longer than 255 characters was used in the
+       configuration.
+
+    *) Bugfix: non-ASCII characters in file names on Windows were not
+       supported by the ngx_http_autoindex_module, the ngx_http_dav_module,
+       and the "include" directive.
+
+    *) Change: the logging level of the "data length too long", "length too
+       short", "bad legacy version", "no shared signature algorithms", "bad
+       digest length", "missing sigalgs extension", "encrypted length too
+       long", "bad length", "bad key update", "mixed handshake and non
+       handshake data", "ccs received early", "data between ccs and
+       finished", "packet length too long", "too many warn alerts", "record
+       too small", and "got a fin before a ccs" SSL errors has been lowered
+       from "crit" to "info".
+
+    *) Bugfix: a socket leak might occur when using HTTP/2 and the
+       "error_page" directive to redirect errors with code 400.
+
+    *) Bugfix: messages about logging to syslog errors did not contain
+       information that the errors happened while logging to syslog.
+       Thanks to Safar Safarly.
+
+    *) Workaround: "gzip filter failed to use preallocated memory" alerts
+       appeared in logs when using zlib-ng.
+
+    *) Bugfix: in the mail proxy server.
+
+
 Changes with nginx 1.23.3                                        13 Dec 2022
 
     *) Bugfix: an error might occur when reading PROXY protocol version 2
