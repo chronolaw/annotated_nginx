@@ -120,23 +120,28 @@ typedef struct {
 } ngx_copy_file_t;
 
 
+// 递归遍历文件目录使用的数据结构
 typedef struct ngx_tree_ctx_s  ngx_tree_ctx_t;
 
+// 递归遍历文件目录使用的回调函数类型
 typedef ngx_int_t (*ngx_tree_init_handler_pt) (void *ctx, void *prev);
 typedef ngx_int_t (*ngx_tree_handler_pt) (ngx_tree_ctx_t *ctx, ngx_str_t *name);
 
+// 递归遍历文件目录使用的数据结构
 struct ngx_tree_ctx_s {
     off_t                      size;
     off_t                      fs_size;
     ngx_uint_t                 access;
     time_t                     mtime;
 
+    // 各种回调函数
     ngx_tree_init_handler_pt   init_handler;
-    ngx_tree_handler_pt        file_handler;
+    ngx_tree_handler_pt        file_handler;        // 操作文件
     ngx_tree_handler_pt        pre_tree_handler;
     ngx_tree_handler_pt        post_tree_handler;
     ngx_tree_handler_pt        spec_handler;
 
+    // 额外分配的数据，可以是0
     void                      *data;
     size_t                     alloc;
 
@@ -159,6 +164,8 @@ ngx_int_t ngx_create_paths(ngx_cycle_t *cycle, ngx_uid_t user);
 ngx_int_t ngx_ext_rename_file(ngx_str_t *src, ngx_str_t *to,
     ngx_ext_rename_file_t *ext);
 ngx_int_t ngx_copy_file(u_char *from, u_char *to, ngx_copy_file_t *cf);
+
+// Nginx自己的递归遍历文件目录函数
 ngx_int_t ngx_walk_tree(ngx_tree_ctx_t *ctx, ngx_str_t *tree);
 
 ngx_atomic_uint_t ngx_next_temp_number(ngx_uint_t collision);
