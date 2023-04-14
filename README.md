@@ -31,7 +31,7 @@ Nginx 1.23.4
 --------|-------|-----
 master  | Nginx开发版1.23.4|有
 mainline| Nginx开发版1.23.4|无
-stable  | Nginx稳定版1.22.0|无
+stable  | Nginx稳定版1.24.0|无
 
 # 已注解
 
