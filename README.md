@@ -11,6 +11,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * 1.17.0不再支持OpenSSL 0.98,limit_rate/proxy_upload_rate支持变量。
 * 1.21.4支持内核TLS（kTLS），要求使用OpenSSL3.0，Linux内核高于4.17。
 * 1.21.5支持更新的PCRE2，但向上的封装接口不变。
+* 1.25.0实验性支持HTTP/3。
 
 请参考：
 * [《Nginx完全开发指南：使用C/C++/JavaScript/Lua》](https://item.jd.com/12536113.html)
@@ -24,13 +25,13 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * [Angie](https://github.com/webserver-llc/angie)
 
 # 当前状态
-Nginx 1.23.4
+Nginx 1.25.0
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.23.4|有
-mainline| Nginx开发版1.23.4|无
+master  | Nginx开发版1.25.0|有
+mainline| Nginx开发版1.25.0|无
 stable  | Nginx稳定版1.24.0|无
 
 # 已注解
