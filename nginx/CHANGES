@@ -1,4 +1,9 @@
 
+Changes with nginx 1.25.0                                        23 May 2023
+
+    *) Feature: experimental HTTP/3 support.
+
+
 Changes with nginx 1.23.4                                        28 Mar 2023
 
     *) Change: now TLSv1.3 protocol is enabled by default.
