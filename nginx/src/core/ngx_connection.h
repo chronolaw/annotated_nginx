@@ -140,6 +140,7 @@ struct ngx_listening_s {
     // ngx_open_listening_sockets
     unsigned            add_reuseport:1;
     unsigned            keepalive:2;
+    unsigned            quic:1;
 
     // 延迟接受请求，只有真正收到数据内核才通知nginx，提高性能
     unsigned            deferred_accept:1;
@@ -263,6 +264,11 @@ struct ngx_connection_s {
     ngx_str_t           addr_text;
 
     ngx_proxy_protocol_t  *proxy_protocol;
+
+    // http3/quic
+#if (NGX_QUIC || NGX_COMPAT)
+    ngx_quic_stream_t     *quic;
+#endif
 
     // 给https协议用的成员
     // 定义在event/ngx_event_openssl.h

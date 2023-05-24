@@ -44,6 +44,7 @@
 
 // 新的http2协议版本号
 #define NGX_HTTP_VERSION_20                2000
+#define NGX_HTTP_VERSION_30                3000
 
 // 1.21.1改用4字节整数，之前是2字节
 // http请求方法代码，可以使用与或非来检查，存储在r->method
@@ -419,6 +420,10 @@ typedef struct {
 #endif
 #endif
 
+#if (NGX_HTTP_V3 || NGX_COMPAT)
+    ngx_http_v3_session_t            *v3_session;
+#endif
+
     // 1.11.11之前
     // ngx_buf_t                       **busy;
     // ngx_int_t                         nbusy;
@@ -663,6 +668,7 @@ struct ngx_http_request_s {
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
+    ngx_http_v3_parse_t              *v3_parse;
 
     // 记录错误日志时可以调用的函数
     // 在ngx_http_log_error里调用
@@ -815,6 +821,7 @@ struct ngx_http_request_s {
     // 是否已经发送了头，如果已经发送则不能再次设置或发送头
     unsigned                          header_sent:1;
 
+    unsigned                          response_sent:1;
     unsigned                          expect_tested:1;
     unsigned                          root_tested:1;
     unsigned                          done:1;

@@ -36,6 +36,7 @@ typedef struct ngx_thread_task_s     ngx_thread_task_t;
 // ssl相关数据结构
 typedef struct ngx_ssl_s             ngx_ssl_t;
 typedef struct ngx_proxy_protocol_s  ngx_proxy_protocol_t;
+typedef struct ngx_quic_stream_s     ngx_quic_stream_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 
 // 1.15.0新增的管理udp会话数据结构
@@ -116,6 +117,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 
 #if (NGX_OPENSSL)
 #include <ngx_event_openssl.h>
+#if (NGX_QUIC)
+#include <ngx_event_quic.h>
+#endif
 #endif
 
 #include <ngx_process_cycle.h>
@@ -126,6 +130,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_connection.h>
 #include <ngx_syslog.h>
 #include <ngx_proxy_protocol.h>
+#if (NGX_HAVE_BPF)
+#include <ngx_bpf.h>
+#endif
 
 
 // 回车换行定义，用于http解析

@@ -28,6 +28,14 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/evp.h>
+#if (NGX_QUIC)
+#ifdef OPENSSL_IS_BORINGSSL
+#include <openssl/hkdf.h>
+#include <openssl/chacha.h>
+#else
+#include <openssl/kdf.h>
+#endif
+#endif
 #include <openssl/hmac.h>
 #ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
@@ -347,6 +355,10 @@ ngx_int_t ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool,
 
 // 开始ssl握手
 ngx_int_t ngx_ssl_handshake(ngx_connection_t *c);
+
+#if (NGX_DEBUG)
+void ngx_ssl_handshake_log(ngx_connection_t *c);
+#endif
 
 // 连接的读写关联处理函数
 // 后续的读写都用ssl的加密来操作

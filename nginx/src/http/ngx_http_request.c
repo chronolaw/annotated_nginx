@@ -86,15 +86,17 @@ static ngx_int_t ngx_http_process_connection(ngx_http_request_t *r,
 static ngx_int_t ngx_http_process_user_agent(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
-// 简单验证host字符串的合法性
-static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool,
-    ngx_uint_t alloc);
+//static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool,
+//    ngx_uint_t alloc);
 
 // 由请求行或请求头里的host定位server{}块位置，决定进入哪个server
 // 核心是ngx_http_find_virtual_server
-static ngx_int_t ngx_http_set_virtual_server(ngx_http_request_t *r,
-    ngx_str_t *host);
+//static ngx_int_t ngx_http_set_virtual_server(ngx_http_request_t *r,
+//    ngx_str_t *host);
 
+// 查找匹配的server{}块
+// 先在hash表里找完全匹配
+// hash找不到用正则匹配
 // 查找匹配的server{}块
 // 先在hash表里找完全匹配
 // hash找不到用正则匹配
@@ -180,7 +182,7 @@ static ngx_int_t ngx_http_post_action(ngx_http_request_t *r);
 // 销毁请求的内存池
 // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
 // 最后销毁连接的内存池
-static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
+//static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
 
 // 请求已经结束，调用log模块记录日志
 // 在ngx_http_free_request里调用
@@ -485,6 +487,13 @@ ngx_http_init_connection(ngx_connection_t *c)
 #if (NGX_HTTP_V2)
     if (hc->addr_conf->http2) {
         rev->handler = ngx_http_v2_init;
+    }
+#endif
+
+#if (NGX_HTTP_V3)
+    if (hc->addr_conf->quic) {
+        ngx_http_v3_init_stream(c);
+        return;
     }
 #endif
 
@@ -1286,6 +1295,14 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
+#endif
+
+#ifdef SSL_OP_ENABLE_MIDDLEBOX_COMPAT
+#if (NGX_HTTP_V3)
+        if (c->listening->quic) {
+            SSL_clear_options(ssl_conn, SSL_OP_ENABLE_MIDDLEBOX_COMPAT);
+        }
+#endif
 #endif
     }
 
@@ -2614,8 +2631,8 @@ ngx_http_process_request(ngx_http_request_t *r)
 }
 
 
+ngx_int_t
 // 简单验证host字符串的合法性
-static ngx_int_t
 ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 {
     u_char  *h, ch;
@@ -2709,7 +2726,7 @@ ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 
 // 由请求行或请求头里的host定位server{}块位置，决定进入哪个server
 // 核心是ngx_http_find_virtual_server
-static ngx_int_t
+ngx_int_t
 ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
 {
     ngx_int_t                  rc;
@@ -3433,6 +3450,13 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     }
 #endif
 
+#if (NGX_HTTP_V3)
+    if (r->connection->quic) {
+        ngx_http_close_request(r, 0);
+        return;
+    }
+#endif
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     // 有多个引用计数，表示有其他异步事件在处理
@@ -3759,6 +3783,20 @@ ngx_http_test_reading(ngx_http_request_t *r)
 
     if (r->stream) {
         if (c->error) {
+            err = 0;
+            goto closed;
+        }
+
+        return;
+    }
+
+#endif
+
+#if (NGX_HTTP_V3)
+
+    if (c->quic) {
+        if (rev->error) {
+            c->error = 1;
             err = 0;
             goto closed;
         }
@@ -4519,7 +4557,7 @@ ngx_http_post_action(ngx_http_request_t *r)
 // 销毁请求的内存池
 // 调用ngx_close_connection,释放连接，加入空闲链表，可以再次使用
 // 最后销毁连接的内存池
-static void
+void
 ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 {
     ngx_connection_t  *c;
@@ -4630,7 +4668,12 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 
     log->action = "closing request";
 
-    if (r->connection->timedout) {
+    if (r->connection->timedout
+#if (NGX_HTTP_V3)
+        && r->connection->quic == NULL
+#endif
+       )
+    {
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
         if (clcf->reset_timedout_connection) {
@@ -4712,6 +4755,12 @@ ngx_http_close_connection(ngx_connection_t *c)
         }
     }
 
+#endif
+
+#if (NGX_HTTP_V3)
+    if (c->quic) {
+        ngx_http_v3_reset_stream(c);
+    }
 #endif
 
 #if (NGX_STAT_STUB)

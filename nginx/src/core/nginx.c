@@ -889,6 +889,9 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
     // 逐个打印文件描述符，后面接';'
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
+        if (ls[i].ignore) {
+            continue;
+        }
         p = ngx_sprintf(p, "%ud;", ls[i].fd);
     }
 

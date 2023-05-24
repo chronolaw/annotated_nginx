@@ -20,17 +20,6 @@
 
 #if !(NGX_WIN32)
 
-// ngx_udp_connection_t
-// udp连接的附加数据
-// 作为ngx_connection_t的一个成员
-// 串进红黑树，缓冲区里是客户端发送的数据
-struct ngx_udp_connection_s {
-    ngx_rbtree_node_t   node;
-    ngx_connection_t   *connection;
-    ngx_buf_t          *buffer;
-};
-
-
 // 专用的关闭函数
 static void ngx_close_accepted_udp_connection(ngx_connection_t *c);
 
@@ -544,8 +533,8 @@ ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
             udpt = (ngx_udp_connection_t *) temp;
             ct = udpt->connection;
 
-            rc = ngx_cmp_sockaddr(c->sockaddr, c->socklen,
-                                  ct->sockaddr, ct->socklen, 1);
+            rc = ngx_memn2cmp(udp->key.data, udpt->key.data,
+                              udp->key.len, udpt->key.len);
 
             if (rc == 0 && c->listening->wildcard) {
                 rc = ngx_cmp_sockaddr(c->local_sockaddr, c->local_socklen,
@@ -607,6 +596,8 @@ ngx_insert_udp_connection(ngx_connection_t *c)
     ngx_crc32_final(hash);
 
     udp->node.key = hash;
+    udp->key.data = (u_char *) c->sockaddr;
+    udp->key.len = c->socklen;
 
     // 清理函数，会删除红黑树节点
     cln = ngx_pool_cleanup_add(c->pool, 0);

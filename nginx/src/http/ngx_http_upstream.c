@@ -582,6 +582,13 @@ ngx_http_upstream_init(ngx_http_request_t *r)
     }
 #endif
 
+#if (NGX_HTTP_V3)
+    if (c->quic) {
+        ngx_http_upstream_init_request(r);
+        return;
+    }
+#endif
+
     // 如果连接设置了超时，那么就要删除定时器
     // 保证连接后端时不会被超时结束
     if (c->read->timer_set) {
@@ -1442,6 +1449,19 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     if (r->stream) {
         return;
     }
+#endif
+
+#if (NGX_HTTP_V3)
+
+    if (c->quic) {
+        if (c->write->error) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_CLIENT_CLOSED_REQUEST);
+        }
+
+        return;
+    }
+
 #endif
 
 #if (NGX_HAVE_KQUEUE)

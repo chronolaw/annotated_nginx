@@ -502,6 +502,18 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 ngx_int_t
 ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 {
+#if (NGX_QUIC)
+
+    ngx_connection_t  *c;
+
+    c = rev->data;
+
+    if (c->quic) {
+        return NGX_OK;
+    }
+
+#endif
+
     // 使用et模式，epoll/kqueue
     if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
 
@@ -576,9 +588,15 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 {
     ngx_connection_t  *c;
 
-    if (lowat) {
-        c = wev->data;
+    c = wev->data;
 
+#if (NGX_QUIC)
+    if (c->quic) {
+        return NGX_OK;
+    }
+#endif
+
+    if (lowat) {
         // 设置发送数据时epoll的响应阈值
         // 当系统空闲缓冲超过lowat时触发epoll可写事件
         // linux不支持send_lowat指令，send_lowat总是0
@@ -1250,8 +1268,16 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         // 从cycle的连接池里获取连接
         // 关键操作 ls->handler(c);调用其他模块的业务handler
         // 1.10使用ngx_event_recvmsg接收udp
-        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
-                                                : ngx_event_recvmsg;
+        if (c->type == SOCK_STREAM) {
+            rev->handler = ngx_event_accept;
+
+#if (NGX_QUIC)
+        } else if (ls[i].quic) {
+            rev->handler = ngx_quic_recvmsg;
+#endif
+        } else {
+            rev->handler = ngx_event_recvmsg;
+        }
 
 #if (NGX_HAVE_REUSEPORT)
 

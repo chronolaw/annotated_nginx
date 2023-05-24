@@ -23,6 +23,18 @@
 #endif
 
 
+// ngx_udp_connection_t
+// udp连接的附加数据
+// 作为ngx_connection_t的一个成员
+// 串进红黑树，缓冲区里是客户端发送的数据
+struct ngx_udp_connection_s {
+    ngx_rbtree_node_t   node;
+    ngx_connection_t   *connection;
+    ngx_buf_t          *buffer;
+    ngx_str_t           key;
+};
+
+
 #if (NGX_HAVE_ADDRINFO_CMSG)
 
 typedef union {

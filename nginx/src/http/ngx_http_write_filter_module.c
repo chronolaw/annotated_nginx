@@ -293,6 +293,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
             r->out = NULL;
             c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
 
+            if (last) {
+                r->response_sent = 1;
+            }
+
             return NGX_OK;
         }
 
@@ -418,6 +422,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     // 已经发送完了
     // 清除缓冲标志位
     c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
+
+    if (last) {
+        r->response_sent = 1;
+    }
 
     // NGX_LOWLEVEL_BUFFERED目前似乎在nginx里还没有用到
     if ((c->buffered & NGX_LOWLEVEL_BUFFERED) && r->postponed == NULL) {
