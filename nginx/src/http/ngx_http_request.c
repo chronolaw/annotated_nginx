@@ -483,13 +483,6 @@ ngx_http_init_connection(ngx_connection_t *c)
     // 暂时不处理写事件
     c->write->handler = ngx_http_empty_handler;
 
-    // http2使用特殊的读事件处理函数ngx_http_v2_init
-#if (NGX_HTTP_V2)
-    if (hc->addr_conf->http2) {
-        rev->handler = ngx_http_v2_init;
-    }
-#endif
-
 #if (NGX_HTTP_V3)
     if (hc->addr_conf->quic) {
         ngx_http_v3_init_stream(c);
@@ -499,23 +492,15 @@ ngx_http_init_connection(ngx_connection_t *c)
 
     // ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
 #if (NGX_HTTP_SSL)
-    {
-    ngx_http_ssl_srv_conf_t  *sscf;
-
-    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
-
-    // sscf->enable对应指令ssl on，通常不使用
     // hc->addr_conf->ssl对应listen xxx ssl
-    if (sscf->enable || hc->addr_conf->ssl) {
+    if (hc->addr_conf->ssl) {
         // 1.15.0不要求必须指定证书
-
         hc->ssl = 1;
         c->log->action = "SSL handshaking";
 
         // ssl连接使用特殊的读事件处理函数ngx_http_ssl_handshake
         // 进入ssl握手处理，而不是直接读取http头
         rev->handler = ngx_http_ssl_handshake;
-    }
     }
 #endif
 
@@ -577,6 +562,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     ngx_buf_t                 *b;
     ngx_connection_t          *c;
     ngx_http_connection_t     *hc;
+#if (NGX_HTTP_V2)
+    ngx_http_v2_srv_conf_t    *h2scf;
+#endif
     ngx_http_core_srv_conf_t  *cscf;
 
     // 从事件的data获得连接对象
@@ -653,6 +641,8 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     // ngx_event_accept.c:ngx_event_accept()里设置为ngx_recv
     // ngx_posix_init.c里初始化为linux的底层接口
     // <0 出错， =0 连接关闭， >0 接收到数据大小
+    size = b->end - b->last;
+
     n = c->recv(c, b->last, size);
 
     // 如果返回NGX_AGAIN表示还没有数据
@@ -672,15 +662,19 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
 
-        /*
-         * We are trying to not hold c->buffer's memory for an idle connection.
-         */
+        if (b->pos == b->last) {
 
-        // 释放缓冲区，避免空闲连接占用内存
-        // 这样，即使有大量的无数据连接，也不会占用很多的内存
-        // 只有连接对象的内存消耗
-        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
-            b->start = NULL;
+            /*
+             * We are trying to not hold c->buffer's memory for an
+             * idle connection.
+             */
+
+            // 释放缓冲区，避免空闲连接占用内存
+            // 这样，即使有大量的无数据连接，也不会占用很多的内存
+            // 只有连接对象的内存消耗
+            if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+                b->start = NULL;
+            }
         }
 
         // 读事件处理完成，因为没读到数据，等待下一次事件发生
@@ -732,6 +726,29 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
     }
+
+#if (NGX_HTTP_V2)
+
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+
+    if (!hc->ssl && (h2scf->enable || hc->addr_conf->http2)) {
+
+        size = ngx_min(sizeof(NGX_HTTP_V2_PREFACE) - 1,
+                       (size_t) (b->last - b->pos));
+
+        if (ngx_memcmp(b->pos, NGX_HTTP_V2_PREFACE, size) == 0) {
+
+            if (size == sizeof(NGX_HTTP_V2_PREFACE) - 1) {
+                ngx_http_v2_init(rev);
+                return;
+            }
+
+            ngx_post_event(rev, &ngx_posted_events);
+            return;
+        }
+    }
+
+#endif
 
     // http日志的额外信息
     c->log->action = "reading client request line";
@@ -1152,13 +1169,16 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 #if (NGX_HTTP_V2                                                              \
      && defined TLSEXT_TYPE_application_layer_protocol_negotiation)
         {
-        unsigned int            len;
-        const unsigned char    *data;
-        ngx_http_connection_t  *hc;
+        unsigned int             len;
+        const unsigned char     *data;
+        ngx_http_connection_t   *hc;
+        ngx_http_v2_srv_conf_t  *h2scf;
 
         hc = c->data;
 
-        if (hc->addr_conf->http2) {
+        h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+
+        if (h2scf->enable || hc->addr_conf->http2) {
 
             SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
 
