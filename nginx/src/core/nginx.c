@@ -24,6 +24,9 @@ static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
 // 1.11.x新增函数
 static void ngx_cleanup_environment(void *data);
 
+// 1.25.2新增函数
+static void ngx_cleanup_environment_variable(void *data);
+
 // nginx自己实现的命令行参数解析
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
 
@@ -718,7 +721,8 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 char **
 ngx_set_environment(ngx_cycle_t *cycle, ngx_uint_t *last)
 {
-    char                **p, **env;
+    char                **p, **env, *str;
+    size_t                len;
     ngx_str_t            *var;
     ngx_uint_t            i, n;
     ngx_core_conf_t      *ccf;
@@ -800,7 +804,31 @@ tz_found:
     for (i = 0; i < ccf->env.nelts; i++) {
 
         if (var[i].data[var[i].len] == '=') {
-            env[n++] = (char *) var[i].data;
+
+            if (last) {
+                env[n++] = (char *) var[i].data;
+                continue;
+            }
+
+            cln = ngx_pool_cleanup_add(cycle->pool, 0);
+            if (cln == NULL) {
+                return NULL;
+            }
+
+            len = ngx_strlen(var[i].data) + 1;
+
+            str = ngx_alloc(len, cycle->log);
+            if (str == NULL) {
+                return NULL;
+            }
+
+            ngx_memcpy(str, var[i].data, len);
+
+            cln->handler = ngx_cleanup_environment_variable;
+            cln->data = str;
+
+            env[n++] = str;
+
             continue;
         }
 
@@ -847,6 +875,29 @@ ngx_cleanup_environment(void *data)
 
 // 执行新的nginx程序，热更新
 // 使用环境变量传递已经打开的文件描述符
+static void
+ngx_cleanup_environment_variable(void *data)
+{
+    char  *var = data;
+
+    char  **p;
+
+    for (p = environ; *p; p++) {
+
+        /*
+         * if an environment variable is still used, as it happens on exit,
+         * the only option is to leak it
+         */
+
+        if (*p == var) {
+            return;
+        }
+    }
+
+    ngx_free(var);
+}
+
+
 ngx_pid_t
 ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 {
