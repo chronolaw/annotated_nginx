@@ -1,4 +1,23 @@
 
+Changes with nginx 1.25.2                                        15 Aug 2023
+
+    *) Feature: path MTU discovery when using HTTP/3.
+
+    *) Feature: TLS_AES_128_CCM_SHA256 cipher suite support when using
+       HTTP/3.
+
+    *) Change: now nginx uses appname "nginx" when loading OpenSSL
+       configuration.
+
+    *) Change: now nginx does not try to load OpenSSL configuration if the
+       --with-openssl option was used to built OpenSSL and the OPENSSL_CONF
+       environment variable is not set.
+
+    *) Bugfix: in the $body_bytes_sent variable when using HTTP/3.
+
+    *) Bugfix: in HTTP/3.
+
+
 Changes with nginx 1.25.1                                        13 Jun 2023
 
     *) Feature: the "http2" directive, which enables HTTP/2 on a per-server
