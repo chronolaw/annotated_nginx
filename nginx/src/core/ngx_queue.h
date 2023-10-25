@@ -59,6 +59,10 @@ struct ngx_queue_s {
     (h)->prev = x
 
 
+// nginx 1.25.3
+#define ngx_queue_insert_before   ngx_queue_insert_tail
+
+
 // 获取队列的头尾指针，可以用它们来实现队列的正向或反向遍历
 // 直到遇到头节点（ngx_queue_sentinel）停止
 #define ngx_queue_head(h)                                                     \
