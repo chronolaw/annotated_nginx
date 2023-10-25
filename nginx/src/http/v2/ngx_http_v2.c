@@ -347,6 +347,7 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http2 read handler");
 
     h2c->blocked = 1;
+    h2c->new_streams = 0;
 
     if (c->close) {
         c->close = 0;
@@ -385,13 +386,11 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
     h2mcf = ngx_http_get_module_main_conf(h2c->http_connection->conf_ctx,
                                           ngx_http_v2_module);
 
-    available = h2mcf->recv_buffer_size - 2 * NGX_HTTP_V2_STATE_BUFFER_SIZE;
+    available = h2mcf->recv_buffer_size - NGX_HTTP_V2_STATE_BUFFER_SIZE;
 
     do {
         p = h2mcf->recv_buffer;
-
-        ngx_memcpy(p, h2c->state.buffer, NGX_HTTP_V2_STATE_BUFFER_SIZE);
-        end = p + h2c->state.buffer_used;
+        end = ngx_cpymem(p, h2c->state.buffer, h2c->state.buffer_used);
 
         n = c->recv(c, end, available);
 
@@ -1284,6 +1283,14 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
         goto rst_stream;
     }
 
+    if (h2c->new_streams++ >= 2 * h2scf->concurrent_streams) {
+        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                      "client sent too many streams at once");
+
+        status = NGX_HTTP_V2_REFUSED_STREAM;
+        goto rst_stream;
+    }
+
     if (!h2c->settings_ack
         && !(h2c->state.flags & NGX_HTTP_V2_END_STREAM_FLAG)
         && h2scf->preread_size < NGX_HTTP_V2_DEFAULT_WINDOW)
@@ -1348,6 +1355,12 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
     return ngx_http_v2_state_header_block(h2c, pos, end);
 
 rst_stream:
+
+    if (h2c->refused_streams++ > ngx_max(h2scf->concurrent_streams, 100)) {
+        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                      "client sent too many refused streams");
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_NO_ERROR);
+    }
 
     if (ngx_http_v2_send_rst_stream(h2c, h2c->state.sid, status) != NGX_OK) {
         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_INTERNAL_ERROR);
@@ -2577,7 +2590,7 @@ ngx_http_v2_state_save(ngx_http_v2_connection_t *h2c, u_char *pos, u_char *end,
         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_INTERNAL_ERROR);
     }
 
-    ngx_memcpy(h2c->state.buffer, pos, NGX_HTTP_V2_STATE_BUFFER_SIZE);
+    ngx_memcpy(h2c->state.buffer, pos, size);
 
     h2c->state.buffer_used = size;
     h2c->state.handler = handler;
