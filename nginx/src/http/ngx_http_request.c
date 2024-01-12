@@ -727,15 +727,21 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         }
     }
 
+    // http2 处理
 #if (NGX_HTTP_V2)
 
+    // 看http2模块的配置
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 
+    // 如果没有ssl，那就是h2c，即明文http2
+    // 1.25.1之后listen http2弃用，即hc->addr_conf->http2今后不会再使用
+    // 1.25.1之后就看h2scf->enable,也就是http2 on指令
     if (!hc->ssl && (h2scf->enable || hc->addr_conf->http2)) {
 
         size = ngx_min(sizeof(NGX_HTTP_V2_PREFACE) - 1,
                        (size_t) (b->last - b->pos));
 
+        // 检查明文http2的preface，也就是prism
         if (ngx_memcmp(b->pos, NGX_HTTP_V2_PREFACE, size) == 0) {
 
             if (size == sizeof(NGX_HTTP_V2_PREFACE) - 1) {
@@ -1166,6 +1172,7 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 
         c->ssl->no_wait_shutdown = 1;
 
+        // ssl握手成功，开始http2处理
 #if (NGX_HTTP_V2                                                              \
      && defined TLSEXT_TYPE_application_layer_protocol_negotiation)
         {
@@ -1176,12 +1183,17 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 
         hc = c->data;
 
+        // 看http2模块的配置
         h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 
+        // 1.25.1之后listen http2弃用，即hc->addr_conf->http2今后不会再使用
+        // 1.25.1之后就看h2scf->enable,也就是http2 on指令
         if (h2scf->enable || hc->addr_conf->http2) {
 
+            // 检查alpn协商
             SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
 
+            // 应该是h2，后面就初始化http2流
             if (len == 2 && data[0] == 'h' && data[1] == '2') {
                 ngx_http_v2_init(c->read);
                 return;
