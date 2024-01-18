@@ -898,10 +898,13 @@ ngx_http_variable_request_get_size(ngx_http_request_t *r,
 }
 
 
+// 在1.23.0之前，ngx_http_variable_header()只获取第一个header的值
+// 获取多个值调用的是ngx_http_variable_headers()
 static ngx_int_t
 ngx_http_variable_header(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     uintptr_t data)
 {
+    // 使用逗号分隔多个值，但如果值里有逗号，则无法区分
     return ngx_http_variable_headers_internal(r, v, data, ',');
 }
 
@@ -914,6 +917,7 @@ ngx_http_variable_cookies(ngx_http_request_t *r,
 }
 
 
+// 获取header的真正实现函数
 static ngx_int_t
 ngx_http_variable_headers_internal(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data, u_char sep)
@@ -926,12 +930,14 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
 
     len = 0;
 
+    // 遍历链表
     for (th = h; th; th = th->next) {
 
         if (th->hash == 0) {
             continue;
         }
 
+        // 加2是因为要用", "分隔
         len += th->value.len + 2;
     }
 
@@ -940,12 +946,14 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 减2，因为末尾不需要逗号
     len -= 2;
 
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
+    // 链表只有一个元素，直接返回值
     if (h->next == NULL) {
         v->len = h->value.len;
         v->data = h->value.data;
@@ -953,6 +961,7 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 分配内存
     p = ngx_pnalloc(r->pool, len);
     if (p == NULL) {
         return NGX_ERROR;
@@ -963,6 +972,7 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
 
     end = p + len;
 
+    // 逐个拷贝header值输出
     for (th = h; th; th = th->next) {
 
         if (th->hash == 0) {
@@ -975,6 +985,7 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
             break;
         }
 
+        // 添加分隔符
         *p++ = sep; *p++ = ' ';
     }
 
@@ -982,6 +993,7 @@ ngx_http_variable_headers_internal(ngx_http_request_t *r,
 }
 
 
+// 处理http_*/sent_http_*等头
 static ngx_int_t
 ngx_http_variable_unknown_header_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -1027,6 +1039,7 @@ ngx_http_variable_unknown_header(ngx_http_request_t *r,
     len = 0;
 #endif
 
+    // 遍历链表
     header = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -1045,10 +1058,12 @@ ngx_http_variable_unknown_header(ngx_http_request_t *r,
             continue;
         }
 
+        // 长度不对直接跳过
         if (header[i].key.len != var->len - prefix) {
             continue;
         }
 
+        // 小写化比较
         for (n = 0; n < var->len - prefix; n++) {
             ch = header[i].key.data[n];
 
@@ -1064,10 +1079,12 @@ ngx_http_variable_unknown_header(ngx_http_request_t *r,
             }
         }
 
+        // 比较不对则跳过
         if (n != var->len - prefix) {
             continue;
         }
 
+        // 找到一个header，加上2个字节的分隔符长度
         len += header[i].value.len + 2;
 
         *ph = &header[i];
@@ -1094,6 +1111,7 @@ ngx_http_variable_unknown_header(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+    // 分配内存准备输出
     p = ngx_pnalloc(r->pool, len);
     if (p == NULL) {
         return NGX_ERROR;
