@@ -1,4 +1,26 @@
 
+Changes with nginx 1.25.5                                        16 Apr 2024
+
+    *) Feature: virtual servers in the stream module.
+
+    *) Feature: the ngx_stream_pass_module.
+
+    *) Feature: the "deferred", "accept_filter", and "setfib" parameters of
+       the "listen" directive in the stream module.
+
+    *) Feature: cache line size detection for some architectures.
+       Thanks to Piotr Sikora.
+
+    *) Feature: support for Homebrew on Apple Silicon.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: Windows cross-compilation bugfixes and improvements.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: unexpected connection closure while using 0-RTT in QUIC.
+       Thanks to Vladimir Khomutov.
+
+
 Changes with nginx 1.25.4                                        14 Feb 2024
 
     *) Security: when using HTTP/3 a segmentation fault might occur in a
