@@ -4761,7 +4761,7 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_str_t              *value, size;
     ngx_url_t               u;
-    ngx_uint_t              n, i;
+    ngx_uint_t              n, i, backlog;
     ngx_http_listen_opt_t   lsopt;
 
     // server有listen的标志位
@@ -4814,6 +4814,8 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #if (NGX_HAVE_INET6)
     lsopt.ipv6only = 1;
 #endif
+
+    backlog = 0;
 
     // 存储地址的字符串形式
     //(void) ngx_sock_ntop(&lsopt.sockaddr.sockaddr, lsopt.socklen, lsopt.addr,
@@ -4878,6 +4880,8 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                    "invalid backlog \"%V\"", &value[n]);
                 return NGX_CONF_ERROR;
             }
+
+            backlog = 1;
 
             continue;
         }
@@ -5126,9 +5130,29 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }   //for检查参数结束
 
-#if (NGX_HTTP_V3)
-
     if (lsopt.quic) {
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (lsopt.fastopen != -1) {
+            return "\"fastopen\" parameter is incompatible with \"quic\"";
+        }
+#endif
+
+        if (backlog) {
+            return "\"backlog\" parameter is incompatible with \"quic\"";
+        }
+
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+        if (lsopt.accept_filter) {
+            return "\"accept_filter\" parameter is incompatible with \"quic\"";
+        }
+#endif
+
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+        if (lsopt.deferred_accept) {
+            return "\"deferred\" parameter is incompatible with \"quic\"";
+        }
+#endif
+
 #if (NGX_HTTP_SSL)
         if (lsopt.ssl) {
             return "\"ssl\" parameter is incompatible with \"quic\"";
@@ -5141,12 +5165,14 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 #endif
 
+        if (lsopt.so_keepalive) {
+            return "\"so_keepalive\" parameter is incompatible with \"quic\"";
+        }
+
         if (lsopt.proxy_protocol) {
             return "\"proxy_protocol\" parameter is incompatible with \"quic\"";
         }
     }
-
-#endif
 
     // 加入cmcf->ports数组
     //if (ngx_http_add_listen(cf, cscf, &lsopt) == NGX_OK) {
