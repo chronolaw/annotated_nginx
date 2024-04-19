@@ -1,4 +1,27 @@
 
+Changes with nginx 1.25.4                                        14 Feb 2024
+
+    *) Security: when using HTTP/3 a segmentation fault might occur in a
+       worker process while processing a specially crafted QUIC session
+       (CVE-2024-24989, CVE-2024-24990).
+
+    *) Bugfix: connections with pending AIO operations might be closed
+       prematurely during graceful shutdown of old worker processes.
+
+    *) Bugfix: socket leak alerts no longer logged when fast shutdown was
+       requested after graceful shutdown of old worker processes.
+
+    *) Bugfix: a socket descriptor error, a socket leak, or a segmentation
+       fault in a worker process (for SSL proxying) might occur if AIO was
+       used in a subrequest.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if SSL
+       proxying was used along with the "image_filter" directive and errors
+       with code 415 were redirected with the "error_page" directive.
+
+    *) Bugfixes and improvements in HTTP/3.
+
+
 Changes with nginx 1.25.3                                        24 Oct 2023
 
     *) Change: improved detection of misbehaving clients when using HTTP/2.
