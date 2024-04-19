@@ -53,6 +53,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     struct sockaddr_in           *sin;
     ngx_stream_in_addr_t         *addr;
     ngx_stream_session_t         *s;
+    ngx_stream_conf_ctx_t        *ctx;
     ngx_stream_addr_conf_t       *addr_conf;
 #if (NGX_HAVE_INET6)
     struct sockaddr_in6          *sin6;
@@ -148,14 +149,17 @@ ngx_stream_init_connection(ngx_connection_t *c)
         return;
     }
 
+    ctx = addr_conf->default_server->ctx;
+
     // 设置会话对象的标志
     s->signature = NGX_STREAM_MODULE;
 
     //设置会话正确的配置结构体
     // addr_conf就是端口所在的server的配置数组
     // 之后就可以用宏正确地获取模块的配置信息
-    s->main_conf = addr_conf->ctx->main_conf;
-    s->srv_conf = addr_conf->ctx->srv_conf;
+    s->main_conf = ctx->main_conf;
+    s->srv_conf = ctx->srv_conf;
+    s->virtual_names = addr_conf->virtual_names;
 
     // 设置会话是否使用ssl
 #if (NGX_STREAM_SSL)
@@ -182,7 +186,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
     ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%uA %sclient %*s connected to %V",
                   c->number, c->type == SOCK_DGRAM ? "udp " : "",
-                  len, text, &addr_conf->addr_text);
+                  len, text, &c->listening->addr_text);
 
     // log的一些参数
     c->log->connection = c->number;

@@ -74,7 +74,9 @@ ngx_os_init(ngx_log_t *log)
 
     // 宏定义为64
     // 然后由ngx_cpuinfo（ngx_cpuinfo.c）来探测
-    ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+    if (ngx_cacheline_size == 0) {
+        ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+    }
 
     // 计算左移数,4k即2^12,值12
     for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }

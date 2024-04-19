@@ -77,9 +77,8 @@ typedef struct {
     socklen_t                      socklen;
     ngx_str_t                      addr_text;
 
-    /* server ctx */
-    // 监听端口所在的server{}配置数组
-    ngx_stream_conf_ctx_t         *ctx;
+    unsigned                       set:1;
+    unsigned                       default_server:1;
 
     // 已经绑定
     unsigned                       bind:1;
@@ -91,6 +90,7 @@ typedef struct {
 #if (NGX_HAVE_INET6)
     unsigned                       ipv6only:1;
 #endif
+    unsigned                       deferred_accept:1;
 
     // 在linux上提高性能的reuseport功能
     unsigned                       reuseport:1;
@@ -98,11 +98,7 @@ typedef struct {
     // 启用so_keepalive特性
     unsigned                       so_keepalive:2;
     unsigned                       proxy_protocol:1;
-#if (NGX_HAVE_KEEPALIVE_TUNABLE)
-    int                            tcp_keepidle;
-    int                            tcp_keepintvl;
-    int                            tcp_keepcnt;
-#endif
+
 
     // 内核里等待连接的队列长度
     int                            backlog;
@@ -110,89 +106,23 @@ typedef struct {
     // 1.14新增
     int                            rcvbuf;
     int                            sndbuf;
-
-    // 1.21.0
+    int                            type;
+#if (NGX_HAVE_SETFIB)
+    int                            setfib;
+#endif
 #if (NGX_HAVE_TCP_FASTOPEN)
     int                            fastopen;
 #endif
-
-    // socket的类型，SOCK_STREAM 表示TCP
-    int                            type;
-} ngx_stream_listen_t;
-
-
-// 用于解决多个server监听相同端口的情况
-// ctx里存储server{}对应的配置数组
-// 存储在ngx_listening_t.servers里
-typedef struct {
-    // ctx里存储server{}对应的配置数组
-    ngx_stream_conf_ctx_t         *ctx;
-
-    // 地址的文本形式
-    ngx_str_t                      addr_text;
-
-    unsigned                       ssl:1;
-    unsigned                       proxy_protocol:1;
-} ngx_stream_addr_conf_t;
-
-// 记录地址信息和定义端口的server{}信息
-typedef struct {
-    // in_addr_t 一般为 32位的unsigned int
-    // 其字节顺序为网络顺序（network byte ordered)
-    in_addr_t                      addr;
-
-    // ctx里存储server{}对应的配置数组
-    ngx_stream_addr_conf_t         conf;
-} ngx_stream_in_addr_t;
-
-
-#if (NGX_HAVE_INET6)
-
-typedef struct {
-    struct in6_addr                addr6;
-    ngx_stream_addr_conf_t         conf;
-} ngx_stream_in6_addr_t;
-
+#if (NGX_HAVE_KEEPALIVE_TUNABLE)
+    int                            tcp_keepidle;
+    int                            tcp_keepintvl;
+    int                            tcp_keepcnt;
 #endif
 
-
-// 给事件机制用的端口信息
-// 存储在ls->servers
-typedef struct {
-    /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
-
-    // 一个数组，里面存储了一个或多个ngx_stream_in_addr_t
-    // 在ngx_stream_add_ports里检查相同的端口添加
-    // 在ngx_stream_init_connection里使用
-    void                          *addrs;
-
-    ngx_uint_t                     naddrs;
-} ngx_stream_port_t;
-
-// 用在ngx_stream_add_ports
-// 整理在stream{}里定义的监听端口
-// 多个相同的端口会存储在addrs里
-// 用addrs[0].opt的方式得到实际的端口信息
-typedef struct {
-    int                            family;
-
-    // 监听的类型， tcp/udp
-    int                            type;
-
-    // 监听的端口，支持ipv4和ipv6
-    // in_port_t通常是uint16
-    in_port_t                      port;
-
-    // 用来保存多个相同的监听端口
-    ngx_array_t                    addrs; /* array of ngx_stream_conf_addr_t */
-} ngx_stream_conf_port_t;
-
-
-// 存储在ngx_stream_conf_port_t的addrs数组里
-// 用来保存多个相同的监听端口
-typedef struct {
-    ngx_stream_listen_t            opt;
-} ngx_stream_conf_addr_t;
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+    char                          *accept_filter;
+#endif
+} ngx_stream_listen_opt_t;
 
 // nginx 1.11.5 stream结构变动很大
 // 取消了之前固定的xxx_handler
@@ -283,9 +213,6 @@ typedef struct {
     // 里面的ctx指向了实际server的配置数组
     ngx_array_t                    servers;     /* ngx_stream_core_srv_conf_t */
 
-    // 存储server{}里定义的监听端口
-    ngx_array_t                    listen;      /* ngx_stream_listen_t */
-
     // nginx 1.11.4新增
     // ngx_stream_access_pt           realip_handler;
     // ngx_stream_access_pt    access_handler;
@@ -307,10 +234,15 @@ typedef struct {
     ngx_array_t                    prefix_variables; /* ngx_stream_variable_t */
     ngx_uint_t                     ncaptures;
 
+    ngx_uint_t                     server_names_hash_max_size;
+    ngx_uint_t                     server_names_hash_bucket_size;
+
     ngx_uint_t                     variables_hash_max_size;
     ngx_uint_t                     variables_hash_bucket_size;
 
     ngx_hash_keys_arrays_t        *variables_keys;
+
+    ngx_array_t                   *ports;
 
     // stream模块的handler都添加在这里
     ngx_stream_phase_t             phases[NGX_STREAM_LOG_PHASE + 1];
@@ -331,6 +263,10 @@ typedef struct {
     // nginx 1.11.5改为专门的content handler
     // 之前会有post_accept、access等处理
     // ngx_stream_content_handler_pt  handler;
+
+    /* array of the ngx_stream_server_name_t, "server_name" directive */
+    ngx_array_t                    server_names;
+
     ngx_stream_content_handler_pt  handler;
 
     // 保存模块的配置结构体，其中的main指向stream里
@@ -340,6 +276,8 @@ typedef struct {
     // 记录server{}块定义所在的文件和行号
     u_char                        *file_name;
     ngx_uint_t                     line;
+
+    ngx_str_t                      server_name;
 
     // 使用nodelay特性
     ngx_flag_t                     tcp_nodelay;
@@ -355,8 +293,96 @@ typedef struct {
 
     ngx_msec_t                     proxy_protocol_timeout;
 
-    ngx_uint_t                     listen;  /* unsigned  listen:1; */
+    unsigned                       listen:1;
+#if (NGX_PCRE)
+    unsigned                       captures:1;
+#endif
 } ngx_stream_core_srv_conf_t;
+
+
+/* list of structures to find core_srv_conf quickly at run time */
+
+
+typedef struct {
+#if (NGX_PCRE)
+    ngx_stream_regex_t            *regex;
+#endif
+    ngx_stream_core_srv_conf_t    *server;   /* virtual name server conf */
+    ngx_str_t                      name;
+} ngx_stream_server_name_t;
+
+
+typedef struct {
+    ngx_hash_combined_t            names;
+
+    ngx_uint_t                     nregex;
+    ngx_stream_server_name_t      *regex;
+} ngx_stream_virtual_names_t;
+
+
+typedef struct {
+    /* the default server configuration for this address:port */
+    ngx_stream_core_srv_conf_t    *default_server;
+
+    ngx_stream_virtual_names_t    *virtual_names;
+
+    unsigned                       ssl:1;
+    unsigned                       proxy_protocol:1;
+} ngx_stream_addr_conf_t;
+
+
+typedef struct {
+    in_addr_t                      addr;
+    ngx_stream_addr_conf_t         conf;
+} ngx_stream_in_addr_t;
+
+
+#if (NGX_HAVE_INET6)
+
+typedef struct {
+    struct in6_addr                addr6;
+    ngx_stream_addr_conf_t         conf;
+} ngx_stream_in6_addr_t;
+
+#endif
+
+
+typedef struct {
+    /* ngx_stream_in_addr_t or ngx_stream_in6_addr_t */
+    void                          *addrs;
+    ngx_uint_t                     naddrs;
+} ngx_stream_port_t;
+
+
+typedef struct {
+    int                            family;
+    int                            type;
+    in_port_t                      port;
+    ngx_array_t                    addrs; /* array of ngx_stream_conf_addr_t */
+} ngx_stream_conf_port_t;
+
+
+typedef struct {
+    ngx_stream_listen_opt_t        opt;
+
+    unsigned                       protocols:3;
+    unsigned                       protocols_set:1;
+    unsigned                       protocols_changed:1;
+
+    ngx_hash_t                     hash;
+    ngx_hash_wildcard_t           *wc_head;
+    ngx_hash_wildcard_t           *wc_tail;
+
+#if (NGX_PCRE)
+    ngx_uint_t                     nregex;
+    ngx_stream_server_name_t      *regex;
+#endif
+
+    /* the default server configuration for this address:port */
+    ngx_stream_core_srv_conf_t    *default_server;
+    ngx_array_t                    servers;
+                                      /* array of ngx_stream_core_srv_conf_t */
+} ngx_stream_conf_addr_t;
 
 
 // 类似ngx_http_request_t，表示tcp通信的会话
@@ -389,6 +415,8 @@ struct ngx_stream_session_s {
     // 数组指针，存储每个stream模块的srv配置
     // s->srv_conf = addr_conf->ctx->srv_conf;
     void                         **srv_conf;
+
+    ngx_stream_virtual_names_t    *virtual_names;
 
     // 连接上游相关的信息，用于转发请求
     // 里面有如何获取负载均衡server、上下游buf等
@@ -505,6 +533,9 @@ typedef struct {
 #define NGX_STREAM_WRITE_BUFFERED  0x10
 
 
+ngx_int_t ngx_stream_add_listen(ngx_conf_t *cf,
+    ngx_stream_core_srv_conf_t *cscf, ngx_stream_listen_opt_t *lsopt);
+
 // 启动引擎数组处理请求
 // 从phase_handler的位置开始调用模块处理
 void ngx_stream_core_run_phases(ngx_stream_session_t *s);
@@ -516,6 +547,10 @@ ngx_int_t ngx_stream_core_preread_phase(ngx_stream_session_t *s,
 ngx_int_t ngx_stream_core_content_phase(ngx_stream_session_t *s,
     ngx_stream_phase_handler_t *ph);
 
+ngx_int_t ngx_stream_validate_host(ngx_str_t *host, ngx_pool_t *pool,
+    ngx_uint_t alloc);
+ngx_int_t ngx_stream_find_virtual_server(ngx_stream_session_t *s,
+    ngx_str_t *host, ngx_stream_core_srv_conf_t **cscfp);
 
 // 在ngx_stream_optimize_servers里设置有连接发生时的回调函数
 // 创建一个处理tcp的会话对象
