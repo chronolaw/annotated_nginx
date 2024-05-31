@@ -1,4 +1,27 @@
 
+Changes with nginx 1.27.0                                        29 May 2024
+
+    *) Security: when using HTTP/3, processing of a specially crafted QUIC
+       session might cause a worker process crash, worker process memory
+       disclosure on systems with MTU larger than 4096 bytes, or might have
+       potential other impact (CVE-2024-32760, CVE-2024-31079,
+       CVE-2024-35200, CVE-2024-34161).
+       Thanks to Nils Bars of CISPA.
+
+    *) Feature: variables support in the "proxy_limit_rate",
+       "fastcgi_limit_rate", "scgi_limit_rate", and "uwsgi_limit_rate"
+       directives.
+
+    *) Bugfix: reduced memory consumption for long-lived requests if "gzip",
+       "gunzip", "ssi", "sub_filter", or "grpc_pass" directives are used.
+
+    *) Bugfix: nginx could not be built by gcc 14 if the --with-atomic
+       option was used.
+       Thanks to Edgar Bonet.
+
+    *) Bugfixes in HTTP/3.
+
+
 Changes with nginx 1.25.5                                        16 Apr 2024
 
     *) Feature: virtual servers in the stream module.
