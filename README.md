@@ -25,14 +25,14 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * [Angie](https://github.com/webserver-llc/angie)
 
 # 当前状态
-Nginx 1.25.5
+Nginx 1.27.0
 
 # Git分支
 分支    |说明   |注释
 --------|-------|-----
-master  | Nginx开发版1.25.5|有
-mainline| Nginx开发版1.25.5|无
-stable  | Nginx稳定版1.24.0|无
+master  | Nginx开发版1.27.0|有
+mainline| Nginx开发版1.27.0|无
+stable  | Nginx稳定版1.26.0|无
 
 # 已注解
 
