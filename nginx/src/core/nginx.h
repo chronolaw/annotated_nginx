@@ -12,8 +12,8 @@
 // version number format
 // 1'015'005
 
-#define nginx_version      1027000
-#define NGINX_VERSION      "1.27.0"
+#define nginx_version      1027001
+#define NGINX_VERSION      "1.27.1"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 // nginx 1.7之后添加--build=Name选项

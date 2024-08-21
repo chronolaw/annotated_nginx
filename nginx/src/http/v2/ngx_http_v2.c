@@ -314,6 +314,12 @@ ngx_http_v2_init(ngx_event_t *rev)
     // 原来存的是配置数组，现在是http2结构
     c->data = h2c;
 
+    // 1.27.1
+    if (ngx_exiting) {
+        ngx_http_v2_finalize_connection(h2c, NGX_HTTP_V2_NO_ERROR);
+        return;
+    }
+
     // 读写handler用http2的
     rev->handler = ngx_http_v2_read_handler;
 
