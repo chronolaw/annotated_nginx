@@ -1,4 +1,20 @@
 
+Changes with nginx 1.27.1                                        14 Aug 2024
+
+    *) Security: processing of a specially crafted mp4 file by the
+       ngx_http_mp4_module might cause a worker process crash
+       (CVE-2024-7347).
+       Thanks to Nils Bars.
+
+    *) Change: now the stream module handler is not mandatory.
+
+    *) Bugfix: new HTTP/2 connections might ignore graceful shutdown of old
+       worker processes.
+       Thanks to Kasei Wang.
+
+    *) Bugfixes in HTTP/3.
+
+
 Changes with nginx 1.27.0                                        29 May 2024
 
     *) Security: when using HTTP/3, processing of a specially crafted QUIC
@@ -15,7 +31,7 @@ Changes with nginx 1.27.0                                        29 May 2024
     *) Bugfix: reduced memory consumption for long-lived requests if "gzip",
        "gunzip", "ssi", "sub_filter", or "grpc_pass" directives are used.
 
-    *) Bugfix: nginx could not be built by gcc 14 if the --with-atomic
+    *) Bugfix: nginx could not be built by gcc 14 if the --with-libatomic
        option was used.
        Thanks to Edgar Bonet.
 
