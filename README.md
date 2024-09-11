@@ -22,6 +22,7 @@ Nginx源码分析，注解代码，帮助学习Nginx。
 * [openresty_dev](https://github.com/chronolaw/openresty_dev)
 * [favorite-nginx](https://github.com/chronolaw/favorite-nginx)
 * [ngx_google_perftools_profiler](https://github.com/chronolaw/ngx_google_perftools_profiler_module)
+* [Nginx on github](https://github.com/nginx/nginx)
 * [Angie](https://github.com/webserver-llc/angie)
 
 # 当前状态
